@@ -1,0 +1,138 @@
+﻿@page "/forecast"
+@using StandardCommon
+
+<div style="width: 100%">
+<div class="chart-block">
+<h4><span>COVID-19</span> <span>重症者数グラフ</span> <span>（予測日：@(forecastData.RealEndDateStr)）</span></h4>
+@(forecastData.LastPredicDateStr)の予測値： @(forecastData.LastPredicSerious._formatComma())名
+@* Chart の Canvas *@
+<div class="scrollableChartWrapper" style="" id="chart-wrapper-serious">
+    <div id="scrollWrapper-sc">
+        <canvas id="seriousChart"></canvas>
+    </div>
+    <canvas id="sc-yAxis1" style="left: 0" width="0"></canvas>
+    <canvas id="sc-yAxis2" style="right: 0" width="0"></canvas>
+</div>
+</div>
+
+<div class="chart-block right-block">
+<h4><span>COVID-19</span> <span>死亡者数グラフ</span> <span>（予測日：@(forecastData.RealEndDateStr)）</span></h4>
+@(forecastData.LastPredicDateStr)の予測値： @(forecastData.LastPredicDeath._formatComma())名
+@* Chart の Canvas *@
+<div class="scrollableChartWrapper" style="" id="chart-wrapper-death">
+    <div id="scrollWrapper">
+        <canvas id="deathChart"></canvas>
+    </div>
+    <canvas id="yAxis1" style="left: 0" width="0"></canvas>
+    <canvas id="yAxis2" style="right: 0" width="0"></canvas>
+</div>
+</div>
+</div>
+
+@code{
+    private static string[] _ages = new string[] { "＜10歳", "10代", "20代", "30代", "40代", "50代", "60代", "70代", "≧80歳" };
+}
+
+<div style="margin-top:20px">
+<div class="table table-block">
+<h5>想定重症化率</h5>
+<div class="tbl-scroll">
+<table class="table">
+    <thead>
+        <tr style="text-align: center">
+            <th>期日</th>
+            @foreach (var age in _ages) { <th>@age</th> }
+            <th>日数</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var rates in forecastData.SeriousRatesByAges.DataSeriesList) {
+            <tr style="text-align: right">
+                <td>@(rates.Date.ToString("M月d日"))</td>
+                @foreach (var rate in rates.DataSeries) {
+                    <td>@String.Format("{0:f1}%", rate * 100)</td>
+                }
+                <td>@(rates.OffsetDays)</td>
+            </tr>
+        }
+    </tbody>
+</table>
+</div>
+</div>
+
+<div class="table table-block">
+<h5>想定死亡率</h5>
+<div class="tbl-scroll">
+<table class="table">
+    <thead>
+        <tr style="text-align: center">
+            <th>期日</th>
+            @foreach (var age in _ages) { <th>@age</th> }
+            <th>日数</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var rates in forecastData.DeathRatesByAges.DataSeriesList) {
+            <tr style="text-align: right">
+                <td>@(rates.Date.ToString("M月d日"))</td>
+                @foreach (var rate in rates.DataSeries) {
+                    <td>@String.Format("{0:f1}%", rate * 100)</td>
+                }
+                <td>@(rates.OffsetDays)</td>
+            </tr>
+        }
+    </tbody>
+</table>
+</div>
+</div>
+
+<div class="table table-block">
+<h5>年代別の陽性者割合（直近3週間）</h5>
+<div class="tbl-scroll">
+<table class="table">
+    <thead>
+        <tr style="text-align: center">
+            <th>期日</th>
+            @foreach (var age in _ages) { <th>@age</th> }
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var rates in forecastData.InfectRatesByAges.DataSeriesList.TakeLast(4)) {
+            <tr style="text-align: right">
+                <td>@(rates.Date.ToString("M月d日"))</td>
+                @foreach (var rate in rates.DataSeries) {
+                    <td>@String.Format("{0:f1}%", rate * 100)</td>
+                }
+            </tr>
+        }
+    </tbody>
+</table>
+</div>
+</div>
+
+<div class="table-block">
+<h5>想定改善率</h5>
+<table class="table">
+    <thead>
+        <tr style="text-align: center">
+            <th>期日</th>
+            <th>改善率</th>
+            <th>日数</th>
+        </tr>
+    </thead>
+    <tbody>
+        @foreach (var rates in forecastData.RecoverRates.DataSeriesList) {
+            <tr style="text-align: right">
+                <td>@(rates.Date.ToString("M月d日"))</td>
+                <td>@String.Format("{0:f1}%", rates.DataSeries[0] * 100)</td>
+                <td>@(rates.OffsetDays)</td>
+            </tr>
+        }
+    </tbody>
+</table>
+</div>
+
+</div>
+
+<div id="static-description2"></div>
+

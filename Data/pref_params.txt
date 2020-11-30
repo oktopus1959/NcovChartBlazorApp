@@ -1,0 +1,8 @@
+#order,All,Tokyo,Osaka
+#params,全国,All,3000,2.5,,21,0
+#params,東京都,Tokyo,600,2.5,,17,0
+#params,大阪府,Osaka,500,2.5,,17,0
+#params,北海道,Hokkaido,,,2020/11/13,13,7
+2020/11/27,全国,All,2520
+2020/11/27,東京都,Tokyo,570
+2020/11/27,大阪府,Osaka,383

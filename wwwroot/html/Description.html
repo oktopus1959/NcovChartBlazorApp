@@ -1,0 +1,50 @@
+﻿<div>
+    <p></p>
+    <h6>【使い方】</h6>
+    <div class="less-indent">
+        <p>「＋」「－」ボタンをクリックすると、棒グラフの幅を増減できます。（注）</p>
+        <p>「予想曲線表示」を選択すると、実効再生産数(Rt)の予想値から計算した陽性者数移動平均曲線を表示します。</p>
+    </div>
+
+    <p class="normal-margin"></p>
+    <h6>【説明】</h6>
+    <div class="less-indent">
+        <p> 当アプリは、いったんピークをつけた実効再生産数(Rt)の減衰に伴い、新規陽性者数がどのように増減するかをグラフ表示するものです。<br/>
+            あくまでも想定した Rt 減衰曲線に基づいて簡単な計算により予想移動平均を計算しているものであり、
+            新規陽性者数がこのグラフの通りに推移することを保証するものではありません。<br/>
+            利用者自身が「基準日」「日数」「減衰度」を設定することにより、今後の陽性者数の増減傾向をあらかじめ把握していただくためのアプリとお考えください。</p>
+
+    </div>
+    <div class="less-indent">
+        <p style="margin-top: 10px"> 「基準日」は、予想曲線の表示開始日となります。利用者が設定しない場合は、システム既定値（または直近で Rt が最大となる日）を使用します。<br />
+            基準日から「Rtが1になるまでの日数」が経過したところで Rt が1になるように Rt を減衰させます。<br />
+            「減衰度」が大きいほど Rt が早く1に近づきます（やや太い横線が Rt=1 を表わしています）。<br/>
+            「RESET」ボタンをクリックすると、各パラメータをシステム既定値で初期化します。</p>
+
+        <p style="margin-top: 10px">上記のように計算した予想 Rt から移動平均を逆算し、さらにそれの7日移動平均をとって平滑化して、これを予想移動平均としてグラフ表示します。</p>
+
+        <p style="margin-top: 10px">「推計陽性者数表示」を選択すると、過去3週間における同曜日の増減傾向を予想移動平均に掛け合わせて推計値を算出し、グレーの棒グラフで表示します。この推計値は目安程度にお考えください。</p>
+
+        <p style="margin-top: 10px">
+            実効再生産数の計算式は、<a href="https://toyokeizai.net/sp/visual/tko/covid19/" target="_blank">東洋経済のサイト</a>と同じものを使わせていただいています。<br />
+            これは、西浦先生の資料「<a href="https://github.com/contactmodel/COVID19-Japan-Reff/blob/master/nishiura_Rt%E4%BC%9A%E8%AD%B0_12May2020.pdf" target="_blank">実効再生産数とその周辺</a>」の
+            p.29「幾何級数的増殖モデルが教えてくれること」で説明されている式で、「Δt = 7」「μ = 5」として得られる式となっています。
+        </p>
+    </div>
+
+    <p class="normal-margin"></p>
+    <h6>【注意】</h6>
+    <div class="less-indent">
+        <p>iPhone 7 以前の機種で Safari を使用している場合、棒グラフの幅を 1 以上にするとグラフ表示が出来なくなるようです。</p>
+        <p>当アプリの仕様は予告なく変更されます。</p>
+    </div>
+
+    <p class="normal-margin"></p>
+    <h6>【データソース】</h6>
+    <div class="less-indent">
+        <p>全国 = <a href="https://www.mhlw.go.jp/stf/covid-19/open-data.html" target="_blank">厚生労働省 オープンデータ(陽性者数)</a></p>
+        <p>各都道府県 = <a href="https://github.com/kaz-ogiwara/covid19" target="_blank">github.com/kaz-ogiwara/covid19/data/prefectures.csv</a> （&copy;東洋経済オンライン「新型コロナウイルス 国内感染の状況」制作：荻原和樹）</p>
+        (ただし全国や東京など、最新日については報道機関による速報値を追加している自治体もあり)
+    </div>
+
+</div>

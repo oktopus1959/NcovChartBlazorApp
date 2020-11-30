@@ -1,0 +1,22 @@
+﻿@page "/about"
+
+@using StandardCommon
+
+@inject IJSRuntime JSRuntime
+
+@code{
+    private async Task insertStaticDescription()
+    {
+        var html = Helper.GetFileContent("wwwroot/html/About.html", System.Text.Encoding.UTF8);
+        if (html._notEmpty()) await JSRuntime.InvokeAsync<string>("insertAboutDescription", html);
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) {
+            await insertStaticDescription();
+        }
+    }
+}
+
+<div id="about-description"></div>

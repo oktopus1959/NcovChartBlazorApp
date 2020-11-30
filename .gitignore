@@ -1,0 +1,14 @@
+.vs/
+bin/
+obj/
+log/
+run/
+work/
+Data/csv/
+Data/covid19/
+Data/work/
+*.save
+*.sav
+*.back
+*.bak
+*.swp

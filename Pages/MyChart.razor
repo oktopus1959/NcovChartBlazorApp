@@ -1,0 +1,102 @@
+﻿@page "/"
+@using ChartBlazorApp.Models
+@using Newtonsoft.Json
+@using ChartBlazorApp.JsInteropClasses
+@using StandardCommon
+ 
+@*@inject IJSRuntime JSRuntime*@
+@*@inject ChartBlazorApp.Models.DailyData dailyData*@
+
+@code { 
+    // グラフ表示の最終日
+    private string _endDate = "2021/5/31";
+
+    private const int _mainPrefNum = 3;
+}
+
+<h4><span>新型コロナ</span> <span>新規陽性者数グラフ</span> <span style="white-space: nowrap">（2020年6月～）</span></h4>
+  <div class="vertical-align" style="margin-top: 1em; line-height: 1.5em">
+    @* 全国、東京、大阪、北海道 *@
+    @for (int i = 0; i < _mainPrefNum; ++i) {
+        var v = _getTitle(i);
+        <div class="inline-wrapper">
+        <span style="vertical-align: middle;">
+            <label for="@v">
+            <input type="radio" name="chart-data-id" id="@v" value="@i" @onchange="ChangeChart" checked="@(_radioIdx == i)"/>
+            <span style="font-size: 1.25em; color: @(_radioIdx == i ? "darkgreen" : "rgb(30,30,30)");">@v</span>
+            </label>
+        </span>
+        </div>
+    }
+    @* その他の府県 *@
+    <div class="inline-wrapper" style="margin-top:0px;">
+        <span style="vertical-align: middle;">
+            <label for="その他">
+            <input type="radio" name="chart-data-id" id="その他" value="@_mainPrefNum" @onchange="ChangeChart" checked="@(_radioIdx == _mainPrefNum)"/>
+            <span style="font-size: 1.25em; color: @(_radioIdx == 3 ? "darkgreen" : "rgb(30,30,30)");">その他 </span>
+            </label>
+            @*<select class="mt-0 mb-1" style="padding: 1px" name="other-pref" value="@_prefIdx" @onchange="ChangePref" disabled="@(_radioIdx != _mainPrefNum)">*@
+            <select class="mt-0 mb-1" style="padding: 2px;" name="other-pref" value="@_prefIdx" @onchange="ChangePref">
+                @for (int i = _mainPrefNum; i < _infectDataCount; ++i) { <option value="@i" selected="@(i == _prefIdx)">@_getTitle(i)</option> }
+            </select>
+        </span>
+    </div>
+    <span><button class="btn btn-primary py-0 mt-0 mb-1" @onclick="RenderReloadMethod">RELOAD</button></span>
+  </div>
+
+@* Chart の Canvas *@
+<div class="scrollableChartWrapper" id="chart-wrapper-home" style="margin-top: 10px;">
+    <div id="scrollWrapper">
+        <canvas id="myChart_0"></canvas>
+    </div>
+    <canvas id="yAxis1" style="left: 0" width="0"></canvas>
+    <canvas id="yAxis2" style="right: 0" width="0"></canvas>
+</div>
+
+<div class="vertical-align" style="margin-top: 1.5em; line-height: 1.5em">
+    @* バーの太さを増減させるボタン*@
+    <div class="inline-wrapper"><span>棒グラフの幅：</span>
+    <button class="btn btn-primary btn-sm py-0" @onclick="RenderThinChartBarMethod">－</button>
+    <span>[ @_barWidth ]</span>
+    <button class="btn btn-primary btn-sm py-0" @onclick="RenderThickChartBarMethod">＋</button></div>
+    @* 左Y軸の最大値を選択するドロップダウン *@
+    <div class="inline-wrapper"><span>左Ｙ軸最大値：</span>
+    <select style="padding: 1px" name="yAxisMax" value="@_yAxisMax" @onchange="ChangeYAxisMax">
+        @for (int n = 10000; n > 5000; n -= 1000) { <option value="@n" selected="@(n == _yAxisMax)">@n</option> }
+        @for (int n = 5000; n > 1000; n -= 500) { <option value="@n" selected="@(n == _yAxisMax)">@n</option> }
+        @for (int n = 1000; n >= 100; n -= 100) { <option value="@n" selected="@(n == _yAxisMax)">@n</option> }
+        @for (int n = 50; n >= 20; n -= 30) { <option value="@n" selected="@(n == _yAxisMax)">@n</option> }
+    </select></div>
+    <span id="for-debug-print"></span>
+</div>
+
+@code{ private string _fontColor(bool enabled) { return enabled ? null : "grey"; } }
+
+<div class="vertical-align" style="margin-top: 1.0em; line-height: 1.5em">
+    <div class="inline-wrapper">
+        <label for="gompertz">
+            <input type="checkbox" name="gompertz" id="gompertz" @onchange="RenderGompertzCurveMethod" checked="@(_drawGompertz)"  />
+            予想曲線表示
+        </label></div>
+    <div class="inline-wrapper">
+        <label for="estimated-bar">
+            <input type="checkbox" name="estimated-bar" id="estimated-bar" @onchange="RenderEstimatedBarMethod" checked="@(_estimatedBar)" disabled="@(!_drawGompertz)" />
+            <span class="@_fontColor(_drawGompertz)">推計陽性者数表示</span>
+        </label></div>
+    <div class="indent2">
+        <div class="inline-wrapper"><span class="@_fontColor(_drawGompertz)">基準日：</span>
+            <input type="text" class="text-date" name="h" value="@_paramDate" @onchange="ChangeGompertzParamDate" disabled="@(!_drawGompertz)"/></div>
+        <div class="inline-wrapper"><span class="@_fontColor(_drawGompertz)">Rtが1になるまでの日数：</span>
+            <input type="text" class="text-number-short" name="h" value="@_paramDaysToOne" @onchange="ChangeRtParamDaysToOne" disabled="@(!_drawGompertz)"/></div>
+        <div class="inline-wrapper"><span class="@_fontColor(_drawGompertz)">減衰度：</span>
+        <select style="padding: 1px" name="decay-factory" value="@_paramDecayFactor" @onchange="ChangeRtParamDecayFactor" disabled="@(!_drawGompertz)">
+            @foreach ((var i, var v) in _decayFactors._enumerate()) {
+                <option value="@v" selected="@(v == _paramDecayFactor)">@i</option>
+            }
+        </select></div>
+        <div class="inline-or-block"><button class="btn btn-primary btn-sm py-0" @onclick="InitializeParams" disabled="@(!_drawGompertz)">RESET</button></div>
+    </div>
+</div>
+
+<div id="static-description" style="margin-top: 20px;"></div>
+

@@ -1,0 +1,57 @@
+﻿@page "/"
+@namespace ChartBlazorApp.Pages
+@addTagHelper *, Microsoft.AspNetCore.Mvc.TagHelpers
+@{
+    Layout = null;
+}
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="keywords" content="新型コロナウイルス,グラフ,実効再生産数,重症者数予測,死亡者数予測" />
+    <title>新型コロナ 新規陽性者数グラフ（2020年6月～）</title>
+    <base href="~/" />
+    <link rel="stylesheet" href="css/bootstrap/bootstrap.min.css" />
+    <link href="css/site.css" rel="stylesheet" />
+    <style>
+    </style>
+</head>
+<body>
+    <div id="components-reconnect-modal" class="my-reconnect-modal components-reconnect-hide">
+        <div class="show"><p>サーバに接続しています...</p></div>
+        <div class="failed"><p>メンテナンスのためにサーバが再起動した可能性があります。<br/>しばらく待ってからページを<a href="javascript:location.reload()">リロード</a>してください。</p></div>
+        <div class="rejected"><p>サーバとの接続が切れました。<br/>ページを<a href="javascript:location.reload()">リロード</a>してください。</p></div>
+    </div>
+
+    <div>
+        @* see: https://docs.microsoft.com/ja-jp/aspnet/core/blazor/fundamentals/additional-scenarios?view=aspnetcore-3.1 *@
+        @*<component type="typeof(App)" render-mode="ServerPrerendered" />*@
+        <component type="typeof(App)" render-mode="Server" />
+    </div>
+
+    <div id="blazor-error-ui">
+        <environment include="Staging,Production">
+            An error has occurred. This application may no longer respond until reloaded.
+        </environment>
+        <environment include="Development">
+            An unhandled exception has occurred. See browser dev tools for details.
+        </environment>
+        <a href="" class="reload">Reload</a>
+        <a class="dismiss">🗙</a>
+    </div>
+
+    <div style="padding-left: 2em; padding-bottom: 10px">
+        <hr />
+        <div class="inline-wrapper" style="margin-bottom: 4px"><span><a href="/">新規陽性者数</a></span></div>
+        <div class="inline-wrapper" style="margin-bottom: 4px"><span><a href="/forecast">重症者数予測・死亡者数予測</a></span></div>
+        <div class="inline-wrapper" style="margin-bottom: 4px"><span><a href="/about">作者</a></span></div>
+    </div>
+
+    <script src="_framework/blazor.server.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.9.3/Chart.min.js"></script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-annotation/0.5.7/chartjs-plugin-annotation.min.js'></script>
+    <script src="~/script/DrawChart.js"></script>
+</body>
+</html>
