@@ -51,5 +51,25 @@ $ ./update_data.sh --load
 簡単に実行したい場合は、 dotnet run を使ってください。
 
 ```sh
-$ dotnet run
+$ dotnet run --urls "http://0.0.0.0:5000;https://0.0.0.0:5001"
 ```
+
+上記のように `--urls "http://0.0.0.0:5000;https://0.0.0.0:5001"` オプションを付けて起動すると
+localhost 以外からもアクセスできるようになります。
+
+## ライセンスなど
+プログラムのソースコードについては完全フリーとします。商用含め、いかなる用途に使用していただいても構いません。
+ただし、使用した結果について、作者は一切の責を免れるものとします。
+
+Data/ 配下の
+
+- death_rate.txt
+- recover_rate.txt
+- serious_rate.txt
+
+については、公開する著作物の一部としてこれらを利用される際は
+[Qiitaアカウント(@okatako)](https://qiita.com/okatako)
+または [Twitterアカウント(@oktopus59)](https://twitter.com/oktopus59) までご一報ください。
+
+以上
+
