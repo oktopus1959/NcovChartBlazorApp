@@ -34,8 +34,9 @@ namespace ChartBlazorApp.Pages
 
         private async Task insertStaticDescription()
         {
-            var html = Helper.GetFileContent("wwwroot/html/Description2.html", System.Text.Encoding.UTF8);
-            if (html._notEmpty()) await JSRuntime.InvokeAsync<string>("insertStaticDescription2", html);
+            //var html = Helper.GetFileContent("wwwroot/html/Description2.html", System.Text.Encoding.UTF8);
+            //if (html._notEmpty()) await JSRuntime.InvokeAsync<string>("insertStaticDescription2", html);
+            await JSRuntime.InvokeAsync<string>("selectDescription", "forecast-page");
         }
 
         /// <summary>
@@ -52,7 +53,7 @@ namespace ChartBlazorApp.Pages
             if (firstRender) {
                 await insertStaticDescription();
                 //await getSettings();
-                _infectData.PredictValuesEx(null, forecastData.FullDays(_infectData.Dates._first()));
+                _infectData.PredictValuesEx(null, forecastData.FullDays(_infectData.Dates._first()), forecastData.PredictStartDate);
                 await RenderDeathAndSeriousChart();
                 StateHasChanged();
             }

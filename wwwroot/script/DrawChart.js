@@ -10,6 +10,16 @@ function insertAboutDescription(html) {
     document.getElementById("about-description").innerHTML = html;
 }
 
+function showOrHideDiv(descDivId, targetId) {
+    document.getElementById(targetId).style.display = descDivId == targetId ? "block" : "none";
+}
+
+function selectDescription(descDivId) {
+    showOrHideDiv(descDivId, "home-page");
+    showOrHideDiv(descDivId, "forecast-page");
+    showOrHideDiv(descDivId, "about-page");
+}
+
 const readAsTextReader = file => {
     const reader = new FileReader();
 
@@ -203,6 +213,7 @@ function ChartDrawer(wrapperId) {
 
     this.wrapperId = wrapperId;
     this.myChart = null;
+    //this.eventListenerAdded = false;
 
     this.render = (barWidth, scrollRate, chartJson) => {
         //console.log('ENTER: render(' + barWidth + ',' + scrollRate + ', ...)');
@@ -259,7 +270,7 @@ function ChartDrawer(wrapperId) {
 
         // RtBaseline および名前無しを凡例に表示しない
         chartData.options.legend.labels = {
-            filter: function(item) { return nameFilter(item.text); }
+            filter: function (item) { return nameFilter(item.text); }
         }
 
         // RtBaseline および名前無しをツールチップに表示しない
@@ -275,8 +286,154 @@ function ChartDrawer(wrapperId) {
             return (order1 < order2) ? -1 : (order1 > order2) ? 1 : 0;
         }
 
+        // ツールチップラベルの編集
+        //chartData.options.tooltips.callbacks = {
+        //    label: function (item, data) {
+        //        var dataset = data.datasets[item.datasetIndex];
+        //        return dataset ? dataset.label.trim() : "";
+        //    }
+        //};
+
+        var chartWidth = this.chartWidth;
+        var chartHeight = this.chartHeight;
+        function _customFixedOrHighest(elements, isHighest) {
+            // 上から120pxの高さのところを返す。
+            // core.tooltip.jsを参照。
+            if (!elements.length) {
+                return false;
+            }
+            var tooltip = this;
+            //console.log(tooltip);
+            //console.log(elements);
+            //console.log(eventPosition);
+
+            var i, len;
+            var count = 0;
+            var xpos = 0;
+            var ymax = 10000;
+            for (i = 0, len = elements.length; i < len; ++i) {
+                var label = elements[i]._chart.config.data.datasets[elements[i]._datasetIndex].label;
+                if (label && label.trim()) {
+                    var el = elements[i];
+                    if (el && el.hasValue()) {
+                        //console.log(label);
+                        var pos = el.tooltipPosition();
+                        if (pos.x) xpos = pos.x;
+                        if (pos.y && pos.y > 0) {
+                            ++count;
+                            if (pos.y < ymax) ymax = pos.y;
+                        }
+                    }
+                }
+            }
+            if (xpos > 0) {
+                var ypos = (count + 1) * 14 + 16;
+                //console.log("ChartWidth:" + chartWidth + ", xpos:" + xpos + ", ypos:" + ypos + ", count:" + count);
+                return {
+                    x: Math.round(xpos - (xpos >= chartWidth / 2 ? 8 : -8)),
+                    y: Math.round(isHighest && ymax > ypos ? ymax : ypos)
+                };
+            } else {
+                return false;
+            }
+        }
+
+        // ツールチップの表示位置のカスタム関数を登録
+        Chart.Tooltip.positioners.customFixed = function (elements, eventPosition) {
+            return _customFixedOrHighest(elements, false);
+        }
+
+        // ツールチップの表示位置のカスタム関数を登録
+        Chart.Tooltip.positioners.customHighest = function (elements, eventPosition) {
+            return _customFixedOrHighest(elements, true);
+        }
+
+        function _customAverage(elements, startIdx, length) {
+            // startIdx から length 個の要素の平均。length <= 0 なら elements[elements.length+length-1]要素まで。
+            // core.tooltip.jsを参照。
+            if (!elements.length || startIdx < 0 || startIdx >= elements.length) {
+                console.log("elements.length: " + elements.length + ", startIdx: " + startIdx);
+                return false;
+            }
+            var endIdx = startIdx + (length > 0 ? length : elements.length + length);
+            if (endIdx < 0 || endIdx >= elements.length) {
+                console.log("elements.length: " + elements.length + ", startIdx: " + startIdx + ", length: " + length);
+                return false;
+            }
+
+            var i;
+            var count = 0;
+            var xpos = 0;
+            var ypos = 0;
+            for (i = startIdx; i < endIdx; ++i) {
+                var el = elements[i];
+                if (el && el.hasValue()) {
+                    var pos = el.tooltipPosition();
+                    if (pos.y && pos.y > 0) {
+                        xpos += pos.x;
+                        ypos += pos.y;
+                        ++count;
+                    }
+                }
+            }
+            if (xpos > 0) {
+                //console.log("ChartWidth:" + chartWidth + ", xpos:" + xpos + ", ypos:" + ypos);
+                xpos /= count;
+                ypos /= count;
+                return {
+                    x: Math.round(xpos - (xpos >= chartWidth / 2 ? 8 : -8)),
+                    y: Math.round(ypos)
+                };
+            } else {
+                return false;
+            }
+        }
+
+        // ツールチップの表示位置のカスタム関数を登録
+        Chart.Tooltip.positioners.customAverage = function (elements, eventPosition) {
+            var _options = this._options;
+            //console.log(this);
+            //console.log("customAverage: _startIdx=" + _options._startIdx + ", _endIdx=" + _options._endIdx);
+            return _customAverage(elements, _options._startIdx, _options._endIdx);
+        }
+
         //console.log('new Chart');
         this.myChart = new Chart(this.ctxChart, chartData);
+
+        //console.log(window.innerWidth);
+        //console.log(window.innerHeight);
+        //console.log(chartData.options._tooltipsHide);
+
+        //var myChart = this.myChart;
+        //var cvsChart = this.cvsChart;
+        //cvsChart._tooltipsHide = myChart.options._tooltipsHide;
+        //function mousemoveListener(e) {
+        //    //console.log(this._tooltipsHide);
+        //    if (this._tooltipsHide && window.innerWidth > 640 && window.innerHeight > 640) {
+        //        var ptrCvsY = e.clientY - cvsChart.getBoundingClientRect().top;
+        //        //console.log(ptrCvsY);
+        //        myChart.options.tooltips.enabled = (ptrCvsY < 360);
+        //    }
+        //}
+        //function mouseclickListener(e) {
+        //    if (this._tooltipsHide) {
+        //        //console.log(cvsChart);
+        //        //console.log(cvsChart.getBoundingClientRect().top);
+        //        //console.log(e);
+        //        var ptrCvsY = e.clientY - cvsChart.getBoundingClientRect().top;
+        //        //console.log(ptrCvsY);
+        //        if (ptrCvsY >= 360) {
+        //            //myChart.options.tooltips.enabled = false;
+        //            myChart.update();
+        //        }
+        //    }
+        //}
+        //if (!this.eventListenerAdded) {
+        //    this.eventListenerAdded = true;
+        //    cvsChart.addEventListener("mousemove", mousemoveListener);
+        //    cvsChart.addEventListener("click", mouseclickListener);
+        //    console.log("eventListener added");
+        //}
     };
 
     //console.log('LEAVE: ChartDrawer()')

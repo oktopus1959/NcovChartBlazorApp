@@ -3,8 +3,8 @@
 
 <div style="width: 100%">
 <div class="chart-block">
-<h4><span>COVID-19</span> <span>重症者数グラフ</span> <span>（予測日：@(forecastData.RealEndDateStr)）</span></h4>
-@(forecastData.LastPredicDateStr)の予測値： @(forecastData.LastPredicSerious._formatComma())名
+<h4><span>COVID-19</span> <span>重症者数グラフ</span></h4>
+<span>@(forecastData.LastPredicDateStr)の予測値：@(forecastData.LastPredicSerious._formatComma())名</span> <span>（予測日：@(forecastData.PredictStartDateStr)）</span>
 @* Chart の Canvas *@
 <div class="scrollableChartWrapper" style="" id="chart-wrapper-serious">
     <div id="scrollWrapper-sc">
@@ -16,8 +16,8 @@
 </div>
 
 <div class="chart-block right-block">
-<h4><span>COVID-19</span> <span>死亡者数グラフ</span> <span>（予測日：@(forecastData.RealEndDateStr)）</span></h4>
-@(forecastData.LastPredicDateStr)の予測値： @(forecastData.LastPredicDeath._formatComma())名
+<h4><span>COVID-19</span> <span>死亡者数グラフ</span></h4>
+<span>@(forecastData.LastPredicDateStr)の予測値：@(forecastData.LastPredicDeath._formatComma())名</span> <span>（予測日：@(forecastData.PredictStartDateStr)）</span>
 @* Chart の Canvas *@
 <div class="scrollableChartWrapper" style="" id="chart-wrapper-death">
     <div id="scrollWrapper">
@@ -35,7 +35,7 @@
 
 <div style="margin-top:20px">
 <div class="table table-block">
-<h5>想定重症化率</h5>
+<h5>想定重症化率（@(forecastData.SeriousRatesByAges.UpdateDate.ToString("M月d日"))更新）</h5>
 <div class="tbl-scroll">
 <table class="table">
     <thead>
@@ -61,7 +61,7 @@
 </div>
 
 <div class="table table-block">
-<h5>想定死亡率</h5>
+<h5>想定死亡率（@(forecastData.DeathRatesByAges.UpdateDate.ToString("M月d日"))更新）</h5>
 <div class="tbl-scroll">
 <table class="table">
     <thead>
@@ -111,7 +111,7 @@
 </div>
 
 <div class="table-block">
-<h5>想定改善率</h5>
+<h5>想定改善率（@(forecastData.RecoverRates.UpdateDate.ToString("M月d日"))更新）</h5>
 <table class="table">
     <thead>
         <tr style="text-align: center">

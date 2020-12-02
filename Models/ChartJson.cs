@@ -93,7 +93,7 @@ namespace ChartBlazorApp.Models
             return CreateDashLine(label, data, color, yAxis, _dotParam);
         }
 
-        public static Dataset CreateDoLtine2(string label, double?[] data, string color)
+        public static Dataset CreateDotLine2(string label, double?[] data, string color)
         {
             return CreateDashLine(label, data, color, "y-2", _dotParam);
         }
@@ -214,10 +214,21 @@ namespace ChartBlazorApp.Models
 
         public Scales scales { get; set; }
 
-        public class Legend { public bool reverse { get; set; } = false; }
+        public class Legend {
+            public bool display { get; set; } = true;
+            public string position { get; set; } = "top";
+            public string align { get; set; } = "center";
+            public bool reverse { get; set; } = false;
+
+            public void SetAlignStart() { align = "start"; }
+            public void SetAlignEnd() { align = "end"; }
+        }
+
         public Legend legend { get; set; } = new Legend();
 
         public Tooltips tooltips { get; set; } = new Tooltips();
+
+        public Annotation annotation { get; set; } = new Annotation();
 
         public static Options Plain(Ticks ticks = null)
         {
@@ -257,6 +268,26 @@ namespace ChartBlazorApp.Models
             scales.yAxes[^1] = new Yaxis() { id = yAxisId, stacked = true, display = false, ticks = scales.yAxes[0].ticks };
             return this;
         }
+
+        public void AddAnnotation(string value, string label = null, string color = null, string axisId = null, string mode = null)
+        {
+            var annotations = annotation.annotations;
+            if (annotations == null) {
+                annotations = new Annotation.Annotation_[1];
+            } else {
+                annotations = annotations._extend(annotations.Length + 1);
+            }
+            annotation.annotations = annotations;
+            var a = annotations[^1] = new Annotation.Annotation_();
+            if (mode._notEmpty()) a.mode = mode;
+            if (axisId._isEmpty()) axisId = scales.xAxes[0].id;
+            if (axisId._notEmpty()) a.scaleID = axisId;
+            if (color._notEmpty()) a.borderColor = color;
+            a.value = value;
+            if (label._notEmpty()) {
+                a.label = new Annotation.Annotation_.Label() { content = label };
+            }
+        }
     }
 
     public class Animation
@@ -264,16 +295,60 @@ namespace ChartBlazorApp.Models
         public int duration { get; set; } = 500;
     }
 
-    public class Scales
+    public class Annotation
     {
-        public Xaxis[] xAxes { get; set; } = new Xaxis[] { new Xaxis() };
-        public Yaxis[] yAxes { get; set; }
+        public class Annotation_
+        {
+            public string type { get; set; } = "line";
+            public string mode { get; set; } = "vertical";
+            public string scaleID { get; set; } = "x-axis-0";
+            public string value { get; set; }
+            public string borderColor { get; set; } = "blue";
+
+            public class Label {
+                public string content { get; set; }
+                public bool enabled { get; set; } = true;
+                public string position { get; set; } = "top";
+            }
+            public Label label { get; set; } = null;
+        }
+
+        public Annotation_[] annotations = null;
     }
 
     public class Tooltips
     {
         public string mode { get; set; } = "index";
         public bool intersect { get; set; } = true;
+
+        public string position { get; set; } = "average";
+
+        public int _startIdx { get; set; } = 0;
+
+        public int _endIdx { get; set; } = 0;
+
+        public void SetCustomFixed()
+        {
+            position = "customFixed";
+        }
+
+        public void SetCustomHighest()
+        {
+            position = "customHighest";
+        }
+
+        public void SetCustomAverage(int startIdx, int endIdx)
+        {
+            position = "customAverage";
+            _startIdx = startIdx;
+            _endIdx = endIdx;
+        }
+    }
+
+    public class Scales
+    {
+        public Xaxis[] xAxes { get; set; } = new Xaxis[] { new Xaxis() };
+        public Yaxis[] yAxes { get; set; }
     }
 
     public class Xaxis

@@ -7,8 +7,9 @@
 @code{
     private async Task insertStaticDescription()
     {
-        var html = Helper.GetFileContent("wwwroot/html/About.html", System.Text.Encoding.UTF8);
-        if (html._notEmpty()) await JSRuntime.InvokeAsync<string>("insertAboutDescription", html);
+        //var html = Helper.GetFileContent("wwwroot/html/About.html", System.Text.Encoding.UTF8);
+        //if (html._notEmpty()) await JSRuntime.InvokeAsync<string>("insertAboutDescription", html);
+        await JSRuntime.InvokeAsync<string>("selectDescription", "about-page");
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)

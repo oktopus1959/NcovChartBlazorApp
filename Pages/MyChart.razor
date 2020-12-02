@@ -14,7 +14,7 @@
     private const int _mainPrefNum = 3;
 }
 
-<h4><span>新型コロナ</span> <span>新規陽性者数グラフ</span> <span style="white-space: nowrap">（2020年6月～）</span></h4>
+<h4><span>新型コロナ</span> <span>陽性者数グラフ</span></h4>
   <div class="vertical-align" style="margin-top: 1em; line-height: 1.5em">
     @* 全国、東京、大阪、北海道 *@
     @for (int i = 0; i < _mainPrefNum; ++i) {
@@ -23,7 +23,7 @@
         <span style="vertical-align: middle;">
             <label for="@v">
             <input type="radio" name="chart-data-id" id="@v" value="@i" @onchange="ChangeChart" checked="@(_radioIdx == i)"/>
-            <span style="font-size: 1.25em; color: @(_radioIdx == i ? "darkgreen" : "rgb(30,30,30)");">@v</span>
+            <span style="font-size: 1.25em; color: @(_radioIdx == i ? "darkgreen" : "rgb(30,30,30)"); font-weight: @(_radioIdx == i ? "bold" : "normal")">@v</span>
             </label>
         </span>
         </div>
@@ -33,7 +33,7 @@
         <span style="vertical-align: middle;">
             <label for="その他">
             <input type="radio" name="chart-data-id" id="その他" value="@_mainPrefNum" @onchange="ChangeChart" checked="@(_radioIdx == _mainPrefNum)"/>
-            <span style="font-size: 1.25em; color: @(_radioIdx == 3 ? "darkgreen" : "rgb(30,30,30)");">その他 </span>
+            <span style="font-size: 1.25em; color: @(_radioIdx == 3 ? "darkgreen" : "rgb(30,30,30)"); font-weight: @(_radioIdx == 3 ? "bold" : "normal")">その他 </span>
             </label>
             @*<select class="mt-0 mb-1" style="padding: 1px" name="other-pref" value="@_prefIdx" @onchange="ChangePref" disabled="@(_radioIdx != _mainPrefNum)">*@
             <select class="mt-0 mb-1" style="padding: 2px;" name="other-pref" value="@_prefIdx" @onchange="ChangePref">
@@ -51,23 +51,6 @@
     </div>
     <canvas id="yAxis1" style="left: 0" width="0"></canvas>
     <canvas id="yAxis2" style="right: 0" width="0"></canvas>
-</div>
-
-<div class="vertical-align" style="margin-top: 1.5em; line-height: 1.5em">
-    @* バーの太さを増減させるボタン*@
-    <div class="inline-wrapper"><span>棒グラフの幅：</span>
-    <button class="btn btn-primary btn-sm py-0" @onclick="RenderThinChartBarMethod">－</button>
-    <span>[ @_barWidth ]</span>
-    <button class="btn btn-primary btn-sm py-0" @onclick="RenderThickChartBarMethod">＋</button></div>
-    @* 左Y軸の最大値を選択するドロップダウン *@
-    <div class="inline-wrapper"><span>左Ｙ軸最大値：</span>
-    <select style="padding: 1px" name="yAxisMax" value="@_yAxisMax" @onchange="ChangeYAxisMax">
-        @for (int n = 10000; n > 5000; n -= 1000) { <option value="@n" selected="@(n == _yAxisMax)">@n</option> }
-        @for (int n = 5000; n > 1000; n -= 500) { <option value="@n" selected="@(n == _yAxisMax)">@n</option> }
-        @for (int n = 1000; n >= 100; n -= 100) { <option value="@n" selected="@(n == _yAxisMax)">@n</option> }
-        @for (int n = 50; n >= 20; n -= 30) { <option value="@n" selected="@(n == _yAxisMax)">@n</option> }
-    </select></div>
-    <span id="for-debug-print"></span>
 </div>
 
 @code{ private string _fontColor(bool enabled) { return enabled ? null : "grey"; } }
@@ -94,8 +77,25 @@
                 <option value="@v" selected="@(v == _paramDecayFactor)">@i</option>
             }
         </select></div>
-        <div class="inline-or-block"><button class="btn btn-primary btn-sm py-0" @onclick="InitializeParams" disabled="@(!_drawGompertz)">RESET</button></div>
+        <div class="inline-wrapper"><button class="btn btn-primary btn-sm py-0" @onclick="InitializeParams" disabled="@(!_drawGompertz)">RESET</button></div>
     </div>
+</div>
+
+<div class="vertical-align" style="margin-top: 1.5em; line-height: 1.5em">
+    @* バーの太さを増減させるボタン*@
+    <div class="inline-wrapper"><span>棒グラフの幅：</span>
+    <button class="btn btn-primary btn-sm py-0" @onclick="RenderThinChartBarMethod">－</button>
+    <span>[ @_barWidth ]</span>
+    <button class="btn btn-primary btn-sm py-0" @onclick="RenderThickChartBarMethod">＋</button></div>
+    @* 左Y軸の最大値を選択するドロップダウン *@
+    <div class="inline-wrapper"><span>左Ｙ軸最大値：</span>
+    <select style="padding: 1px" name="yAxisMax" value="@_yAxisMax" @onchange="ChangeYAxisMax">
+        @for (int n = 10000; n > 5000; n -= 1000) { <option value="@n" selected="@(n == _yAxisMax)">@n</option> }
+        @for (int n = 5000; n > 1000; n -= 500) { <option value="@n" selected="@(n == _yAxisMax)">@n</option> }
+        @for (int n = 1000; n >= 100; n -= 100) { <option value="@n" selected="@(n == _yAxisMax)">@n</option> }
+        @for (int n = 50; n >= 20; n -= 30) { <option value="@n" selected="@(n == _yAxisMax)">@n</option> }
+    </select></div>
+    <span id="for-debug-print"></span>
 </div>
 
 <div id="static-description" style="margin-top: 20px;"></div>

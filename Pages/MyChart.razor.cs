@@ -236,8 +236,9 @@ namespace ChartBlazorApp.Pages
 
         private async Task insertStaticDescription()
         {
-            var html = Helper.GetFileContent("wwwroot/html/Description.html", System.Text.Encoding.UTF8);
-            if (html._notEmpty()) await JSRuntime.InvokeAsync<string>("insertStaticDescription", html);
+            //var html = Helper.GetFileContent("wwwroot/html/Description.html", System.Text.Encoding.UTF8);
+            //if (html._notEmpty()) await JSRuntime.InvokeAsync<string>("insertStaticDescription", html);
+            await JSRuntime.InvokeAsync<string>("selectDescription", "home-page");
         }
 
         /// <summary>

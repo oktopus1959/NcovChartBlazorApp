@@ -51,7 +51,7 @@ span, label, th, td {
 
 div.chart-block {
     display: inline-block;
-    margin-top: 10px;
+    /* margin-top: 10px; */
 }
 
 div.table-block {
@@ -67,7 +67,7 @@ table {
 @media (min-width: 0px) {
     div.inline-or-block { display: block; margin-top: 4px; }
     div.chart-block { max-width: 100%; }
-    div.right-block { margin-left: 0px; }
+    div.right-block { margin-top: 20px; margin-left: 0px; }
     div.table-block { margin-right: 0px; }
     div.tbl-scroll { overflow-x: scroll; }
 }
@@ -89,7 +89,7 @@ table {
 
 @media (min-width: 1000px) {
     div.chart-block { max-width: 48%; }
-    div.right-block { margin-left: 20px; }
+    div.right-block { margin-top: 0px; margin-left: 20px; }
 }
 
 
@@ -156,16 +156,18 @@ select {
 }
 
 .my-reconnect-modal > div {
-    position: fixed;
-    top: 0;
-    right: 0;
-    bottom: 0;
-    left: 0;
-    z-index: 1000;
-    overflow: hidden;
-    background-color: #fff;
-    opacity: 0.8;
+    width: 100%;
+    /* background-color: #89c7de; */
+    background-color: teal;
+    color: #fff;
     text-align: center;
+    padding: 10px 0;
+    position: fixed;
+    bottom: 0;
+}
+
+.my-reconnect-modal a {
+    color: midnightblue;
     font-weight: bold;
 }
 
@@ -196,6 +198,11 @@ select {
 .components-reconnect-rejected > .rejected {
     display: block;
 }
+
+.dummy {
+    display: none;
+}
+
 /*** 追加終わり ***/
 
 .btn-primary {
@@ -340,7 +347,7 @@ app {
         margin-left: 0;
     }
 */
-    .main > div {
+    .main > div, .description {
         padding-left: 1rem !important;
         padding-right: 0.5rem !important;
     }
@@ -359,12 +366,14 @@ app {
         top: 0;
     }
 
+    /* 削除
     .main .top-row {
         position: sticky;
         top: 0;
     }
+    */
 
-    .main > div {
+    .main > div, .description {
         padding-left: 2rem !important;
         padding-right: 1.5rem !important;
     }
@@ -378,3 +387,11 @@ app {
         display: block;
     }
 }
+
+@media (min-height: 700px) {
+    .main .top-row {
+        position: sticky;
+        top: 0;
+    }
+}
+

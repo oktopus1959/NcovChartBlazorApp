@@ -10,8 +10,7 @@
 <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="keywords" content="新型コロナウイルス,グラフ,実効再生産数,重症者数予測,死亡者数予測" />
-    <title>新型コロナ 新規陽性者数グラフ（2020年6月～）</title>
+    <title>新型コロナ 新規陽性者数グラフ</title>
     <base href="~/" />
     <link rel="stylesheet" href="css/bootstrap/bootstrap.min.css" />
     <link href="css/site.css" rel="stylesheet" />
@@ -19,16 +18,139 @@
     </style>
 </head>
 <body>
-    <div id="components-reconnect-modal" class="my-reconnect-modal components-reconnect-hide">
-        <div class="show"><p>サーバに接続しています...</p></div>
-        <div class="failed"><p>メンテナンスのためにサーバが再起動した可能性があります。<br/>しばらく待ってからページを<a href="javascript:location.reload()">リロード</a>してください。</p></div>
-        <div class="rejected"><p>サーバとの接続が切れました。<br/>ページを<a href="javascript:location.reload()">リロード</a>してください。</p></div>
-    </div>
-
     <div>
         @* see: https://docs.microsoft.com/ja-jp/aspnet/core/blazor/fundamentals/additional-scenarios?view=aspnetcore-3.1 *@
         @*<component type="typeof(App)" render-mode="ServerPrerendered" />*@
         <component type="typeof(App)" render-mode="Server" />
+    </div>
+
+    <div class="content description">
+        <div id="home-page" style="display:none;">
+            <!-- 陽性者数グラフ -->
+            <h6>【使い方】</h6>
+            <div class="less-indent">
+                <p>「＋」「－」ボタンをクリックすると、棒グラフの幅を増減できます。（注）</p>
+                <p>「予想曲線表示」を選択すると、実効再生産数(Rt)の予想値から計算した陽性者数移動平均曲線を表示します。</p>
+            </div>
+
+            <p class="normal-margin"></p>
+            <h6>【説明】</h6>
+            <div class="less-indent">
+                <p>
+                    当アプリは、いったんピークをつけた実効再生産数(Rt)の減衰に伴い、新規陽性者数がどのように増減するかをグラフ表示するものです。<br />
+                    あくまでも想定した Rt 減衰曲線に基づいて簡単な計算により予想移動平均を計算しているものであり、
+                    新規陽性者数がこのグラフの通りに推移することを保証するものではありません。<br />
+                    利用者自身が「基準日」「日数」「減衰度」を設定することにより、今後の陽性者数の増減傾向をあらかじめ把握していただくためのアプリとお考えください。
+                </p>
+
+            </div>
+            <div class="less-indent">
+                <p style="margin-top: 10px">
+                    「基準日」は、予想曲線の表示開始日となります。利用者が設定しない場合は、システム既定値（または直近で Rt が最大となる日）を使用します。<br />
+                    基準日から「Rtが1になるまでの日数」が経過したところで Rt が1になるように Rt を減衰させます。<br />
+                    「減衰度」が大きいほど Rt が早く1に近づきます（やや太い横線が Rt=1 を表わしています）。<br />
+                    「RESET」ボタンをクリックすると、各パラメータをシステム既定値で初期化します。
+                </p>
+
+                <p style="margin-top: 10px">上記のように計算した予想 Rt から移動平均を逆算し、さらにそれの7日移動平均をとって平滑化して、これを予想移動平均としてグラフ表示します。</p>
+
+                <p style="margin-top: 10px">「推計陽性者数表示」を選択すると、過去3週間における同曜日の増減傾向を予想移動平均に掛け合わせて推計値を算出し、グレーの棒グラフで表示します。この推計値は目安程度にお考えください。</p>
+
+                <p style="margin-top: 10px">
+                    実効再生産数の計算式は、<a href="https://toyokeizai.net/sp/visual/tko/covid19/" target="_blank">東洋経済のサイト</a>と同じものを使わせていただいています。<br />
+                    これは、西浦先生の資料「<a href="https://github.com/contactmodel/COVID19-Japan-Reff/blob/master/nishiura_Rt%E4%BC%9A%E8%AD%B0_12May2020.pdf" target="_blank">実効再生産数とその周辺</a>」の
+                    p.29「幾何級数的増殖モデルが教えてくれること」で説明されている式で、「Δt = 7」「μ = 5」として得られる式となっています。
+                </p>
+            </div>
+
+            <p class="normal-margin"></p>
+            <h6>【注意】</h6>
+            <div class="less-indent">
+                <p>iPhone 7 以前の機種で Safari を使用している場合、棒グラフの幅を 1 以上にするとグラフ表示が出来なくなるようです。</p>
+                <p>当アプリの仕様は予告なく変更されます。</p>
+            </div>
+
+            <p class="normal-margin"></p>
+            <h6>【データソース】</h6>
+            <div class="less-indent">
+                <p>全国 = <a href="https://www.mhlw.go.jp/stf/covid-19/open-data.html" target="_blank">厚生労働省 オープンデータ(陽性者数)</a></p>
+                <p>各都道府県 = <a href="https://github.com/kaz-ogiwara/covid19" target="_blank">github.com/kaz-ogiwara/covid19/data/prefectures.csv</a> （&copy;東洋経済オンライン「新型コロナウイルス 国内感染の状況」制作：荻原和樹）</p>
+                (ただし全国や東京など、最新日については報道機関による速報値を追加している自治体もあり)
+            </div>
+        </div>
+
+        <div id="forecast-page" style="display:none;">
+            <!-- 重症者数予測グラフ・死亡者数予測グラフ -->
+            <h6>【説明】</h6>
+            <div class="less-indent">
+                <p>
+                    「重症者数予測」・「死亡者数予測」の両グラフとも、2020年7月1日を起点として、推計値を積み上げた数値を予測値として表示しています。<br />
+                    「予測日」 までは実数を基に推計値を計算し、予測日以降は「<a href="/">陽性者数</a>」-「全国」のシステム既定値による推計陽性者数を基に計算しています。<br />
+                    予測日以降の数値については、かなりブレが生じる可能性があることにご留意ください。
+                </p>
+
+                <p style="margin-top:10px">
+                    各表の各行の数値は、その行の「期日」以降、次の行の「期日」以前に適用される率であることを示しています。<br />
+                    たとえば、重症化率の「7月1日」の行の場合、7月1～9月30日の期間に適用される率であることを示します。
+                </p>
+
+                <p style="margin-top:10px">
+                    各表の「日数」は、報告日を何日遡って計算対象陽性者数を算出するかを示しています。<br />
+                    たとえば、死亡率の「10月1日」の行の場合、計算日が11月1日だとすると、15日遡った10月17日を中心とした前後7日間の平均値を対象陽性者数とします。
+                </p>
+
+                <p style="margin-top:10px">「改善率」は、「日数」だけ遡った日を中心に前後14日間の重症者数の平均を算出し、それに「改善率」を掛け合わせた人数が重症から改善する、という想定を表す数値です。</p>
+
+                <p style="margin-top:10px">
+                    「年代別の陽性者割合」は、厚労省から毎週発表される「新型コロナウイルス感染症の国内発生動向」
+                    （<a href="https://www.mhlw.go.jp/content/10906000/000696696.pdf" target="_blank">11月18日18時時点の例</a>）の「年齢階級別陽性者数」から計算しています。<br />
+                    （このPDFは、「<a href="https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/0000121431_00086.html" target="_blank">発生状況</a>」
+                    の一覧からたどれる日別資料の末尾「（参考資料）」のところにリンクがあります。）<br />
+                    なお当表の末尾行は、前3週間の平均値となっています。
+                </p>
+            </div>
+
+            <p class="normal-margin"></p>
+            <h6>【注意】</h6>
+            <div class="less-indent">
+                重症化率、死亡率、改善率は、何らかの公的機関により発表されているものではありません。<br />
+                あくまでも、下記データソースを基にして、当サイトの作成者がカーブフィッティングにより算出したものにすぎないことにご注意ください。<br />
+                とくに、この数値について何らかの公的機関や医療機関等への問合せなどは絶対に行わないようにお願いします。
+            </div>
+
+            <p class="normal-margin"></p>
+            <h6>【データソース】</h6>
+            <div class="less-indent">
+                <p><a href="https://www.mhlw.go.jp/stf/covid-19/open-data.html" target="_blank">厚生労働省 オープンデータ(陽性者数, 死亡者数, 重症者数)</a></p>
+            </div>
+        </div>
+
+        <div id="about-page" style="display:none;">
+            <!-- ソースコード・作成者 -->
+            <h5>【ソースコード】</h5>
+            <div class="less-indent">
+                <p>当アプリのソースコードを下記 github にて公開しました。</p>
+                <a href="https://github.com/oktopus1959/NcovChartBlazorApp" target="_blank">https://github.com/oktopus1959/NcovChartBlazorApp</a>
+            </div>
+
+            <div style="margin-top: 2rem"></div>
+            <h5>【作成者】</h5>
+            <div class="less-indent">
+                <p>
+                    Twitter: <a href="https://twitter.com/oktopus59" target="_blank">@@oktopus59</a>
+                    <!--<a href="https://twitter.com/oktopus1959" target="_blank">@@oktopus1959</a> -->
+                </p>
+                <p>
+                    このサイトは ASP.NET Core Blazor と Chart.js の勉強を兼ねて作成しました。その成果は Qiita の
+                    <ul>
+                        <li><a href="https://qiita.com/okatako/items/171f05dfc36d6b27769d" target="_blank">ASP.NET Core Blazor と Chart.js で入門する Web アプリ作成</a></li>
+                        <li><a href="https://qiita.com/okatako/items/94a769a0925337c79483" target="_blank">Chart.js でY軸を表示しながらグラフを横スクロールする</a></li>
+                    </ul>
+                    にまとめてあります。
+                </p>
+                <p>ご意見・ご質問・ご要望は上記 Twitter または Qiita アカウントまでどうぞ。</p>
+            </div>
+        </div>
     </div>
 
     <div id="blazor-error-ui">
@@ -46,12 +168,24 @@
         <hr />
         <div class="inline-wrapper" style="margin-bottom: 4px"><span><a href="/">新規陽性者数</a></span></div>
         <div class="inline-wrapper" style="margin-bottom: 4px"><span><a href="/forecast">重症者数予測・死亡者数予測</a></span></div>
-        <div class="inline-wrapper" style="margin-bottom: 4px"><span><a href="/about">作者</a></span></div>
+        <div class="inline-wrapper" style="margin-bottom: 4px"><span><a href="/about">ソースコード・作者</a></span></div>
+    </div>
+
+    <div id="components-reconnect-modal" class="components-reconnect-hide my-reconnect-modal">
+        <!--
+        <div class="show"><p>サーバに接続しています...</p></div>
+        <div class="failed"><p>メンテナンスのためにサーバが再起動した可能性があります。<br />しばらく待ってからページを<a href="javascript:location.reload()">リロード</a>してください。</p></div>
+        <div class="rejected"><p>サーバとの接続が切れました。<br />ページを<a href="javascript:location.reload()">リロード</a>してください。</p></div>
+        -->
+        <div class="show"><p>再接続中...（または<a href="javascript:location.reload()">リロード</a>）</p></div>
+        <div class="failed"><p>ページを<a href="javascript:location.reload()">リロード</a>してください。</p></div>
+        <div class="rejected"><p>ページを<a href="javascript:location.reload()">リロード</a>してください。</p></div>
     </div>
 
     <script src="_framework/blazor.server.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.9.3/Chart.min.js"></script>
     <script src='https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-annotation/0.5.7/chartjs-plugin-annotation.min.js'></script>
     <script src="~/script/DrawChart.js"></script>
+
 </body>
 </html>

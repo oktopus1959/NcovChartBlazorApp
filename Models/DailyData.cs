@@ -69,6 +69,13 @@ namespace ChartBlazorApp.Models
             public int PreDataNum { get; set; }
         }
 
+        public static double CalcRt(double[] total, int idx)
+        {
+            double weekly(int i) => total._nth(i) - total._nth(i - 7);
+            double w7 = weekly(idx - 7);
+            return w7 > 0 ? Math.Pow(weekly(idx) / w7, 5.0 / 7.0) : 0.0;
+        }
+
         private List<InfectData> loadPrefectureData(IEnumerable<string> lines)
         {
             List<string> prefOrder = new List<string>();
@@ -243,14 +250,19 @@ namespace ChartBlazorApp.Models
                     }
                     Options options = Options.CreateTwoAxes(new Ticks(y1_max, y1_step), new Ticks(y2_max, y2_step));
                     if (!bAnimation) options.AnimationDuration = 0;
-                    //options.tooltips.intersect = false;
-                    options.legend.reverse = true;
+                    options.legend.SetAlignEnd();
+                    options.legend.reverse = true;  // 凡例の表示を登録順とは逆順にする
                     chartData.options = options;
 
                     var dataSets = new List<Dataset>();
 #if DEBUG
-                    if (rtDecayParam != null) dataSets.Add(Dataset.CreateDotLine("逆算移動平均", data.RevAverage.Take(data.DispDays)._toNullableArray(1), "darkblue"));
+                    if (rtDecayParam != null) {
+                        dataSets.Add(Dataset.CreateDotLine("逆算移動平均", data.RevAverage.Take(data.DispDays)._toNullableArray(1), "darkblue"));
+                        //dataSets.Add(Dataset.CreateDotLine2("逆算Rt", data.RevRt.Take(data.DispDays)._toNullableArray(1), "crimson"));
+                    }
 #endif
+                    dataSets.Add(Dataset.CreateLine("                ", new double?[fullDates.Count], "rgba(0,0,0,0)", "rgba(0,0,0,0)"));
+
                     double?[] predRts = null;
                     double?[] predAverage = null;
                     if (rtDecayParam != null) {
@@ -266,16 +278,21 @@ namespace ChartBlazorApp.Models
                     double?[] positives = data.Newly.Take(realDays)._toNullableArray(0, 0);
                     var positiveDataset = Dataset.CreateBar("新規陽性者数", positives, "royalblue").SetHoverColors("mediumblue").SetDispOrder(1);
                     if (rtDecayParam != null && estimatedBar) {
+                        options.tooltips.intersect = false;
+                        options.tooltips.SetCustomHighest();
                         dataSets.Add(positiveDataset);
                         dataSets.Add(Dataset.CreateBar("推計陽性者数", data.PredNewly.Take(predDays)._toNullableArray(0), "darkgray").SetHoverColors("darkseagreen").SetDispOrder(2));
                     } else {
                         options.AddStackedAxis();
+                        options.tooltips.SetCustomFixed();
                         dataSets.Add(positiveDataset.SetStackedAxisId());
                         //double?[] dummyBars = calcDummyData(predDays, positives, realAverage, predAverage, realRts, predRts, y1_max, y2_max);
-                        double?[] dummyBars = Dataset.CalcDummyData(predDays,
-                            new double?[][] { positives }, new double?[][] { realAverage, predAverage }, new double?[][] { realRts, predRts },
-                            y1_max, y2_max);
-                        dataSets.Add(Dataset.CreateBar("", dummyBars, "rgba(0,0,0,0)").SetStackedAxisId().SetHoverColors("rgba(10,10,10,0.1)").SetDispOrder(100));
+                        double?[] dummyBar = positives.Select(v => y1_max - (v ?? 0)).ToArray()._extend(predDays, y1_max)._toNullableArray(0, 0);
+                        dataSets.Add(Dataset.CreateBar("", dummyBar, "rgba(0,0,0,0)").SetStackedAxisId().SetHoverColors("rgba(10,10,10,0.1)").SetDispOrder(100));
+                        //double?[] dummyBars = Dataset.CalcDummyData(predDays,
+                        //    new double?[][] { positives }, new double?[][] { realAverage, predAverage }, new double?[][] { realRts, predRts },
+                        //    y1_max, y2_max);
+                        //dataSets.Add(Dataset.CreateBar("", dummyBars, "rgba(0,0,0,0)").SetStackedAxisId().SetHoverColors("rgba(10,10,10,0.1)").SetDispOrder(100));
                     }
                     double?[] rt1Line = new double?[fullDates.Count];
                     rt1Line[0] = rt1Line[^1] = 1.0;
@@ -371,6 +388,8 @@ namespace ChartBlazorApp.Models
         //public double[] PredRt { get; private set; }
         /// <summary> 推計陽性者数 </summary>
         public double[] PredNewly { get; private set; }
+        /// <summary> 逆算Rt </summary>
+        public double[] RevRt { get; private set; }
         /// <summary> 表示日数 </summary>
         public int DispDays { get; set; } = 1;
 
@@ -379,17 +398,20 @@ namespace ChartBlazorApp.Models
         /// </summary>
         /// <param name="rtDecayParam"></param>
         /// <param name="numFullDays"></param>
-        public void PredictValuesEx(RtDecayParam rtDecayParam, int numFullDays)
+        /// <param name="predStartDt">予測開始日</param>
+        public void PredictValuesEx(RtDecayParam rtDecayParam, int numFullDays, DateTime? predStartDt = null)
         {
             if (rtDecayParam == null) rtDecayParam = InitialDecayParam;
             var firstRealDate = Dates.First();
-            int realDays = (Dates.Last() - firstRealDate).Days + 1;
+            DateTime realEndDate = predStartDt?.AddDays(-1) ?? DateTime.MaxValue;
+            if (realEndDate > Dates.Last()) realEndDate = Dates.Last();
+            int realDays = (realEndDate - firstRealDate).Days + 1;
 
             RevAverage = new double[numFullDays];
             FullPredRt = new double[numFullDays];
 
             if (rtDecayParam.StartDate._notValid()) rtDecayParam.StartDate = InitialDecayParam.StartDate;
-            if (rtDecayParam.StartDate > Dates.Last()) rtDecayParam.StartDate = Dates.Last();
+            if (rtDecayParam.StartDate > realEndDate) rtDecayParam.StartDate = realEndDate;
             PredStartIdx = (rtDecayParam.StartDate - firstRealDate).Days;
             Array.Copy(Average, RevAverage, PredStartIdx);
             int predRtLen = rtDecayParam.CopyPredictRt(Rt, PredStartIdx, FullPredRt, realDays);
@@ -413,6 +435,12 @@ namespace ChartBlazorApp.Models
             }
             PredAverage = revAveAverage._extend(numFullDays);
             PredNewly = predictInfect(Newly, Average, PredAverage, realDays, PredStartIdx);
+            double total = 0;
+            double[] totals = PredNewly.Select((n, i) => total += (n > 0 ? n : Newly._nth(i))).ToArray();
+            RevRt = new double[numFullDays];
+            for (int i = PredStartIdx; i < PredNewly.Length; ++i) {
+                RevRt[i] = DailyData.CalcRt(totals, i);
+            }
         }
 
         private static double[] predictInfect(double[] newly, double[] average, double[] pred, int realDays, int predStartIdx)

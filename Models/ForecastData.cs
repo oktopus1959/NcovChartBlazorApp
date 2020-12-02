@@ -55,6 +55,8 @@ namespace ChartBlazorApp.Models
     /// </summary>
     public class DatedDataSeriesList
     {
+        public DateTime UpdateDate { get; set; }
+
         public List<DatedDataSeries> DataSeriesList { get; set; }
 
         public DatedDataSeries FindDataSeries(DateTime date)
@@ -85,11 +87,11 @@ namespace ChartBlazorApp.Models
         public DateTime PredDispStartDate { get; set; }
 
         /// <summary> 予測に利用する実データの終了日(の翌日) </summary>
-        public DateTime RealEndDate { get; set; }
+        public DateTime PredictStartDate { get; set; }
 
-        public string RealEndDateStr { get { return RealEndDate.ToString("M月d日"); } }
+        public string PredictStartDateStr { get { return PredictStartDate.ToString("M月d日"); } }
 
-        public DateTime LastPredicDate { get { return RealEndDate.AddDays(PredictDays - 1); } }
+        public DateTime LastPredicDate { get { return PredictStartDate.AddDays(PredictDays - 1); } }
 
         public string LastPredicDateStr { get { return LastPredicDate.ToString("M月d日"); } }
 
@@ -102,7 +104,7 @@ namespace ChartBlazorApp.Models
 
         public double StartRecoverTotal { get; set; }
 
-        public int FullDays(DateTime firstDate) { return Math.Max((RealEndDate - firstDate).Days, 0) + PredictDays + AverageShiftDays + 7; }
+        public int FullDays(DateTime firstDate) { return Math.Max((PredictStartDate - firstDate).Days, 0) + PredictDays + AverageShiftDays + 7; }
 
         public double MaxDeath { get; set; }
 
@@ -126,12 +128,16 @@ namespace ChartBlazorApp.Models
         private DatedDataSeriesList loadDeathRate(string csvfile)
         {
             var list = new DatedDataSeriesList() { DataSeriesList = new List<DatedDataSeries>() };
-            foreach (var items in readFile(csvfile).Select(line => line.Trim().Split(',')).ToArray()) {
-                list.DataSeriesList.Add(new DatedDataSeries() {
-                    Date = items[0]._parseDateTime(),
-                    DataSeries = items[1..10].Select(item => item._parseDouble()).ToArray(),
-                    OffsetDays = items[10]._parseInt(0),
-                });
+            foreach (var items in readFile(csvfile).Select(line => line.Trim().Split(','))) {
+                if (items[0]._startsWith("#")) {
+                    list.UpdateDate = items[0].Trim('#', ' ')._parseDateTime();
+                } else {
+                    list.DataSeriesList.Add(new DatedDataSeries() {
+                        Date = items[0]._parseDateTime(),
+                        DataSeries = items[1..10].Select(item => item._parseDouble()).ToArray(),
+                        OffsetDays = items[10]._parseInt(0),
+                    });
+                }
             }
             return list;
         }
@@ -144,12 +150,16 @@ namespace ChartBlazorApp.Models
         private void loadRecoverRate()
         {
             RecoverRates = new DatedDataSeriesList() { DataSeriesList = new List<DatedDataSeries>() };
-            foreach (var items in readFile("Data/csv/recover_rate.csv").Select(line => line.Trim().Split(',')).ToArray()) {
-                RecoverRates.DataSeriesList.Add(new DatedDataSeries() {
-                    Date = items[0]._parseDateTime(),
-                    DataSeries = items[1]._parseDouble()._toArray1(),
-                    OffsetDays = items[2]._parseInt(0),
-                });
+            foreach (var items in readFile("Data/csv/recover_rate.csv").Select(line => line.Trim().Split(','))) {
+                if (items[0]._startsWith("#")) {
+                    RecoverRates.UpdateDate = items[0].Trim('#', ' ')._parseDateTime();
+                } else {
+                    RecoverRates.DataSeriesList.Add(new DatedDataSeries() {
+                        Date = items[0]._parseDateTime(),
+                        DataSeries = items[1]._parseDouble()._toArray1(),
+                        OffsetDays = items[2]._parseInt(0),
+                    });
+                }
             }
         }
 
@@ -227,9 +237,9 @@ namespace ChartBlazorApp.Models
             var prevData1 = list[list.Count - 1];
             var prevData2 = list[list.Count - 2];
             var prevData3 = list[list.Count - 3];
-            RealEndDate = prevData1.Date.AddDays(7);
+            PredictStartDate = prevData1.Date.AddDays(7);
             list.Add(new DatedDataSeries() {
-                Date = RealEndDate,
+                Date = PredictStartDate,
                 DataSeries = prevCounts.Select((_, i) => (prevData1.DataSeries[i] + prevData2.DataSeries[i] + prevData3.DataSeries[i]) / 3).ToArray()
             });
             return new DatedDataSeriesList { DataSeriesList = list };
@@ -282,7 +292,7 @@ namespace ChartBlazorApp.Models
         public void MakePreliminaryData(InfectData infectData)
         {
             var firstDate = infectData.Dates._first();
-            int realDays = Math.Max((RealEndDate - firstDate).Days, 0);
+            int realDays = Math.Max((PredictStartDate - firstDate).Days, 0);
             double[] dailyInfect = infectData.Newly.Take(realDays).ToArray();
             double[] dailyInPred = infectData.PredNewly.Take(FullDays(firstDate)).Select((x, i) => (i < realDays && dailyInfect[i] > 0) ? dailyInfect[i] : x).ToArray();
             int preambleDays = (ChartStartDate - firstDate).Days;
@@ -378,21 +388,26 @@ namespace ChartBlazorApp.Models
             Options options = Options.CreateTwoAxes(new Ticks(y1_max, y1_step), new Ticks(y1_max, y1_step));
             options.AnimationDuration = 500;
             //options.tooltips.intersect = false;
+            options.tooltips.SetCustomAverage(0, -1);
+            var predDate = PredictStartDate._toShortDateString();
+            options.AddAnnotation(predDate, predDate);
+            options.legend.SetAlignEnd();
             options.legend.reverse = true;
             options.AddStackedAxis();
 
             var dataSets = new List<Dataset>();
+            dataSets.Add(Dataset.CreateLine("  ", new double?[FullPredictDeath.Length], "rgba(0,0,0,0)", "rgba(0,0,0,0)"));
             double?[] predLine = FullPredictDeath._toNullableArray(0);
             dataSets.Add(Dataset.CreateDotLine("予測死亡者数", predLine, "indianred").SetHoverColors("firebrick").SetDispOrder(2));
             //dataSets.Add(Dataset.CreateDotLine("予測死亡者数(日次)", predDailyDeath._toNullableArray(0), "darkgreen"));
             double?[] realBar = RealDeath._toNullableArray(0);
             dataSets.Add(Dataset.CreateBar("死亡者実数", realBar, "dimgray").SetHoverColors("black").SetStackedAxisId());
             double?[] dummyBars1 = RealDeath.Select(v => y1_max - v).ToArray()._extend(FullPredictDeath.Length, y1_max)._toNullableArray(0, 0);
-            double?[] dummyBars2 = new double[0]._extend(FullPredictDeath.Length, -1)._toNullableArray(0, -1);
-            double?[] dummyBars3 = Dataset.CalcDummyData(FullPredictDeath.Length, new double?[][] { realBar, dummyBars1, dummyBars2 }, new double?[][] { predLine }, null, y1_max);
+            //double?[] dummyBars2 = new double[0]._extend(FullPredictDeath.Length, -1)._toNullableArray(0, -1);
+            //double?[] dummyBars3 = Dataset.CalcDummyData(FullPredictDeath.Length, new double?[][] { realBar, dummyBars1, dummyBars2 }, new double?[][] { predLine }, null, y1_max);
             dataSets.Add(Dataset.CreateBar("", dummyBars1, "rgba(0,0,0,0)").SetStackedAxisId().SetHoverColors("rgba(10,10,10,0.1)"));
-            dataSets.Add(Dataset.CreateBar("", dummyBars2, "rgba(0,0,0,0)").SetStackedAxisId());
-            dataSets.Add(Dataset.CreateBar("", dummyBars3, "rgba(0,0,0,0)").SetStackedAxisId());
+            //dataSets.Add(Dataset.CreateBar("", dummyBars2, "rgba(0,0,0,0)").SetStackedAxisId());
+            //dataSets.Add(Dataset.CreateBar("", dummyBars3, "rgba(0,0,0,0)").SetStackedAxisId());
 
             return new JsonData() {
                 chartData = new ChartJson {
@@ -418,10 +433,15 @@ namespace ChartBlazorApp.Models
             Options options = Options.CreateTwoAxes(new Ticks(y1_max, y1_step), new Ticks(y1_max, y1_step));
             options.AnimationDuration = 500;
             //options.tooltips.intersect = false;
+            options.tooltips.SetCustomAverage(0, -1);
+            var predDate = PredictStartDate._toShortDateString();
+            options.AddAnnotation(predDate, predDate);
+            options.legend.SetAlignEnd();
             options.legend.reverse = true;
             options.AddStackedAxis();
 
             var dataSets = new List<Dataset>();
+            dataSets.Add(Dataset.CreateLine("  ", new double?[FullPredictSerious.Length], "rgba(0,0,0,0)", "rgba(0,0,0,0)"));
             double?[] predLine = FullPredictSerious._toNullableArray(0);
             dataSets.Add(Dataset.CreateDotLine("予測重症者数", predLine, "darkorange").SetHoverColors("firebrick").SetDispOrder(2));
             //dataSets.Add(Dataset.CreateDotLine("予測重症者数(累積)", fullPredictSeriousTotal._toNullableArray(0), "darkgreen"));
@@ -429,11 +449,11 @@ namespace ChartBlazorApp.Models
             double?[] realBar = RealSerious._toNullableArray(0);
             dataSets.Add(Dataset.CreateBar("重症者実数", realBar, "steelblue").SetHoverColors("mediumblue").SetStackedAxisId());
             double?[] dummyBars1 = RealSerious.Select(v => y1_max - v).ToArray()._extend(FullPredictSerious.Length, y1_max)._toNullableArray(0, 0);
-            double?[] dummyBars2 = new double[0]._extend(FullPredictSerious.Length, -1)._toNullableArray(0, -1);
-            double?[] dummyBars3 = Dataset.CalcDummyData(FullPredictSerious.Length, new double?[][] { realBar, dummyBars1, dummyBars2 }, new double?[][] { predLine }, null, y1_max);
+            //double?[] dummyBars2 = new double[0]._extend(FullPredictSerious.Length, -1)._toNullableArray(0, -1);
+            //double?[] dummyBars3 = Dataset.CalcDummyData(FullPredictSerious.Length, new double?[][] { realBar, dummyBars1, dummyBars2 }, new double?[][] { predLine }, null, y1_max);
             dataSets.Add(Dataset.CreateBar("", dummyBars1, "rgba(0,0,0,0)").SetStackedAxisId().SetHoverColors("rgba(10,10,10,0.1)"));
-            dataSets.Add(Dataset.CreateBar("", dummyBars2, "rgba(0,0,0,0)").SetStackedAxisId());
-            dataSets.Add(Dataset.CreateBar("", dummyBars3, "rgba(0,0,0,0)").SetStackedAxisId());
+            //dataSets.Add(Dataset.CreateBar("", dummyBars2, "rgba(0,0,0,0)").SetStackedAxisId());
+            //dataSets.Add(Dataset.CreateBar("", dummyBars3, "rgba(0,0,0,0)").SetStackedAxisId());
 
             return new JsonData() {
                 chartData = new ChartJson {
