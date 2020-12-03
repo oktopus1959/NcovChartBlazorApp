@@ -296,16 +296,19 @@ function ChartDrawer(wrapperId) {
 
         var chartWidth = this.chartWidth;
         var chartHeight = this.chartHeight;
-        function _customFixedOrHighest(elements, isHighest) {
+        function _customFixedOrHighest(elements, eventPosition, isHighest) {
             // 上から120pxの高さのところを返す。
             // core.tooltip.jsを参照。
             if (!elements.length) {
                 return false;
             }
+            // X軸ラベル部分ならツールチップを表示しない
+            //console.log(eventPosition);
+            if (eventPosition.y >= 360) return false;
+
             var tooltip = this;
             //console.log(tooltip);
             //console.log(elements);
-            //console.log(eventPosition);
 
             var i, len;
             var count = 0;
@@ -340,12 +343,12 @@ function ChartDrawer(wrapperId) {
 
         // ツールチップの表示位置のカスタム関数を登録
         Chart.Tooltip.positioners.customFixed = function (elements, eventPosition) {
-            return _customFixedOrHighest(elements, false);
+            return _customFixedOrHighest(elements, eventPosition, false);
         }
 
         // ツールチップの表示位置のカスタム関数を登録
         Chart.Tooltip.positioners.customHighest = function (elements, eventPosition) {
-            return _customFixedOrHighest(elements, true);
+            return _customFixedOrHighest(elements, eventPosition, true);
         }
 
         function _customAverage(elements, startIdx, length) {
