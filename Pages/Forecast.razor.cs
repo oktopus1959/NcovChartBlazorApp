@@ -76,11 +76,11 @@ namespace ChartBlazorApp.Pages
 
             var json = forecastData.MakeDeathJsonData();
             var jsonStr = (json?.chartData)._toString();
-            await JSRuntime.InvokeAsync<string>("renderChart2", "chart-wrapper-death", -3, 100, jsonStr);
+            await JSRuntime.InvokeAsync<string>("renderChart2", "chart-wrapper-death", -2, 100, jsonStr);
 
             json = forecastData.MakeSeriousJsonData();
             jsonStr = (json?.chartData)._toString();
-            await JSRuntime.InvokeAsync<string>("renderChart2", "chart-wrapper-serious", -3, 100, jsonStr);
+            await JSRuntime.InvokeAsync<string>("renderChart2", "chart-wrapper-serious", -2, 100, jsonStr);
         }
 
     }

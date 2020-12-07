@@ -58,7 +58,7 @@ namespace ChartBlazorApp.Models
 
         private static DateTime _firstDate = "2020/6/1"._parseDateTime();
 
-        public class PreInfectData
+        public class PrefInfectData
         {
             public string Title { get; set; }
             public double Y1_Max { get; set; }
@@ -79,20 +79,17 @@ namespace ChartBlazorApp.Models
         private List<InfectData> loadPrefectureData(IEnumerable<string> lines)
         {
             List<string> prefOrder = new List<string>();
-            var dataDict = new Dictionary<string, PreInfectData>();
-            PreInfectData getOrNewData(string[] items, bool bAddOrder)
+            var prefDataDict = new Dictionary<string, PrefInfectData>();
+            PrefInfectData getOrNewData(string[] items, bool bAddOrder)
             {
-                PreInfectData data = null;
+                PrefInfectData data = null;
                 var dispName = items[1];
                 var keyName = items[2];
                 if (keyName._notEmpty()) {
-                    data = dataDict._safeGetOrNewInsert(keyName);
+                    data = prefDataDict._safeGetOrNewInsert(keyName);
                     if (data.Title._isEmpty()) {
                         data.Title = dispName;
-                        data.DecayParam = new RtDecayParam() {
-                            DaysToOne = 15,
-                            DecayFactor = 1000,
-                        };
+                        data.DecayParam = RtDecayParam.CreateDefaultParam();
                         data.Dates = new List<DateTime>();
                         data.Total = new List<double>();
                     }
@@ -113,7 +110,7 @@ namespace ChartBlazorApp.Models
                         data.Y1_Max = items._nth(3)._parseDouble(0.0);
                         data.Y2_Max = items._nth(4)._parseDouble(0.0);
                         data.DecayParam.StartDate = items._nth(5)._parseDateTime();
-                        data.DecayParam.DaysToOne = items._nth(6)._parseInt(15);
+                        data.DecayParam.DaysToOne = items._nth(6)._parseInt(RtDecayParam.DefaultParam.DaysToOne);
                         var factor = items._nth(7)._parseDouble(0);
                         if (factor < 10) factor = Pages.MyChart._decayFactors[(int)factor];
                         data.DecayParam.DecayFactor = factor;
@@ -121,15 +118,26 @@ namespace ChartBlazorApp.Models
                 } else if (items[0]._startsWith("20")) {
                     var data = getOrNewData(items, true);
                     if (data != null) {
-                        data.Total.Add(items._nth(3)._parseDouble(0));
                         var dt = items._nth(0)._parseDateTime();
-                        data.Dates.Add(dt);
-                        if (dt < _firstDate) ++data.PreDataNum;
+                        var val = items._nth(3)._parseDouble(0);
+                        if (data.Dates._isEmpty() || data.Dates.Last() < dt) {
+                            data.Total.Add(val);
+                            data.Dates.Add(dt);
+                            if (dt < _firstDate) ++data.PreDataNum;
+                        } else {
+                            for (int i = data.Dates.Count() - 1; i >= 0; --i) {
+                                if (data.Dates[i] == dt) {
+                                    data.Total[i] = val;
+                                } else if (data.Dates[i] > dt) {
+                                    break;
+                                }
+                            }
+                        }
                     }
                 }
             }
 
-            InfectData makeData(PreInfectData data)
+            InfectData makeData(PrefInfectData data)
             {
                 int predatanum = data.PreDataNum;
                 double total(int i) => data.Total._nth(i + predatanum);
@@ -163,7 +171,7 @@ namespace ChartBlazorApp.Models
 
             var infectList = new List<InfectData>();
             foreach (var pref in prefOrder) {
-                var data = dataDict._safeGet(pref);
+                var data = prefDataDict._safeGet(pref);
                 if (data != null) infectList.Add(makeData(data));
             }
             return infectList;
@@ -227,19 +235,15 @@ namespace ChartBlazorApp.Models
                     }
                     int realDays = (lastDate - firstDate).Days + 1;
                     int predDays = realDays + 21;
-#if DEBUG
-                    predDays += 14;
-#endif
 
                     if (rtDecayParam != null) {
-                        data.PredictValuesEx(rtDecayParam, fullDates._length());
-
-                        for (int i = data.FullPredRt.Length - 1; i >= realDays; --i) {
-                            if (Math.Abs(data.FullPredRt[i] - 1.0) < 0.005) {
-                                predDays = Math.Max(i + 14, predDays);
-                                break;
-                            }
-                        }
+                        predDays = data.PredictValuesEx(rtDecayParam, fullDates._length());
+                        //for (int i = data.FullPredRt.Length - 1; i >= (predDays - 14); --i) {
+                        //    if (Math.Abs(data.FullPredRt[i] - 1.0) < 0.005) {
+                        //        predDays = i + 14;
+                        //        break;
+                        //    }
+                        //}
                     }
 
                     data.DispDays = Math.Max(realDays + 21, predDays) + 1;
@@ -329,16 +333,17 @@ namespace ChartBlazorApp.Models
 
         public int findRecentMaxIndex(double[] rt)
         {
+            const int FIND_MAX_DURATION = 10;
             int lastIdx = rt.Length - 1;
             int maxIdx = lastIdx;
             var maxVal = rt[lastIdx];
-            int count = 7;
+            int count = FIND_MAX_DURATION;
             while (count-- > 0 && --lastIdx >= 0) {
                 var v = rt[lastIdx];
                 if (v > maxVal) {
                     maxVal = v;
                     maxIdx = lastIdx;
-                    count = 7;
+                    count = FIND_MAX_DURATION;
                 }
             }
             return maxIdx;
@@ -399,7 +404,8 @@ namespace ChartBlazorApp.Models
         /// <param name="rtDecayParam"></param>
         /// <param name="numFullDays"></param>
         /// <param name="predStartDt">予測開始日</param>
-        public void PredictValuesEx(RtDecayParam rtDecayParam, int numFullDays, DateTime? predStartDt = null)
+        /// <returns>表示開始から予測終了までの日数</returns>
+        public int PredictValuesEx(RtDecayParam rtDecayParam, int numFullDays, DateTime? predStartDt = null)
         {
             if (rtDecayParam == null) rtDecayParam = InitialDecayParam;
             var firstRealDate = Dates.First();
@@ -411,10 +417,12 @@ namespace ChartBlazorApp.Models
             FullPredRt = new double[numFullDays];
 
             if (rtDecayParam.StartDate._notValid()) rtDecayParam.StartDate = InitialDecayParam.StartDate;
+            if (rtDecayParam.StartDateDetail._notValid()) rtDecayParam.StartDateDetail = RtDecayParam.DefaultParam.StartDate;
             if (rtDecayParam.StartDate > realEndDate) rtDecayParam.StartDate = realEndDate;
-            PredStartIdx = (rtDecayParam.StartDate - firstRealDate).Days;
+            if (rtDecayParam.StartDateDetail > realEndDate) rtDecayParam.StartDateDetail = realEndDate;
+            PredStartIdx = (rtDecayParam.EffectiveStartDate - firstRealDate).Days;
             Array.Copy(Average, RevAverage, PredStartIdx);
-            int predRtLen = rtDecayParam.CopyPredictRt(Rt, PredStartIdx, FullPredRt, realDays);
+            int predRtLen = rtDecayParam.CalcAndCopyPredictRt(Rt, PredStartIdx, FullPredRt, realDays);
 
             for (int i = 0; i < predRtLen; ++i) {
                 int idx = PredStartIdx + i;
@@ -424,8 +432,9 @@ namespace ChartBlazorApp.Models
                 }
             }
 
+            predRtLen -= 4;
             double[] revAveAverage = new double[numFullDays];   // 逆算移動平均の平均
-            for (int i = 0; i < predRtLen - 4; ++i) {
+            for (int i = 0; i < predRtLen; ++i) {
                 int idx = PredStartIdx + i;
                 int beg = idx - 3;
                 int end = idx + 4;
@@ -441,6 +450,8 @@ namespace ChartBlazorApp.Models
             for (int i = PredStartIdx; i < PredNewly.Length; ++i) {
                 RevRt[i] = DailyData.CalcRt(totals, i);
             }
+
+            return PredStartIdx + predRtLen;
         }
 
         private static double[] predictInfect(double[] newly, double[] average, double[] pred, int realDays, int predStartIdx)
@@ -487,33 +498,134 @@ namespace ChartBlazorApp.Models
 
     public class RtDecayParam
     {
+        public bool UseDetail { get; set; }
+
         /// <summary>予測開始日</summary>
         public DateTime StartDate { get; set; }
 
+        public DateTime StartDateDetail { get; set; }
+
+        public DateTime EffectiveStartDate { get { return UseDetail ? StartDateDetail : StartDate; } }
+
         public int DaysToOne { get; set; }
+
+        public int DaysToRt1 { get; set; }
+        public double Rt1 { get; set; }
+
+        public int DaysToRt2 { get; set; }
+        public double Rt2 { get; set; }
+
+        public int DaysToRt3 { get; set; }
+        public double Rt3 { get; set; }
+
+        public int DaysToRt4 { get; set; }
+        public double Rt4 { get; set; }
 
         public double DecayFactor { get; set; }
 
-        public const int ExtensionDays = 40;
+        public const int DaysToNextRt = 15;
+
+        public static RtDecayParam CreateDefaultParam()
+        {
+            return new RtDecayParam() {
+                UseDetail = false,
+                StartDateDetail = new DateTime(2020, 7, 4),
+                DaysToOne = DaysToNextRt,
+                DaysToRt1 = 45,
+                Rt1 = 0.83,
+                DaysToRt2 = 60,
+                Rt2 = 1,
+                DaysToRt3 = 26,
+                Rt3 = 1.4,
+                DaysToRt4 = 30,
+                Rt4 = 0.83,
+                DecayFactor = 1000,
+            };
+        }
+
+        public static RtDecayParam DefaultParam { get; } = CreateDefaultParam();
+
+        public const int ExtensionDays = 25;
+        public const int ExtensionDaysEx = 15;
 
         /// <summary> y = (a / x) + b の形の関数として Rt の減衰を計算する </summary>
-        public int CopyPredictRt(double[] rts, int startIdx, double[] predRt, int realDays)
+        /// <returns>計算された予測Rtの日数を返す</returns>
+        public int CalcAndCopyPredictRt(double[] rts, int startIdx, double[] predRt, int realDays)
         {
             double startValue = rts[startIdx];
-            double factor1 = DecayFactor;
-            double a1 = (startValue - 1) * (factor1 + DaysToOne) * factor1 / DaysToOne;
-            double b1 = startValue - (a1 / factor1);
-            // Rt=0を下回ってから
-            double decayFactorUnder0 = 50;
-            double minRt = 0.75;
-            double factor2 = Math.Min(DecayFactor, decayFactorUnder0);
-            double a2 = (startValue - 1) * (factor2 + DaysToOne) * factor2 / DaysToOne;
-            double b2 = startValue - (a2 / factor2);
-            int copyLen = Math.Min(Math.Max(DaysToOne, realDays - startIdx + ExtensionDays), predRt.Length - startIdx);
-            for (int i = 0; i < copyLen; ++i) {
-                predRt[startIdx + i] = Math.Max(i < DaysToOne ? a1 / (factor1 + i) + b1 : a2 / (factor2 + i) + b2, minRt);
+            if (UseDetail) {
+                double decayFactor = 10000;
+                double rt1 = Rt1;
+                int daysToRt1 = DaysToRt1;
+                if (daysToRt1 < 1) daysToRt1 = DaysToNextRt;
+                double a1 = (startValue - rt1) * (decayFactor + daysToRt1) * decayFactor / daysToRt1;
+                double b1 = startValue - (a1 / decayFactor);
+                // Rt1に到達してから
+                double rt2 = Rt2;
+                int daysToRt2 = DaysToRt2;
+                if (daysToRt2 < 1) daysToRt2 = DaysToNextRt;
+                double a2 = (rt1 - rt2) * (decayFactor + daysToRt2) * decayFactor / daysToRt2;
+                double b2 = rt1 - (a2 / decayFactor);
+                // Rt2に到達してから
+                double rt3 = Rt3;
+                int daysToRt3 = DaysToRt3;
+                if (daysToRt3 < 1) daysToRt3 = DaysToNextRt;
+                double a3 = (rt2 - rt3) * (decayFactor + daysToRt3) * decayFactor / daysToRt3;
+                double b3 = rt2 - (a3 / decayFactor);
+                // Rt3に到達してから
+                double rt4 = Rt4;
+                int daysToRt4 = DaysToRt4;
+                if (daysToRt4 < 1) daysToRt4 = DaysToNextRt;
+                double a4 = (rt3 - rt4) * (decayFactor + daysToRt4) * decayFactor / daysToRt4;
+                double b4 = rt3 - (a4 / decayFactor);
+
+                int copyLen = Math.Min(Math.Max(daysToRt1 + daysToRt2 + daysToRt3 + daysToRt4 + ExtensionDaysEx, realDays - startIdx + ExtensionDays), predRt.Length - startIdx);
+                for (int i = 0; i < copyLen; ++i) {
+                    double rt;
+                    if (i <= daysToRt1) {
+                        rt = a1 / (decayFactor + i) + b1;
+                    } else if (i <= daysToRt1 + daysToRt2) {
+                        rt = a2 / (decayFactor + i - daysToRt1) + b2;
+                        if (rt1 > rt2) {
+                            if (rt < rt2) rt = rt2;
+                        } else {
+                            if (rt > rt2) rt = rt2;
+                        }
+                    } else if (i <= daysToRt1 + daysToRt2 + daysToRt3) {
+                        rt = a3 / (decayFactor + i - daysToRt1 - daysToRt2) + b3;
+                        if (rt2 > rt3) {
+                            if (rt < rt3) rt = rt3;
+                        } else {
+                            if (rt > rt3) rt = rt3;
+                        }
+                    } else {
+                        rt = a4 / (decayFactor + i - daysToRt1 - daysToRt2 - daysToRt3) + b4;
+                        if (rt3 > rt4) {
+                            if (rt < rt4) rt = rt4;
+                        } else {
+                            if (rt > rt4) rt = rt4;
+                        }
+                    }
+                    predRt[startIdx + i] = rt;
+                }
+                return copyLen;
+            } else {
+                double rt1 = 1;
+                double factor1 = DecayFactor;
+                double a1 = (startValue - rt1) * (factor1 + DaysToOne) * factor1 / DaysToOne;
+                double b1 = startValue - (a1 / factor1);
+                // Rt1に到達してから
+                double rt2 = startValue >= rt1 ? 0.75 : 1.2;
+                double decayFactorAfterReachedRt1 = 50;
+                double factor2 = Math.Min(DecayFactor, decayFactorAfterReachedRt1);
+                double a2 = (startValue - rt1) * (factor2 + DaysToOne) * factor2 / DaysToOne;
+                double b2 = startValue - (a2 / factor2);
+                int copyLen = Math.Min(Math.Max(DaysToOne + ExtensionDaysEx, realDays - startIdx + ExtensionDays), predRt.Length - startIdx);
+                for (int i = 0; i < copyLen; ++i) {
+                    predRt[startIdx + i] = Math.Max(i < DaysToOne ? a1 / (factor1 + i) + b1 : a2 / (factor2 + i) + b2, rt2);
+                }
+                return copyLen;
             }
-            return copyLen;
         }
     }
 

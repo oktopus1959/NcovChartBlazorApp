@@ -30,6 +30,24 @@ findLastDate() {
     grep ',$1,' $2 | tail -n 1 | cut -d, -f1
 }
 
+findNonZeroTail() {
+    local pref="$1"
+    local file="$2"
+    local lastLine=""
+    local lastTotal=""
+    local mytotal=""
+    for line in $(grep ",${pref}," $file | tail -n 10 | sort -r); do
+        mytotal=$(echo $line | cut -d, -f4)
+        if [ "$lastTotal" -a "$lastTotal" != "$mytotal" ]; then
+            break
+        elif [ "$lastTotal" == "" ]; then
+            lastTotal=$mytotal
+        fi
+        lastLine="$line"
+    done
+    echo "$lastLine"
+}
+
 addExtraTotal() {
     paramFile=$1
     outFile=$2
@@ -37,6 +55,7 @@ addExtraTotal() {
     VAR_PRINT outFile
     for pref in $(grep '^20' $paramFile | cut -d, -f3 | sort -u); do
         echo "== $pref =="
+        #tailLine=$(findNonZeroTail ${pref} $outFile)
         tailLine=$(grep ",${pref}," $outFile | tail -n 1)
         tailDate=$(normalizeDate "$tailLine")
         tailVal=$(echo $tailLine | cut -d, -f4)

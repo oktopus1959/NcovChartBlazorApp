@@ -53,8 +53,8 @@ namespace ChartBlazorApp.Models
         public string type { get; set; } = "bar";
         public bool fill { get; set; } = false;
         public bool spanGaps { get; set; } = false;
-        public int pointRadius { get; set; } = 3;
-        public int pointHoverRadius { get; set; } = 4;
+        public double pointRadius { get; set; } = 2.5;
+        public double pointHoverRadius { get; set; } = 4.5;
         public double? borderWidth { get; set; } = null;
         public double[] borderDash { get; set; }
         public string xAxisID { get; set; } = null;

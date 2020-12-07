@@ -10,6 +10,10 @@ function insertAboutDescription(html) {
     document.getElementById("about-description").innerHTML = html;
 }
 
+function insertOthersDescription(html) {
+    document.getElementById("others-description").innerHTML = html;
+}
+
 function showOrHideDiv(descDivId, targetId) {
     document.getElementById(targetId).style.display = descDivId == targetId ? "block" : "none";
 }
@@ -294,6 +298,13 @@ function ChartDrawer(wrapperId) {
         //    }
         //};
 
+        // ツールチップが表示されているか
+        //var tooltipShown = false;
+        //chartData.options.tooltips.custom = function (tooltip) {
+        //    console.log(tooltip.opacity);
+        //    tooltipShown = tooltip.opacity > 0;
+        //};
+
         var chartWidth = this.chartWidth;
         var chartHeight = this.chartHeight;
         function _customFixedOrHighest(elements, eventPosition, isHighest) {
@@ -303,10 +314,10 @@ function ChartDrawer(wrapperId) {
                 return false;
             }
             // X軸ラベル部分ならツールチップを表示しない
-            //console.log(eventPosition);
-            if (eventPosition.y >= 360) return false;
+            if (eventPosition.y >= 360) {
+                return false;
+            }
 
-            var tooltip = this;
             //console.log(tooltip);
             //console.log(elements);
 

@@ -91,12 +91,19 @@ namespace ChartBlazorApp.Models
 
         public string PredictStartDateStr { get { return PredictStartDate.ToString("M月d日"); } }
 
-        public DateTime LastPredicDate { get { return PredictStartDate.AddDays(PredictDays - 1); } }
+        public DateTime LastPredictDate { get { return PredictStartDate.AddDays(PredictDays - 1); } }
 
-        public string LastPredicDateStr { get { return LastPredicDate.ToString("M月d日"); } }
+        public string LastPredictDateStr { get { return LastPredictDate.ToString("M月d日"); } }
 
-        public int LastPredicDeath { get; set; }
-        public int LastPredicSerious { get; set; }
+        public int LastPredictDeath { get; set; }
+
+        public int LastPredictSerious { get; set; }
+
+        public int MaxPredictSerious { get; set; }
+
+        public DateTime MaxPredictSeriousDate { get; set; }
+
+        public string MaxPredictSeriousDateStr { get { return MaxPredictSeriousDate.ToString("M月d日"); } }
 
         public int LastAccumPositive { get; set; }
 
@@ -108,7 +115,11 @@ namespace ChartBlazorApp.Models
 
         public double MaxDeath { get; set; }
 
+        public double MinDeath { get; set; }
+
         public double MaxSerious { get; set; }
+
+        public double MinSerious { get; set; }
 
         public DailyData dailyData { get; set; }
 
@@ -251,7 +262,7 @@ namespace ChartBlazorApp.Models
         /// 0: StartDate ,
         /// 1: PredDispStartDate ,
         /// 2: StartSeriousTotal,StartRecoveredTotal ,
-        /// 3: MaxDeath,MaxSerious ,
+        /// 3: MaxDeath,MaxSerious[,MinDeath,MinSerious]
         /// 4: 2020/6/1,death,serious ,
         /// 5: ...</para>
         /// </summary>
@@ -264,6 +275,8 @@ namespace ChartBlazorApp.Models
             StartRecoverTotal = items[2][1]._parseDouble();
             MaxDeath = items[3][0]._parseDouble();
             MaxSerious = items[3][1]._parseDouble();
+            MinDeath = items[3]._nth(2)._parseDouble(0);
+            MinSerious = items[3]._nth(3)._parseDouble(0);
             var dataStart = items[4][0]._parseDateTime();
             _realDeathSeries = new DatedDataSeries() {
                 Date = dataStart,
@@ -311,7 +324,7 @@ namespace ChartBlazorApp.Models
             double[] predDailyDeath = calcPredDailyDeath(firstDate, dailyInPred, realDays + PredictDays);
             double[] fullPredictDeath = predDailyDeath.Select((x, i) => predDeathTotal += x).ToArray();
             FullPredictDeath = fullPredictDeath.Select((x, i) => Math.Round(x)).ToArray();
-            LastPredicDeath = (int)FullPredictDeath.Last();
+            LastPredictDeath = (int)FullPredictDeath.Last();
 
             // serious予想
             RealSerious = _realSeriousSeries.GetSubSeriesFrom(ChartStartDate);
@@ -328,8 +341,13 @@ namespace ChartBlazorApp.Models
                 fullPredictRecoverTotal[j] = predRecoverTotal;
                 fullPredictSerious[i] = fullPredictSeriousTotal[j] - fullPredictDeath[j] - predRecoverTotal;
             }
+
+            (var idx, var val) = fullPredictSerious.Skip(realDays)._top1();
+            MaxPredictSerious = (int)Math.Round(val);
+            MaxPredictSeriousDate = firstDate.AddDays(realDays + idx);
+
             FullPredictSerious = fullPredictSerious.Skip(preambleSerious.Length).Select((x, i) => Math.Round(x)).ToArray();
-            LastPredicSerious = (int)FullPredictSerious.Last();
+            LastPredictSerious = (int)FullPredictSerious.Last();
         }
 
         private double[] calcPredDailyDeath(DateTime firstDate, double[] infectPred, int numDays)
@@ -384,8 +402,9 @@ namespace ChartBlazorApp.Models
         public JsonData MakeDeathJsonData()
         {
             double y1_max = MaxDeath;
-            double y1_step = y1_max / 10;
-            Options options = Options.CreateTwoAxes(new Ticks(y1_max, y1_step), new Ticks(y1_max, y1_step));
+            double y1_min = MinDeath;
+            double y1_step = (y1_max - y1_min) / 10;
+            Options options = Options.CreateTwoAxes(new Ticks(y1_max, y1_step, y1_min), new Ticks(y1_max, y1_step, y1_min));
             options.AnimationDuration = 500;
             //options.tooltips.intersect = false;
             options.tooltips.SetCustomAverage(0, -1);
@@ -428,9 +447,10 @@ namespace ChartBlazorApp.Models
         public JsonData MakeSeriousJsonData()
         {
             double y1_max = MaxSerious;
+            double y1_min = MinSerious;
             //double y1_max = 3000;
-            double y1_step = y1_max / 10;
-            Options options = Options.CreateTwoAxes(new Ticks(y1_max, y1_step), new Ticks(y1_max, y1_step));
+            double y1_step = (y1_max - y1_min) / 10;
+            Options options = Options.CreateTwoAxes(new Ticks(y1_max, y1_step, y1_min), new Ticks(y1_max, y1_step, y1_min));
             options.AnimationDuration = 500;
             //options.tooltips.intersect = false;
             options.tooltips.SetCustomAverage(0, -1);

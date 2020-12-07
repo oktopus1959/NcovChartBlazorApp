@@ -1,4 +1,4 @@
 2020/7/1,#RealDispStartDate
 2020/10/1,#PredDispStartDate
 1238.70475,225.70475,#StartSeriousTotal,StartRecoveredTotal
-3000,700
+3250,700,750

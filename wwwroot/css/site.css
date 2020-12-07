@@ -35,6 +35,11 @@ div.less-indent {
     padding-left: 0.8em;
 }
 
+div.less-indent p {
+    margin-top: 5px;
+    margin-bottom: 5px;
+}
+
 div.indent {
     text-indent: 0;
     padding-left: 1em;
@@ -62,6 +67,12 @@ div.table-block {
 
 table {
     font-size: 0.8rem;
+}
+
+.inline-wrapper {
+    display: inline-block;
+    margin-top: 4px;
+    margin-right: 1em;
 }
 
 @media (min-width: 0px) {
@@ -128,6 +139,10 @@ label, input[type='checkbox'], input[type='radio'] {
     color: grey;
 }
 
+.no-color {
+    color: rgba(0,0,0,0);
+}
+
 .text-date {
     width: 6em;
     padding: 0px 4px;
@@ -147,12 +162,6 @@ label, input[type='checkbox'], input[type='radio'] {
 
 select {
     padding: 1px 0px;
-}
-
-.inline-wrapper {
-    display: inline-block;
-    margin-top: 4px;
-    margin-right: 1em;
 }
 
 .my-reconnect-modal > div {

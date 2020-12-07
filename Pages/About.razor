@@ -9,6 +9,8 @@
     {
         //var html = Helper.GetFileContent("wwwroot/html/About.html", System.Text.Encoding.UTF8);
         //if (html._notEmpty()) await JSRuntime.InvokeAsync<string>("insertAboutDescription", html);
+        var html = Helper.GetFileContent("wwwroot/html/Others.html", System.Text.Encoding.UTF8);
+        if (html._notEmpty()) await JSRuntime.InvokeAsync<string>("insertOthersDescription", html);
         await JSRuntime.InvokeAsync<string>("selectDescription", "about-page");
     }
 
