@@ -181,9 +181,9 @@ namespace ChartBlazorApp.Models
         // 呼び出し方法については _Host.cshtml の renderChart0 関数、および GompertzInterop クラスを参照のこと。
         // 参照: https://docs.microsoft.com/ja-jp/aspnet/core/blazor/call-dotnet-from-javascript?view=aspnetcore-3.1
         [JSInvokable]
-        public string GetChartData(int dataIdx, int yAxisMax, string endDate, bool estimatedBar, bool bAnimation)
+        public string GetChartData(int dataIdx, int yAxisMax, string endDate, bool estimatedBar, bool onlyOnClick, bool bAnimation)
         {
-            var json = MakeJsonData(dataIdx, yAxisMax, endDate._parseDateTime(), null, estimatedBar, bAnimation);
+            var json = MakeJsonData(dataIdx, yAxisMax, endDate._parseDateTime(), null, estimatedBar, onlyOnClick, bAnimation);
             return json?.chartData == null ? "" : JsonConvert.SerializeObject(json.chartData, new JsonSerializerSettings { NullValueHandling = NullValueHandling.Include, });
         }
 
@@ -215,13 +215,14 @@ namespace ChartBlazorApp.Models
         /// <param name="aheadParamIdx">事前作成予想データインデックス(負なら使わない)</param>
         /// <param name="bAnimation">グラフアニメーションの有無</param>
         /// <returns></returns>
-        public JsonData MakeJsonData(int dataIdx, double yAxisMax, DateTime endDate, RtDecayParam rtDecayParam, bool estimatedBar, bool bAnimation = false)
+        public JsonData MakeJsonData(int dataIdx, double yAxisMax, DateTime endDate, RtDecayParam rtDecayParam, bool estimatedBar, bool onlyOnClick, bool bAnimation = false)
         {
             JsonData jsonData = null;
             string title = "";
             var data = InfectDataList._nth(dataIdx);
             if (data != null) {
                 title = data.Title;
+                Console.WriteLine($"{DateTime.Now} [MakeJsonData] idx={dataIdx}, pref={title}");
                 //int x0 = data.X0;
                 var chartData = new ChartJson { type = "bar" };
                 //var borderDash = new double[] { 10, 3 };
@@ -256,6 +257,7 @@ namespace ChartBlazorApp.Models
                     if (!bAnimation) options.AnimationDuration = 0;
                     options.legend.SetAlignEnd();
                     options.legend.reverse = true;  // 凡例の表示を登録順とは逆順にする
+                     options.SetOnlyClickEvent(onlyOnClick);
                     chartData.options = options;
 
                     var dataSets = new List<Dataset>();

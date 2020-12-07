@@ -412,6 +412,10 @@ function ChartDrawer(wrapperId) {
         }
 
         //console.log('new Chart');
+
+        // クリック時のみ、反応する
+        //chartData.options.events = ["click"];
+
         this.myChart = new Chart(this.ctxChart, chartData);
 
         //console.log(window.innerWidth);

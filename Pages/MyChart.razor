@@ -11,7 +11,7 @@
     // グラフ表示の最終日
     private string _endDate = "2021/5/31";
 
-    private const int _mainPrefNum = 3;
+    private const int _mainPrefNum = UserSettings.MainPrefNum;
 }
 
 <h4><span>新型コロナ</span> <span>陽性者数グラフ</span></h4>
@@ -119,19 +119,25 @@
 <div class="vertical-align" style="margin-top: 1.5em; line-height: 1.5em">
     @* バーの太さを増減させるボタン*@
     <div class="inline-wrapper"><span>棒グラフの幅：</span>
-    <button class="btn btn-primary btn-sm py-0" @onclick="RenderThinChartBarMethod">－</button>
-    <span>[ @_barWidth ]</span>
-    <button class="btn btn-primary btn-sm py-0" @onclick="RenderThickChartBarMethod">＋</button></div>
+        <button class="btn btn-primary btn-sm py-0" @onclick="RenderThinChartBarMethod">－</button>
+        <span>[ @_barWidth ]</span>
+        <button class="btn btn-primary btn-sm py-0" @onclick="RenderThickChartBarMethod">＋</button></div>
     @* 左Y軸の最大値を選択するドロップダウン *@
     <div class="inline-wrapper"><span>左Ｙ軸最大値：</span>
-    <select style="padding: 1px" name="yAxisMax" value="@_yAxisMax" @onchange="ChangeYAxisMax">
-        @for (int n = 100000; n > 50000; n -= 50000) { <option value="@n" selected="@(n == _yAxisMax)">@n</option> }
-        @for (int n = 50000; n > 10000; n -= 10000) { <option value="@n" selected="@(n == _yAxisMax)">@n</option> }
-        @for (int n = 10000; n > 5000; n -= 1000) { <option value="@n" selected="@(n == _yAxisMax)">@n</option> }
-        @for (int n = 5000; n > 1000; n -= 500) { <option value="@n" selected="@(n == _yAxisMax)">@n</option> }
-        @for (int n = 1000; n >= 100; n -= 100) { <option value="@n" selected="@(n == _yAxisMax)">@n</option> }
-        @for (int n = 50; n >= 20; n -= 30) { <option value="@n" selected="@(n == _yAxisMax)">@n</option> }
-    </select></div>
+        <select style="padding: 1px" name="yAxisMax" value="@_yAxisMax" @onchange="ChangeYAxisMax">
+            @for (int n = 100000; n > 50000; n -= 50000) { <option value="@n" selected="@(n == _yAxisMax)">@n</option> }
+            @for (int n = 50000; n > 10000; n -= 10000) { <option value="@n" selected="@(n == _yAxisMax)">@n</option> }
+            @for (int n = 10000; n > 5000; n -= 1000) { <option value="@n" selected="@(n == _yAxisMax)">@n</option> }
+            @for (int n = 5000; n > 1000; n -= 500) { <option value="@n" selected="@(n == _yAxisMax)">@n</option> }
+            @for (int n = 1000; n >= 100; n -= 100) { <option value="@n" selected="@(n == _yAxisMax)">@n</option> }
+            @for (int n = 50; n >= 20; n -= 30) { <option value="@n" selected="@(n == _yAxisMax)">@n</option> }
+        </select></div>
+    @* クリック時のみ反応する *@
+    <div class="inline-wrapper">
+        <label for="only-on-click">
+            <input type="checkbox" name="only-on-click" id="only-on-click" @onchange="ChangeOnlyOnClick" checked="@(_onlyOnClick)" />
+            <span>クリック時のみtooltip表示</span>
+        </label></div>
     <span id="for-debug-print"></span>
 </div>
 

@@ -39,51 +39,6 @@ namespace ChartBlazorApp.Pages
         //[Parameter]
         //public int DataIdx { get; set; } = 0;
 
-        /// <summary>
-        /// ブラウザの LocalStorage から値を取得
-        /// </summary>
-        /// <param name="key"></param>
-        /// <returns></returns>
-        private async ValueTask<string> getLocalStorage(string key)
-        {
-            return await JSRuntime.InvokeAsync<string>("getLocalStorage", key);
-        }
-
-        /// <summary>
-        /// ブラウザの LocalStorage に値を保存
-        /// </summary>
-        /// <param name="key"></param>
-        private async Task setLocalStorage(string key, string value)
-        {
-            await JSRuntime.InvokeAsync<string>("setLocalStorage", key, value);
-        }
-
-        /// <summary>
-        /// ブラウザの LocalStorage からint値を取得。無ければ null を返す。
-        /// </summary>
-        /// <param name="key"></param>
-        private async ValueTask<int?> getLocalStorageInt(string key)
-        {
-            try {
-                return int.Parse(await getLocalStorage(key));
-            } catch {
-                return null;
-            }
-        }
-
-        /// <summary>
-        /// ブラウザの LocalStorage からdouble値を取得。無ければ null を返す。
-        /// </summary>
-        /// <param name="key"></param>
-        private async ValueTask<double?> getLocalStorageDouble(string key)
-        {
-            try {
-                return double.Parse(await getLocalStorage(key));
-            } catch {
-                return null;
-            }
-        }
-
         // データの数
         public int _infectDataCount { get { return dailyData?.InfectDataList?.Count ?? 0; } }
 
@@ -104,153 +59,7 @@ namespace ChartBlazorApp.Pages
             2,      // 9
         };
 
-        public class Settings
-        {
-            public int radioIdx { get; set; }
-            public int prefIdx { get; set; }
-            public int barWidth { get; set; }
-            public int[] yAxisMax { get; set; }
-            public bool drawExpectation { get; set; }
-            public bool estimatedBar { get; set; }
-            public bool detailSettings { get; set; }
-            public string[] paramRtStartDate { get; set; }
-            public string[] paramRtStartDateDetail { get; set; }
-            public int[] paramRtDaysToOne { get; set; }
-            public int[] paramRtDaysToRt1 { get; set; }
-            public double[] paramRtRt1 { get; set; }
-            public int[] paramRtDaysToRt2 { get; set; }
-            public double[] paramRtRt2 { get; set; }
-            public int[] paramRtDaysToRt3 { get; set; }
-            public double[] paramRtRt3 { get; set; }
-            public int[] paramRtDaysToRt4 { get; set; }
-            public double[] paramRtRt4 { get; set; }
-            public double[] paramRtDecayFactor { get; set; }
-
-            public int dataIdx { get { return radioIdx < _mainPrefNum ? radioIdx : prefIdx; } }
-
-            public Settings initialize(int numData)
-            {
-                radioIdx = 0;
-                prefIdx = _mainPrefNum;
-                barWidth = 0;
-                yAxisMax = new int[numData];
-                drawExpectation = false;
-                estimatedBar = false;
-                detailSettings = false;
-                paramRtStartDate = new string[numData];
-                paramRtStartDateDetail = new string[numData];
-                paramRtDaysToOne = new int[numData];
-                paramRtDaysToRt1 = new int[numData];
-                paramRtRt1 = new double[numData];
-                paramRtDaysToRt2 = new int[numData];
-                paramRtRt2 = new double[numData];
-                paramRtDaysToRt3 = new int[numData];
-                paramRtRt3 = new double[numData];
-                paramRtDaysToRt4 = new int[numData];
-                paramRtRt4 = new double[numData];
-                paramRtDecayFactor = new double[numData];
-                return this;
-            }
-
-            private T[] _extendArray<T>(T[] array, int num)
-            {
-                if (array._isEmpty()) {
-                    array = new T[num];
-                } else if (array.Length < num) {
-                    Array.Resize(ref array, num);
-                }
-                return array;
-            }
-
-            public Settings fillEmptyArray(int numData)
-            {
-                yAxisMax = _extendArray(yAxisMax, numData);
-                paramRtStartDate = _extendArray(paramRtStartDate, numData);
-                paramRtStartDateDetail = _extendArray(paramRtStartDateDetail, numData);
-                paramRtDaysToOne = _extendArray(paramRtDaysToOne, numData);
-                paramRtDaysToRt1 = _extendArray(paramRtDaysToRt1, numData);
-                paramRtRt1 = _extendArray(paramRtRt1, numData);
-                paramRtDaysToRt2 = _extendArray(paramRtDaysToRt2, numData);
-                paramRtRt2 = _extendArray(paramRtRt2, numData);
-                paramRtDaysToRt3 = _extendArray(paramRtDaysToRt3, numData);
-                paramRtRt3 = _extendArray(paramRtRt3, numData);
-                paramRtDaysToRt4 = _extendArray(paramRtDaysToRt4, numData);
-                paramRtRt4 = _extendArray(paramRtRt4, numData);
-                paramRtDecayFactor = _extendArray(paramRtDecayFactor, numData);
-                return this;
-            }
-
-            public int myYAxisMax() { return yAxisMax._getNth(dataIdx); }
-            public string myParamStartDate() { return paramRtStartDate._getNth(dataIdx); }
-            public string myParamStartDateDetail() { return paramRtStartDateDetail._getNth(dataIdx); }
-            public int myParamDaysToOne() { return paramRtDaysToOne._getNth(dataIdx); }
-            public int myParamDaysToRt1() { return paramRtDaysToRt1._getNth(dataIdx); }
-            public double myParamRt1() { return paramRtRt1._getNth(dataIdx); }
-            public int myParamDaysToRt2() { return paramRtDaysToRt2._getNth(dataIdx); }
-            public double myParamRt2() { return paramRtRt2._getNth(dataIdx); }
-            public int myParamDaysToRt3() { return paramRtDaysToRt3._getNth(dataIdx); }
-            public double myParamRt3() { return paramRtRt3._getNth(dataIdx); }
-            public int myParamDaysToRt4() { return paramRtDaysToRt4._getNth(dataIdx); }
-            public double myParamRt4() { return paramRtRt4._getNth(dataIdx); }
-            public double myParamDecayFactor() { return paramRtDecayFactor._getNth(dataIdx); }
-
-            public void changeBarWidth(int value)
-            {
-                barWidth = Math.Min(Math.Max(barWidth + value, -4), 4);
-            }
-            public void changeYAxisMax(int value) {
-                if (yAxisMax.Length > dataIdx) yAxisMax[dataIdx] = value;
-            }
-            public void setDrawExpectation(bool value) {
-                drawExpectation = value;
-            }
-            public void setEstimatedBar(bool value) {
-                estimatedBar = value;
-            }
-            public void setDetailSettings(bool value) {
-                detailSettings = value;
-            }
-            public void setParamStartDate(string value) {
-                if (paramRtStartDate.Length > dataIdx) paramRtStartDate[dataIdx] = value;
-            }
-            public void setParamStartDateDetail(string value) {
-                if (paramRtStartDateDetail.Length > dataIdx) paramRtStartDateDetail[dataIdx] = value;
-            }
-            public void setParamDaysToOne(int value) {
-                if (paramRtDaysToOne.Length > dataIdx) paramRtDaysToOne[dataIdx] = value;
-            }
-            public void setParamDaysToRt1(int value) {
-                if (paramRtDaysToRt1.Length > dataIdx) paramRtDaysToRt1[dataIdx] = value;
-            }
-            public void setParamRt1(double value) {
-                if (paramRtRt1.Length > dataIdx) paramRtRt1[dataIdx] = value;
-            }
-            public void setParamDaysToRt2(int value) {
-                if (paramRtDaysToRt2.Length > dataIdx) paramRtDaysToRt2[dataIdx] = value;
-            }
-            public void setParamRt2(double value) {
-                if (paramRtRt2.Length > dataIdx) paramRtRt2[dataIdx] = value;
-            }
-            public void setParamDaysToRt3(int value) {
-                if (paramRtDaysToRt3.Length > dataIdx) paramRtDaysToRt3[dataIdx] = value;
-            }
-            public void setParamRt3(double value) {
-                if (paramRtRt3.Length > dataIdx) paramRtRt3[dataIdx] = value;
-            }
-            public void setParamDaysToRt4(int value) {
-                if (paramRtDaysToRt4.Length > dataIdx) paramRtDaysToRt4[dataIdx] = value;
-            }
-            public void setParamRt4(double value) {
-                if (paramRtRt4.Length > dataIdx) paramRtRt4[dataIdx] = value;
-            }
-            public void setParamDecayFactor(double value) {
-                if (paramRtDecayFactor.Length > dataIdx) paramRtDecayFactor[dataIdx] = value;
-            }
-        }
-
-        private const string SettingsKey = "net.oktopus59.ncov.settings.v4"; // v1008
-
-        private Settings _currentSettings = (new Settings()).initialize(0);
+        private UserSettings _currentSettings = UserSettings.CreateInitialSettings();
 
         private ChartBlazorApp.Models.InfectData _infectData { get { return dailyData.InfectDataList._getNth(_currentSettings.dataIdx); } }
 
@@ -269,6 +78,8 @@ namespace ChartBlazorApp.Pages
         private bool _estimatedBar { get { return _currentSettings.estimatedBar; } }
 
         private bool _detailSettings { get { return _currentSettings.detailSettings; } }
+
+        private bool _onlyOnClick { get { return _currentSettings.onlyOnClick; } }
 
         private string _paramDate { get { return _currentSettings.myParamStartDate()._orElse(() => _infectData.InitialDecayParam.StartDate._toDateString()); } }
 
@@ -296,28 +107,9 @@ namespace ChartBlazorApp.Pages
 
         private double _paramDecayFactor { get { return _currentSettings.myParamDecayFactor()._gtZeroOr(_infectData.InitialDecayParam.DecayFactor); } }
 
-        private async Task saveSettings()
-        {
-            await setLocalStorage(
-                SettingsKey,
-                JsonConvert.SerializeObject(_currentSettings));
-        }
-
-        /// <summary>
-        /// 保存しておいた設定を取得する
-        /// </summary>
-        /// <returns></returns>
         private async Task getSettings()
         {
-            async ValueTask<Settings> _getSettings()
-            {
-                try {
-                    return JsonConvert.DeserializeObject<Settings>(await getLocalStorage(SettingsKey)).fillEmptyArray(_infectDataCount);
-                } catch {
-                    return (new Settings()).initialize(_infectDataCount);
-                }
-            }
-            _currentSettings = await _getSettings();
+            _currentSettings = await UserSettings.GetSettings(JSRuntime, _infectDataCount);
         }
 
         private async Task insertStaticDescription()
@@ -415,6 +207,12 @@ namespace ChartBlazorApp.Pages
             string dt = args.Value.ToString();
             if (dt._reMatch(@"^\d+/\d+$")) dt = $"{DateTime.Now._yyyy()}/{dt}";
             _currentSettings.setParamStartDateDetail(dt);
+            await RenderChartMethod();
+        }
+
+        public async Task ChangeOnlyOnClick(ChangeEventArgs args)
+        {
+            _currentSettings.setOnlyOnClick((bool)args.Value);
             await RenderChartMethod();
         }
 
@@ -572,13 +370,13 @@ namespace ChartBlazorApp.Pages
                 };
             }
 
-            var json = dailyData.MakeJsonData(_currentSettings.dataIdx, _yAxisMax, _endDate._parseDateTime(), rtParam, _estimatedBar, bFirst);
+            var json = dailyData.MakeJsonData(_currentSettings.dataIdx, _yAxisMax, _endDate._parseDateTime(), rtParam, _estimatedBar, _onlyOnClick, bFirst);
 
             var jsonStr = (json?.chartData)._toString();
             int barWidth = _drawExpectation && _estimatedBar && _barWidth < 0 ? 0 : _barWidth;
             double scrlbarRatio = bResetScrollBar || barWidth != _barWidth ? newlyDaysRatio() : 0;
             await JSRuntime.InvokeAsync<string>("renderChart2", "chart-wrapper-home", barWidth, scrlbarRatio, jsonStr);
-            if (!bFirst) await saveSettings();
+            if (!bFirst) await _currentSettings.SaveSettings();
         }
 
         private double newlyDaysRatio()

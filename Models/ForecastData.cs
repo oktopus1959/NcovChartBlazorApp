@@ -313,10 +313,8 @@ namespace ChartBlazorApp.Models
 
             // 予測期間における新規陽性者数累計
             LastAccumPositive = (int)Math.Round(infectData.PredNewly.Skip(realDays).Take(PredictDays).Sum(), 0);
-#if DEBUG
             //foreach (var p in infectData.PredNewly.Skip(realDays).Take(PredictDays)) Console.WriteLine(p.ToString("f1"));
-            Console.WriteLine($"LastAccumPositive={LastAccumPositive}");
-#endif
+            Console.WriteLine($"{DateTime.Now} [Forecast.MakePreliminaryData] LastAccumPositive={LastAccumPositive}");
 
             // death予想
             RealDeath = _realDeathSeries.GetSubSeriesFrom(ChartStartDate);
@@ -399,7 +397,7 @@ namespace ChartBlazorApp.Models
         /// 死亡者数予測グラフ用データの作成
         /// </summary>
         /// <returns></returns>
-        public JsonData MakeDeathJsonData()
+        public JsonData MakeDeathJsonData(bool onlyOnClick)
         {
             double y1_max = MaxDeath;
             double y1_min = MinDeath;
@@ -413,6 +411,7 @@ namespace ChartBlazorApp.Models
             options.legend.SetAlignEnd();
             options.legend.reverse = true;
             options.AddStackedAxis();
+            options.SetOnlyClickEvent(onlyOnClick);
 
             var dataSets = new List<Dataset>();
             dataSets.Add(Dataset.CreateLine("  ", new double?[FullPredictDeath.Length], "rgba(0,0,0,0)", "rgba(0,0,0,0)"));
@@ -444,7 +443,7 @@ namespace ChartBlazorApp.Models
         /// 重症者数予測グラフ用データの作成
         /// </summary>
         /// <returns></returns>
-        public JsonData MakeSeriousJsonData()
+        public JsonData MakeSeriousJsonData(bool onlyOnClick)
         {
             double y1_max = MaxSerious;
             double y1_min = MinSerious;
@@ -459,6 +458,7 @@ namespace ChartBlazorApp.Models
             options.legend.SetAlignEnd();
             options.legend.reverse = true;
             options.AddStackedAxis();
+            options.SetOnlyClickEvent(onlyOnClick);
 
             var dataSets = new List<Dataset>();
             dataSets.Add(Dataset.CreateLine("  ", new double?[FullPredictSerious.Length], "rgba(0,0,0,0)", "rgba(0,0,0,0)"));

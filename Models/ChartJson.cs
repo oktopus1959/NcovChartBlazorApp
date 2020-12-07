@@ -230,6 +230,18 @@ namespace ChartBlazorApp.Models
 
         public Annotation annotation { get; set; } = new Annotation();
 
+        public string[] events { get; set; }
+
+        public void SetOnlyClickEvent(bool flag)
+        {
+            if (flag) SetEvents("click");
+        }
+
+        public void SetEvents(params string[] events)
+        {
+            this.events = events;
+        }
+
         public static Options Plain(Ticks ticks = null)
         {
             return new Options {
