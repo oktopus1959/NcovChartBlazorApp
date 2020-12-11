@@ -2,9 +2,9 @@
 @using StandardCommon
 
 <div style="width: 100%">
-<div class="chart-block">
-<h4><span>COVID-19</span> <span>重症者数グラフ</span></h4>
-<span>最大予測：@(forecastData.MaxPredictSeriousDateStr)：@(forecastData.MaxPredictSerious._formatComma())名</span>／<span>@(forecastData.LastPredictDateStr)の予測値：@(forecastData.LastPredictSerious._formatComma())名</span>
+<div class="chart-block" style="@(_userData.UseDetail ? "max-width: 100%" : null)">
+<h4><span>新型コロナ</span> <span>重症者数グラフ</span> <span>@(_userData.UseDetail ? "（詳細設定使用）" : "")</span></h4>
+<span>最大予測：@(_userData.MaxPredictSeriousDateStr)：@(_userData.MaxPredictSerious._formatComma())名</span>／<span>@(_userData.LastPredictDateStr)の予測値：@(_userData.LastPredictSerious._formatComma())名</span>
 <span>（予測日：@(forecastData.PredictStartDateStr)）</span>
 @* Chart の Canvas *@
 <div class="scrollableChartWrapper" style="" id="chart-wrapper-serious">
@@ -16,9 +16,9 @@
 </div>
 </div>
 
-<div class="chart-block right-block">
-<h4><span>COVID-19</span> <span>累計死亡者数グラフ</span></h4>
-<span>@(forecastData.LastPredictDateStr)の予測値：@(forecastData.LastPredictDeath._formatComma())名</span> <span>（予測日：@(forecastData.PredictStartDateStr)）</span>
+<div class="chart-block right-block" style="@(_userData.UseDetail ? "max-width: 100%" : null)">
+<h4><span>新型コロナ</span> <span>累計死亡者数グラフ</span> <span>@(_userData.UseDetail ? "（詳細設定使用）" : "")</span></h4>
+<span>@(_userData.LastPredictDateStr)の予測値：@(_userData.LastPredictDeath._formatComma())名</span> <span>（予測日：@(forecastData.PredictStartDateStr)）</span>
 @* Chart の Canvas *@
 <div class="scrollableChartWrapper" style="" id="chart-wrapper-death">
     <div id="scrollWrapper">
@@ -26,6 +26,38 @@
     </div>
     <canvas id="yAxis1" style="left: 0" width="0"></canvas>
     <canvas id="yAxis2" style="right: 0" width="0"></canvas>
+</div>
+</div>
+</div>
+
+<div class="inline-wrapper" style="margin-top: 10px;">
+    <label for="both-sum-diff">
+        <input type="checkbox" name="both-sum-diff" id="both-sum-diff" @onchange="ShowBothDiffChart" />
+        <span>その他グラフ</span>
+    </label></div>
+
+<div style="display: @(_bothDiffChart ? "blcok" : "none"); width: 100%">
+<div class="chart-block">
+<h4><span>日別死亡者数グラフ</span></h4>
+@* Chart の Canvas *@
+<div class="scrollableChartWrapper" id="chart-wrapper-dailydeath">
+    <div id="scrollWrapper-dd">
+        <canvas id="dailyDeathChart"></canvas>
+    </div>
+    <canvas id="dd-yAxis1" style="left: 0" width="0"></canvas>
+    <canvas id="dd-yAxis2" style="right: 0" width="0"></canvas>
+</div>
+</div>
+
+<div class="chart-block right-block">
+<h4><span>重症＋死亡者 ［実数－予測値］</span></h4>
+@* Chart の Canvas *@
+<div class="scrollableChartWrapper" id="chart-wrapper-bothsum">
+    <div id="scrollWrapper-bs">
+        <canvas id="bothChart"></canvas>
+    </div>
+    <canvas id="bs-yAxis1" style="left: 0" width="0"></canvas>
+    <canvas id="bs-yAxis2" style="right: 0" width="0"></canvas>
 </div>
 </div>
 </div>

@@ -18,10 +18,13 @@ function showOrHideDiv(descDivId, targetId) {
     document.getElementById(targetId).style.display = descDivId == targetId ? "block" : "none";
 }
 
-function selectDescription(descDivId) {
+function selectDescription(descDivId, paramId, paramVal) {
     showOrHideDiv(descDivId, "home-page");
     showOrHideDiv(descDivId, "forecast-page");
     showOrHideDiv(descDivId, "about-page");
+    if (paramId && paramVal) {
+        document.getElementById(paramId).innerHTML = paramVal;
+    }
 }
 
 const readAsTextReader = file => {
@@ -112,8 +115,6 @@ function ChartDrawer(wrapperId) {
         // グラフ描画後は、canvas.width(height):canvas.style.width(height) 比は、下記 scale の値になっている
         var scale = window.devicePixelRatio;
 
-        //document.getElementById("for-debug-print").innerHTML = "  scale=" + scale;
-
         //console.log("scale=" + scale);
         //console.log("this.currentBarWidth=" + this.currentBarWidth);
         //console.log("this.chartWidth=" + this.chartWidth);
@@ -203,12 +204,14 @@ function ChartDrawer(wrapperId) {
         // スクロールする
         if (this.initialScrollRate > 0) {
             var wrapper = document.getElementById(this.wrapperId).getElementsByTagName("div")[0];
-            var cliWidth = wrapper.clientWidth;
-            var scrWidth = wrapper.scrollWidth;
+            var cliWidth = wrapper.clientWidth;     // 描画時にdivがdisplay:noneになっているとこの値は0
+            var scrWidth = wrapper.scrollWidth;     // 描画時にdivがdisplay:noneになっているとこの値は0
             //console.log("clientWidth=" + cliWidth);
             //console.log("scrollWidth=" + scrWidth);
             //console.log("scrollRate=" + this.initialScrollRate);
-            wrapper.scrollLeft = Math.min(Math.max(scrWidth * this.initialScrollRate - cliWidth * 0.667, 0.0), scrWidth - cliWidth);
+            // 描画時にdivがdisplay:noneになっていると、そもそもスクロールが効かない
+            wrapper.scrollLeft = cliWidth == 0 ? 100 : Math.min(Math.max(scrWidth * this.initialScrollRate - cliWidth * 0.667, 0.0), scrWidth - cliWidth);
+            //console.log("wrapper.scrollLeft=" + wrapper.scrollLeft);
             this.initialScrollRate = 0;
         }
 
