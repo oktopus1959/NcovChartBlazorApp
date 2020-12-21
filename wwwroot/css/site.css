@@ -50,8 +50,91 @@ div.indent2 {
     padding-left: 2em;
 }
 
+div.flex-box {
+    display: flex;
+    flex-wrap: wrap;
+}
+
+div.with-border {
+    padding-top: 4px;
+    padding-bottom: 8px;
+    padding-left: 12px;
+    border: solid 1px;
+    border-color: lightgray;
+}
+
 span, label, th, td {
     white-space: nowrap;
+}
+
+label {
+    margin-bottom: 0px;
+}
+
+.left-triangle {
+    width: 0;
+    height: 0;
+    border-top: 0.5em solid transparent;
+    border-right: 0.5em solid white;
+    border-bottom: 0.5em solid transparent;
+}
+
+.left-triangle-black {
+    width: 0;
+    height: 0;
+    border-top: 0.5em solid transparent;
+    border-right: 0.5em solid black;
+    border-bottom: 0.5em solid transparent;
+}
+
+.right-triangle {
+    width: 0;
+    height: 0;
+    border-top: 0.5em solid transparent;
+    border-left: 0.5em solid white;
+    border-bottom: 0.5em solid transparent;
+}
+
+.right-triangle-black {
+    width: 0;
+    height: 0;
+    border-top: 0.5em solid transparent;
+    border-left: 0.5em solid black;
+    border-bottom: 0.5em solid transparent;
+}
+
+hr.narrow {
+    margin-top: 8px;
+    margin-bottom: 4px;
+    margin-right: 8px;
+}
+
+.vertical-center {
+    /*height: 1.5rem;*/
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    /*background-color: aqua;*/
+}
+
+.vertical-thick {
+    height: 2.5em !important;
+}
+
+.inline-wrapper {
+    display: inline-block;
+    margin-top: 4px;
+    margin-right: 1em;
+}
+
+.vertical-center .inline-wrapper,select,input {
+    margin-top: 0px !important;
+    margin-bottom: 0px !important;
+}
+
+.position-right {
+    margin-left: auto;
+    margin-right: 8px;
 }
 
 div.chart-block {
@@ -67,12 +150,6 @@ div.table-block {
 
 table {
     font-size: 0.8rem;
-}
-
-.inline-wrapper {
-    display: inline-block;
-    margin-top: 4px;
-    margin-right: 1em;
 }
 
 @media (min-width: 0px) {
