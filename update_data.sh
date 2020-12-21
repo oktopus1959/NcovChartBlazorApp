@@ -94,6 +94,7 @@ downloadCsv() {
 }
 
 PREF_PARAM_FILE=Data/pref_params.txt
+PREF_WORK_FILE=$WORKDIR/prefectures_ex.csv
 PREF_TARGET_FILE=$CSVDIR/prefectures_ex.csv
 PCR_DAILY_FILE=pcr_positive_daily.csv
 PCR_DAILY_WORK=$WORKDIR/$PCR_DAILY_FILE
@@ -114,7 +115,7 @@ mkdir -p $CSVDIR $WORKDIR
 FIRST_DATE='2020.0?5.18'
 
 # ヘッダー部
-grep '^#' $PREF_PARAM_FILE > $PREF_TARGET_FILE
+grep '^#' $PREF_PARAM_FILE > $PREF_WORK_FILE
 
 # 全国
 RUN_CMD -f "downloadCsv https://www.mhlw.go.jp/content/$PCR_DAILY_FILE ${PCR_DAILY_WORK}"
@@ -130,16 +131,17 @@ end
 EOS
 }
 
-RUN_CMD -f "sed -nr '/^${FIRST_DATE},/,$ p' $PCR_DAILY_WORK| ruby -e '$(ruby_script)' >> ${PREF_TARGET_FILE}"
+RUN_CMD -f "sed -nr '/^${FIRST_DATE},/,$ p' $PCR_DAILY_WORK| ruby -e '$(ruby_script)' >> ${PREF_WORK_FILE}"
 
 # 都道府県
 [ "$LOADFLAG" ] && RUN_CMD -m "(cd Data/covid19; git pull)"
 RUN_CMD -f -m "sed -nr '/^${FIRST_DATE},/,$ p' $PREF_SRCFILE | \
             sed -r 's/^([0-9]+),([0-9]+),([0-9]+),/\1\/\2\/\3,/' | \
-            cut -d, -f1-4 >> ${PREF_TARGET_FILE}"
+            cut -d, -f1-4 >> ${PREF_WORK_FILE}"
 
 # 追加陽性者数
-RUN_CMD -f -m "addExtraTotal $PREF_PARAM_FILE $PREF_TARGET_FILE"
+RUN_CMD -f -m "addExtraTotal $PREF_PARAM_FILE $PREF_WORK_FILE"
+RUN_CMD -f -m "sed 's/[都府県],/,/' $PREF_WORK_FILE > $PREF_TARGET_FILE"
 
 # 重症者&死亡者&改善率
 RUN_CMD -f "downloadCsv https://www.mhlw.go.jp/content/$DEATH_TOTAL_FILE ${DEATH_TOTAL_WORK}"
