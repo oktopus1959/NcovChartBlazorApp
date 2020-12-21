@@ -17,6 +17,12 @@ namespace ChartBlazorApp.Pages
 {
     public partial class Forecast : ComponentBase
     {
+#if DEBUG
+        private static bool _debug = true;
+#else
+        private static bool _debug = false;
+#endif
+
         // IJSRuntime はシステムが既定で用意している
         [Inject]
         protected IJSRuntime JSRuntime { get; set; }
@@ -33,7 +39,7 @@ namespace ChartBlazorApp.Pages
 
         private InfectData _infectData0 { get { return dailyData.InfectDataList[0]; } }
 
-        private UserSettings _userSettings;
+        private EffectiveParams _effectiveParams = new EffectiveParams(null, null);
 
         private async Task insertStaticDescription()
         {
@@ -43,12 +49,13 @@ namespace ChartBlazorApp.Pages
 
         private async Task selectStaticDescription()
         {
-            await JSRuntime.InvokeAsync<string>("selectDescription", "forecast-page", "infect-rate-ave-weeks", forecastData.RateAveWeeks.ToString());
+            //await JSRuntime.InvokeAsync<string>("selectDescription", "forecast-page", "infect-rate-ave-weeks", forecastData.RateAveWeeks.ToString());
+            await JSRuntime.InvokeAsync<string>("selectDescription", "forecast-page");
         }
 
         private async Task getSettings()
         {
-            _userSettings = await UserSettings.GetSettings(JSRuntime, 0);
+            _effectiveParams = await EffectiveParams.CreateByGettingUserSettings(JSRuntime, dailyData);
         }
 
         /// <summary>
@@ -76,11 +83,11 @@ namespace ChartBlazorApp.Pages
             //forecastData.Initialize();
         }
 
-        private bool _bothDiffChart = false;
+        private bool _showOtherCharts = _debug;
 
-        public async Task ShowBothDiffChart(ChangeEventArgs args)
+        public async Task ShowOtherCharts(ChangeEventArgs args)
         {
-            _bothDiffChart = (bool)(args.Value);
+            _showOtherCharts = (bool)(args.Value);
             await RenderDeathAndSeriousChart(false);
             StateHasChanged();
         }
@@ -92,30 +99,34 @@ namespace ChartBlazorApp.Pages
         /// <returns></returns>
         public async Task RenderDeathAndSeriousChart(bool bAnimation = true)
         {
-            //_infectData.PredictValuesEx(null, forecastData.FullDays(_infectData.Dates._first()), forecastData.PredictStartDate);
-            RtDecayParam rtParam = null;
-            if (_userSettings.useOnForecast || _userSettings.drawExpectation && _userSettings.fourstepSettings) {
-                // ユーザ設定を使う
-                rtParam = _userSettings.MakeRtDecayParam(_infectData0.InitialDecayParam, 0);  // 0: 全国
-            }
-            _userData = forecastData.MakePreliminaryData(_infectData0, rtParam);
-            bool onlyOnClick = _userSettings?.onlyOnClick ?? false;
+            // ユーザ設定を使うか
+            //bool useSettings = _effectiveParams.UseOnForecast || (_effectiveParams.DrawExpectation && _effectiveParams.FourstepSettings);
+            //bool useSettings = _effectiveParams.DetailSettings || (_effectiveParams.DrawExpectation && _effectiveParams.FourstepSettings);
+            RtDecayParam rtParam = _effectiveParams.MakeRtDecayParam(0);  // 0: 全国
+            // 予測に必要なデータの準備
+            _userData = new UserForecastData().MakeData(forecastData, _infectData0, rtParam);
 
-            var json = forecastData.MakeDeathJsonData(_userData, onlyOnClick, bAnimation);
-            var jsonStr = (json?.chartData)._toString();
+            bool onlyOnClick = _effectiveParams.OnlyOnClick;
+
+            var jsonStr = forecastData.MakeDeathJsonData(_userData, onlyOnClick, bAnimation);
             await JSRuntime.InvokeAsync<string>("renderChart2", "chart-wrapper-death", -2, newlyDaysRatio(), jsonStr);
 
-            json = forecastData.MakeSeriousJsonData(_userData, onlyOnClick, bAnimation);
-            jsonStr = (json?.chartData)._toString();
+            jsonStr = forecastData.MakeSeriousJsonData(_userData, onlyOnClick, bAnimation);
             await JSRuntime.InvokeAsync<string>("renderChart2", "chart-wrapper-serious", -2, newlyDaysRatio(), jsonStr);
 
-            json = forecastData.MakeDailyDeathJonData(_userData, onlyOnClick);
-            jsonStr = (json?.chartData)._toString();
-            await JSRuntime.InvokeAsync<string>("renderChart2", "chart-wrapper-dailydeath", -2, 100, jsonStr);
+            if (_showOtherCharts) {
+                jsonStr = forecastData.MakeDailyDeathJonData(_userData, onlyOnClick);
+                await JSRuntime.InvokeAsync<string>("renderChart2", "chart-wrapper-dailydeath", -2, 100, jsonStr);
 
-            json = forecastData.MakeBothDiffJsonData(_userData, onlyOnClick);
-            jsonStr = (json?.chartData)._toString();
-            await JSRuntime.InvokeAsync<string>("renderChart2", "chart-wrapper-bothsum", -2, 100, jsonStr);
+                jsonStr = forecastData.MakeSeriousDiffJsonData(_userData, onlyOnClick);
+                await JSRuntime.InvokeAsync<string>("renderChart2", "chart-wrapper-seriousdiff", -2, 100, jsonStr);
+
+                jsonStr = forecastData.MakeDeathDiffJsonData(_userData, onlyOnClick);
+                await JSRuntime.InvokeAsync<string>("renderChart2", "chart-wrapper-deathdiff", -2, 100, jsonStr);
+
+                jsonStr = forecastData.MakeBothDiffJsonData(_userData, onlyOnClick);
+                await JSRuntime.InvokeAsync<string>("renderChart2", "chart-wrapper-bothsum", -2, 100, jsonStr);
+            }
         }
 
         private double newlyDaysRatio()

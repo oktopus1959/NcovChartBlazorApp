@@ -41,6 +41,12 @@ div.less-indent p {
 }
 
 div.indent {
+    margin-left: 2px;
+    text-indent: 0;
+    padding-left: 0.2em;
+}
+
+div.indent1 {
     text-indent: 0;
     padding-left: 1em;
 }
@@ -58,13 +64,27 @@ div.flex-box {
 div.with-border {
     padding-top: 4px;
     padding-bottom: 8px;
-    padding-left: 12px;
+    padding-left: 8px;
+    margin-left: 0px !important;
+    margin-right: 8px !important;
     border: solid 1px;
-    border-color: lightgray;
+    border-color: silver;
 }
 
 span, label, th, td {
     white-space: nowrap;
+}
+
+span.bold {
+    font-weight: bold;
+}
+/*
+span.h5 {
+    font-size: 1.25em;
+}
+*/
+.small {
+    font-size: small;
 }
 
 label {
@@ -137,6 +157,20 @@ hr.narrow {
     margin-right: 8px;
 }
 
+@media (min-width: 0px) {
+    .position-right-responsive {
+        margin-left: auto;
+        margin-right: 6px;
+    }
+}
+
+@media (min-width: 400px) {
+    .position-right-responsive {
+        margin-left: 0px;
+        margin-right: 1em;
+    }
+}
+
 div.chart-block {
     display: inline-block;
     /* margin-top: 10px; */
@@ -146,6 +180,10 @@ div.table-block {
     display: inline-block;
     margin-top: 10px;
     /*margin-right: 20px;*/
+}
+
+div.tbl-scroll{
+    margin-top: 2px;
 }
 
 table {
@@ -222,17 +260,20 @@ label, input[type='checkbox'], input[type='radio'] {
 
 .text-date {
     width: 6em;
+    height: 24px;
     padding: 0px 4px;
 }
 
 .text-number {
     width: 4em;
+    height: 24px;
     padding: 0px 4px;
     text-align: right;
 }
 
 .text-number-short {
     width: 3em;
+    height: 24px;
     padding: 0px 4px;
     text-align: right;
 }

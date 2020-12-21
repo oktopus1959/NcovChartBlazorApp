@@ -280,7 +280,7 @@ function ChartDrawer(wrapperId) {
             filter: function (item) { return nameFilter(item.text); }
         }
 
-        // RtBaseline および名前無しをツールチップに表示しない
+        // ツーチップフィルタ; RtBaseline および名前無しをツールチップに表示しない
         chartData.options.tooltips.filter = function (item, data) {
             var dataset = data.datasets[item.datasetIndex];
             return dataset && nameFilter(dataset.label) && dataset.data[item.index] != undefined;

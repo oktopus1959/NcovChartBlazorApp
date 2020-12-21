@@ -16,9 +16,13 @@ namespace ChartBlazorApp.Models
 
         public const int ExtensionDays = 25;
 
+        public const int LocalMaxRtDuration = 10;
+
         public const int RadioIdxMax = MainPrefNum + FavorPrefMax;
 
-        // ---- ここから下が LocalStorage に保存される (すべてのメンバーを public にしておくこと)
+        // ---- ここから下が LocalStorage に保存される (すべてのメンバーを public かつ { get; set; } にしておくこと)
+
+        public bool _oldValuesCopied { get; set; }
 
         public int radioIdx { get; set; }
         /// <summary> select で表示している道府県のインデックス </summary>
@@ -30,11 +34,13 @@ namespace ChartBlazorApp.Models
 
         public bool drawExpectation { get; set; }
         public bool estimatedBar { get; set; }
+        public int estimatedBarMinWidth { get; set; }
         public bool detailSettings { get; set; }
         public bool fourstepSettings { get; set; }
         public bool onlyOnClick { get; set; }
         public int extensionDays { get; set; }
-        public bool useOnForecast { get; set; }
+        //public bool useOnForecast { get; set; }
+        public int? localMaxRtDuration { get; set; }
 
         public string[] paramRtStartDate { get; set; }
         public string[] paramRtStartDateFourstep { get; set; }
@@ -43,6 +49,8 @@ namespace ChartBlazorApp.Models
         public int[] paramRtDaysToNext { get; set; }
         public double[] paramRtMaxRt { get; set; }
         public double[] paramRtMinRt { get; set; }
+        public double[] paramRtEasyRt1 { get; set; }
+        public double[] paramRtEasyRt2 { get; set; }
         public double[] paramRtDecayFactorNext { get; set; }
 
         public int[] paramRtDaysToRt1 { get; set; }
@@ -55,8 +63,6 @@ namespace ChartBlazorApp.Models
         public double[] paramRtRt4 { get; set; }
 
         // ---- 上のところまでが LocalStorage に保存される
-
-        public int dataIdx { get { return prefIdxByRadio(radioIdx); } }
 
         public int favorPrefNum {
             get {
@@ -103,11 +109,13 @@ namespace ChartBlazorApp.Models
             yAxisMax = new int[numData];
             drawExpectation = false;
             estimatedBar = false;
+            estimatedBarMinWidth = 0;
             detailSettings = false;
             fourstepSettings = false;
             onlyOnClick = false;
             extensionDays = 0;
-            useOnForecast = false;
+            //useOnForecast = false;
+            localMaxRtDuration = null;
             paramRtStartDate = new string[numData];
             paramRtStartDateFourstep = new string[numData];
             paramRtDaysToOne = new int[numData];
@@ -115,6 +123,8 @@ namespace ChartBlazorApp.Models
             paramRtDaysToNext = new int[numData];
             paramRtMaxRt = new double[numData];
             paramRtMinRt = new double[numData];
+            paramRtEasyRt1 = new double[numData];
+            paramRtEasyRt2 = new double[numData];
             paramRtDecayFactorNext = new double[numData];
             paramRtDaysToRt1 = new int[numData];
             paramRtRt1 = new double[numData];
@@ -125,30 +135,6 @@ namespace ChartBlazorApp.Models
             paramRtDaysToRt4 = new int[numData];
             paramRtRt4 = new double[numData];
             return this;
-        }
-
-        public RtDecayParam MakeRtDecayParam(RtDecayParam iniParam, int idx = -1)
-        {
-            return new RtDecayParam {
-                UseDetail = detailSettings,
-                Fourstep = fourstepSettings,
-                StartDate = myParamStartDate(idx)._parseDateTime()._orElse(iniParam.StartDate),
-                StartDateFourstep = myParamStartDateFourstep(idx)._parseDateTime()._orElse(iniParam.StartDateFourstep),
-                DaysToOne = myParamDaysToOne(idx)._gtZeroOr(iniParam.DaysToOne),
-                DecayFactor = myParamDecayFactor(idx)._gtZeroOr(iniParam.DecayFactor),
-                DaysToNext = myParamDaysToNext(idx)._gtZeroOr(iniParam.DaysToNext),
-                RtMax = myParamMaxRt(idx)._gtZeroOr(iniParam.RtMax),
-                RtMin = myParamMinRt(idx)._gtZeroOr(iniParam.RtMin),
-                DecayFactorNext = myParamDecayFactorNext(idx)._gtZeroOr(iniParam.DecayFactorNext),
-                DaysToRt1 = myParamDaysToRt1(idx)._gtZeroOr(iniParam.DaysToRt1),
-                Rt1 = myParamRt1(idx)._gtZeroOr(iniParam.Rt1),
-                DaysToRt2 = myParamDaysToRt2(idx)._gtZeroOr(iniParam.DaysToRt2),
-                Rt2 = myParamRt2(idx)._gtZeroOr(iniParam.Rt2),
-                DaysToRt3 = myParamDaysToRt3(idx)._gtZeroOr(iniParam.DaysToRt3),
-                Rt3 = myParamRt3(idx)._gtZeroOr(iniParam.Rt3),
-                DaysToRt4 = myParamDaysToRt4(idx)._gtZeroOr(iniParam.DaysToRt4),
-                Rt4 = myParamRt4(idx)._gtZeroOr(iniParam.Rt4),
-            };
         }
 
         private T[] _extendArray<T>(T[] array, int num)
@@ -168,19 +154,20 @@ namespace ChartBlazorApp.Models
         /// </summary>
         /// <param name="key"></param>
         /// <returns></returns>
-        private static async ValueTask<string> getLocalStorage(IJSRuntime jsRuntime)
+        private static async ValueTask<UserSettings> getLocalStorage(IJSRuntime jsRuntime, string key, int numData)
         {
-            return await jsRuntime.InvokeAsync<string>("getLocalStorage", SettingsKey);
+            if (key._isEmpty()) throw new Exception("Empty key");
+            return (await jsRuntime.InvokeAsync<string>("getLocalStorage", key))._jsonDeserialize<UserSettings>().SetJsRuntime(jsRuntime).fillEmptyValues(numData);
         }
 
         /// <summary>
         /// 保存しておいた設定を取得する
         /// </summary>
         /// <returns></returns>
-        public static async ValueTask<UserSettings> GetSettings(IJSRuntime jsRuntime, int numData)
+        public static async ValueTask<UserSettings> GetSettings(IJSRuntime jsRuntime, int numData, DailyData dailyData)
         {
             try {
-                return (await getLocalStorage(jsRuntime))._jsonDeserialize<UserSettings>().SetJsRuntime(jsRuntime).fillEmptyArray(numData);
+                return await getLocalStorage(jsRuntime, SettingsKey, numData);
             } catch {
                 return (new UserSettings().SetJsRuntime(jsRuntime)).Initialize(numData);
             }
@@ -192,10 +179,14 @@ namespace ChartBlazorApp.Models
         /// <param name="key"></param>
         public async Task SaveSettings()
         {
-            await JSRuntime.InvokeAsync<string>("setLocalStorage", SettingsKey, this._jsonSerialize());
+            try {
+                await JSRuntime.InvokeAsync<string>("setLocalStorage", SettingsKey, this._jsonSerialize());
+            } catch {
+                Console.WriteLine($"settings write failed");
+            }
         }
 
-        public UserSettings fillEmptyArray(int numData)
+        public UserSettings fillEmptyValues(int numData)
         {
             yAxisMax = _extendArray(yAxisMax, numData);
             favorPrefIdxes = _extendArray(favorPrefIdxes, FavorPrefMax);
@@ -206,6 +197,7 @@ namespace ChartBlazorApp.Models
             paramRtDaysToNext = _extendArray(paramRtDaysToNext, numData);
             paramRtMaxRt = _extendArray(paramRtMaxRt, numData);
             paramRtMinRt = _extendArray(paramRtMinRt, numData);
+            paramRtEasyRt1 = _extendArray(paramRtEasyRt1, numData);
             paramRtDecayFactorNext = _extendArray(paramRtDecayFactorNext, numData);
             paramRtDaysToRt1 = _extendArray(paramRtDaysToRt1, numData);
             paramRtRt1 = _extendArray(paramRtRt1, numData);
@@ -215,8 +207,25 @@ namespace ChartBlazorApp.Models
             paramRtRt3 = _extendArray(paramRtRt3, numData);
             paramRtDaysToRt4 = _extendArray(paramRtDaysToRt4, numData);
             paramRtRt4 = _extendArray(paramRtRt4, numData);
+
+            if (_oldValuesCopied) {
+#if DEBUG
+                Console.WriteLine($"Old value already copied");
+#endif
+                paramRtEasyRt2 = _extendArray(paramRtEasyRt2, numData);
+            } else {
+                paramRtEasyRt2 = new double[paramRtMinRt.Length];
+                Array.Copy(paramRtMinRt, paramRtEasyRt2, paramRtMinRt.Length);
+                _oldValuesCopied = true;
+                Console.WriteLine($"Old value now copied");
+            }
             return this;
         }
+
+        public int myExtensionDays() { return extensionDays._gtZeroOr(ExtensionDays); }
+        public int myLocalMaxRtDuration() { return localMaxRtDuration._geZeroOr(LocalMaxRtDuration); }
+
+        public int dataIdx { get { return prefIdxByRadio(radioIdx); } }
 
         public int myYAxisMax(int idx = -1) { return yAxisMax._getNth(idx >= 0 ? idx : dataIdx); }
         public string myParamStartDate(int idx = -1) { return paramRtStartDate._getNth(idx >= 0 ? idx : dataIdx); }
@@ -226,6 +235,8 @@ namespace ChartBlazorApp.Models
         public int myParamDaysToNext(int idx = -1) { return paramRtDaysToNext._getNth(idx >= 0 ? idx : dataIdx); }
         public double myParamMaxRt(int idx = -1) { return paramRtMaxRt._getNth(idx >= 0 ? idx : dataIdx); }
         public double myParamMinRt(int idx = -1) { return paramRtMinRt._getNth(idx >= 0 ? idx : dataIdx); }
+        public double myParamEasyRt1(int idx = -1) { return paramRtEasyRt1._getNth(idx >= 0 ? idx : dataIdx); }
+        public double myParamEasyRt2(int idx = -1) { return paramRtEasyRt2._getNth(idx >= 0 ? idx : dataIdx); }
         public double myParamDecayFactorNext(int idx = -1) { return paramRtDecayFactorNext._getNth(idx >= 0 ? idx : dataIdx); }
         public int myParamDaysToRt1(int idx = -1) { return paramRtDaysToRt1._getNth(idx >= 0 ? idx : dataIdx); }
         public double myParamRt1(int idx = -1) { return paramRtRt1._getNth(idx >= 0 ? idx : dataIdx); }
@@ -246,54 +257,62 @@ namespace ChartBlazorApp.Models
         }
 
         /// <summary>
-        /// prefIdx を指定ラジオボタン位置に挿入する
-        /// </summary>
-        /// <param name="prefIdx">DailyData.InfectDataListにおけるインデックス</param>
-        /// <param name="radioPos">ラジオボタンの位置; 範囲外なら除去</param>
-        public void moveFavorPref(int prefIdx, int radioPos)
-        {
-            if (favorPrefIdxes._notEmpty()) {
-                int favorPos = radioPos - MainPrefNum;
-                if (favorPos >= 0 && favorPos < favorPrefIdxes.Length) {
-                    // 挿入位置を空ける
-                    int fp = favorPrefIdxes._findIndex(prefIdx);
-                    if (fp < 0) fp = favorPrefIdxes.Length;
-                    if (favorPrefIdxes[favorPos] > 0) {
-                        if (fp < favorPos) {
-                            for (int i = fp; i < favorPos; ++i) favorPrefIdxes[i] = favorPrefIdxes[i + 1];
-                        } else if (fp > favorPos) {
-                            int ep = Math.Min(fp, favorPrefIdxes.Length - 1);
-                            for (int i = ep; i > favorPos; --i) favorPrefIdxes[i] = favorPrefIdxes[i - 1];
-                        }
-                    } else {
-                        if (fp >= 0 && fp < favorPrefIdxes.Length) favorPrefIdxes[fp] = 0;
-                    }
-                    favorPrefIdxes[favorPos] = prefIdx;
-                } else {
-                    for (int i = 0; i < favorPrefIdxes.Length; ++i) {
-                        if (favorPrefIdxes[i] == prefIdx) favorPrefIdxes[i] = 0;
-                    }
-                }
-                doCompaction();
-                int rp = favorPrefIdxes._findIndex(i => i == prefIdx) + MainPrefNum;
-                radioIdx = rp >= MainPrefNum && rp < selectorRadioPos ? rp : selectorRadioPos;
-            }
-        }
-
-        /// <summary>
         /// 現在のラジオボタンの位置にあるPrefを左(delta=-1)または右(delta=1)に移動する
         /// </summary>
         /// <param name="delta"></param>
         public void moveRadioPref(int delta)
         {
-            int pos;
+            int radioPos; // 移動先の位置
             if (delta < 0) {
-                pos = (radioIdx >= selectorRadioPos) ? Math.Min(radioIdx, RadioIdxMax - 1) : radioIdx - 1;
-                if (pos < MainPrefNum) return;
+                radioPos = (radioIdx >= selectorRadioPos) ? Math.Min(radioIdx, RadioIdxMax - 1) : radioIdx - 1;
+                if (radioPos < MainPrefNum) return;
             } else {
-                pos = (radioIdx < selectorRadioPos - 1) ? radioIdx + 1 : -1;
+                radioPos = (radioIdx < selectorRadioPos - 1) ? radioIdx + 1 : -1;
             }
-            moveFavorPref(dataIdx, pos);
+
+            // 以下、 dataIdx を radioPos に移動する汎用的な作りになっている。radioPos が範囲外なら dataIdx が除去される。
+            if (favorPrefIdxes._notEmpty()) {
+                int pfIdx = dataIdx;                        // pfIdx: 移動対象の prefIdx
+                int favorPos = radioPos - MainPrefNum;      // favorPos: favorPrefIdxes[] の中での挿入位置
+                if (favorPos >= 0 && favorPos < favorPrefIdxes.Length) {
+                    // favorPrefIdxes[] に挿入
+                    int fp = favorPrefIdxes._findIndex(pfIdx);  // fp: favorPrefIdxes[] 内で移動対象 prefIdx の位置。なければ -1
+                    if (fp < 0) fp = favorPrefIdxes.Length;
+                    if (favorPrefIdxes[favorPos] > 0) {
+                        // 移動先に別のprefが入っている
+                        if (fp < favorPos) {
+                            // 移動対象が favorPrefIdxes[] の中で、移動先より前の位置にある
+                            for (int i = fp; i < favorPos; ++i) favorPrefIdxes[i] = favorPrefIdxes[i + 1];
+                        } else {
+                            int ep = Math.Min(fp, favorPrefIdxes.Length - 1);
+                            if (ep > favorPos) {
+                                // 移動対象が favorPrefIdxes[] の中で、移動先より後の位置にある
+                                for (int i = ep; i > favorPos; --i) favorPrefIdxes[i] = favorPrefIdxes[i - 1];
+                            } else {
+                                // 移動対象が favorPrefIdxes[] の中で移動先と同じ位置にある、または移動対象がセレクタ位置にあって移動先が除去される
+                                prefIdx = favorPrefIdxes[favorPos];
+                            }
+                        }
+                    } else {
+                        // 移動先が空なので、移動元(もしあれば)を空にしておく
+                        if (fp >= 0 && fp < favorPrefIdxes.Length) favorPrefIdxes[fp] = 0;
+                    }
+                    // 移動先に移動対象 prefIdx をセット
+                    favorPrefIdxes[favorPos] = pfIdx;
+                } else {
+                    // favorPrefIdxes[] から除去
+                    for (int i = 0; i < favorPrefIdxes.Length; ++i) {
+                        if (favorPrefIdxes[i] == pfIdx) {
+                            // pref を除去して selector に設定する
+                            favorPrefIdxes[i] = 0;
+                            prefIdx = pfIdx;
+                        }
+                    }
+                }
+                doCompaction();
+                int rp = favorPrefIdxes._findIndex(i => i == pfIdx) + MainPrefNum;
+                radioIdx = rp >= MainPrefNum && rp < selectorRadioPos ? rp : selectorRadioPos;
+            }
 
         }
 
@@ -339,6 +358,10 @@ namespace ChartBlazorApp.Models
         {
             estimatedBar = value;
         }
+        public void setEstimatedBarMinWidth(int value)
+        {
+            estimatedBarMinWidth = value;
+        }
         public void setDetailSettings(bool value)
         {
             detailSettings = value;
@@ -355,9 +378,13 @@ namespace ChartBlazorApp.Models
         {
             extensionDays = value;
         }
-        public void setUseOnForecast(bool value)
+        //public void setUseOnForecast(bool value)
+        //{
+        //    useOnForecast = value;
+        //}
+        public void setLocalMaxRtDuration(int value)
         {
-            useOnForecast = value;
+            localMaxRtDuration = value;
         }
         public void setParamStartDate(string value)
         {
@@ -386,6 +413,14 @@ namespace ChartBlazorApp.Models
         public void setParamMinRt(double value)
         {
             if (paramRtMinRt.Length > dataIdx) paramRtMinRt[dataIdx] = value;
+        }
+        public void setParamEasyRt1(double value)
+        {
+            if (paramRtEasyRt1.Length > dataIdx) paramRtEasyRt1[dataIdx] = value;
+        }
+        public void setParamEasyRt2(double value)
+        {
+            if (paramRtEasyRt2.Length > dataIdx) paramRtEasyRt2[dataIdx] = value;
         }
         public void setParamDecayFactorNext(double value)
         {
@@ -441,6 +476,20 @@ namespace ChartBlazorApp.Models
         public static T _jsonDeserialize<T>(this string jsonStr)
         {
             return JsonSerializer.Deserialize<T>(jsonStr);
+        }
+    }
+
+    public static class SettingsHelper
+    {
+        public static string[] ReadFile(string path)
+        {
+            try {
+                using (System.IO.StreamReader sr = new System.IO.StreamReader(path)) {
+                    return sr.ReadToEnd().Trim().Split('\n').Select(x => x.Trim()).ToArray();
+                }
+            } catch {
+                return new string[0];
+            }
         }
     }
 

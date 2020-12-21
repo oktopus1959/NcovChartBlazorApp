@@ -384,13 +384,6 @@ namespace StandardCommon
             return array._notEmpty() ? string.Join(delim, array) : "";
         }
 
-        /// <summary>
-        ///  述語を満たす配列の要素を探してその位置を返す。なければ -1を返す。
-        /// </summary>
-        /// <typeparam name="T"></typeparam>
-        /// <param name="array"></param>
-        /// <param name="predicate"></param>
-        /// <returns></returns>
         public static int _findIndex<T>(this T[] array, Func<T, bool> predicate)
         {
             if (array != null)
@@ -401,18 +394,6 @@ namespace StandardCommon
                 }
             }
             return -1;
-        }
-
-        /// <summary>
-        ///  配列の要素を探してその位置を返す。なければ -1を返す。
-        /// </summary>
-        /// <typeparam name="T"></typeparam>
-        /// <param name="array"></param>
-        /// <param name="predicate"></param>
-        /// <returns></returns>
-        public static int _findIndex<T>(this T[] array, T elem) where T : IComparable
-        {
-            return array._findIndex(x => x.CompareTo(elem) == 0);
         }
 
         /// <summary>

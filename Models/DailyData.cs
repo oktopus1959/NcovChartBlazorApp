@@ -21,6 +21,8 @@ namespace ChartBlazorApp.Models
             }
         }
 
+        public int InfectDataCount { get { return _infectDataList?.Count ?? 0; } }
+
         private List<InfectData> _infectDataList = null;
 
         public DailyData()
@@ -43,10 +45,10 @@ namespace ChartBlazorApp.Models
         private DateTime _lastInitializedDt;
         private DateTime _lastFileDt;
 
-        public void Initialize()
+        public void Initialize(bool bForce = false)
         {
 #if DEBUG
-            Console.WriteLine($"{DateTime.Now} [DailyData.Initialize] CALLED");
+            //Console.WriteLine($"{DateTime.Now} [DailyData.Initialize] CALLED");
 #endif
             if (m_syncBool.BusyCheck()) return;
             using (m_syncBool) {
@@ -57,7 +59,7 @@ namespace ChartBlazorApp.Models
 
                 const string filePath = "Data/csv/prefectures_ex.csv";
                 var fileInfo = Helper.GetFileInfo(filePath);
-                if (fileInfo.ModifyDt > _lastFileDt) {
+                if (bForce || fileInfo.ModifyDt > _lastFileDt) {
                     // ファイルが更新されていたら再ロードする
                     _lastFileDt = fileInfo.ModifyDt;
                     _infectDataList = loadPrefectureData(readFile(filePath));
@@ -99,7 +101,7 @@ namespace ChartBlazorApp.Models
                     data = prefDataDict._safeGetOrNewInsert(keyName);
                     if (data.Title._isEmpty()) {
                         data.Title = dispName;
-                        data.DecayParam = RtDecayParam.CreateDefaultParam();
+                        data.DecayParam = new RtDecayParam();   // 全て 0 の初期データ
                         data.Dates = new List<DateTime>();
                         data.Total = new List<double>();
                     }
@@ -120,11 +122,11 @@ namespace ChartBlazorApp.Models
                         data.Y1_Max = items._nth(3)._parseDouble(0.0);
                         data.Y2_Max = items._nth(4)._parseDouble(0.0);
                         data.DecayParam.StartDate = items._nth(5)._parseDateTime();
-                        data.DecayParam.DaysToOne = items._nth(6)._parseInt(RtDecayParam.DefaultParam.DaysToOne);
-                        data.DecayParam.DecayFactor = Pages.MyChart.GetDecayFactor(items._nth(7)._parseDouble(0));
-                        data.DecayParam.RtMax = items._nth(8)._parseDouble(1.2);
-                        data.DecayParam.RtMin = items._nth(9)._parseDouble(0.8);
-                        data.DecayParam.DecayFactorNext = Pages.MyChart.GetDecayFactor(items._nth(10)._parseDouble(4));
+                        data.DecayParam.DaysToOne = items._nth(6)._parseInt(0);
+                        data.DecayParam.DecayFactor = Pages.MyChart.GetDecayFactor(items._nth(7)._parseDouble(-9999));
+                        data.DecayParam.EasyRt1 = items._nth(8)._parseDouble(0);
+                        data.DecayParam.EasyRt2 = items._nth(9)._parseDouble(0);
+                        data.DecayParam.DecayFactorNext = Pages.MyChart.GetDecayFactor2(items._nth(10)._parseDouble(-9999));
                     }
                 } else if (items[0]._startsWith("20")) {
                     var data = getOrNewData(items, true);
@@ -148,25 +150,64 @@ namespace ChartBlazorApp.Models
                 }
             }
 
+            double[] adjustTotal(double[] total)
+            {
+                double[] adjTotal = new double[total.Length];
+                Array.Copy(total, adjTotal, total.Length);
+                int emptyIdx = -1;
+                for (int i = 0; i < adjTotal.Length; ++i) {
+                    var newVal = total._nth(i) - total._nth(i - 1);
+                    if (newVal > 0) {
+                        if (emptyIdx >= 0) {
+                            double prevVal = adjTotal._nth(emptyIdx - 1) - adjTotal._nth(emptyIdx - 2);
+                            int num = i - emptyIdx + 1;
+                            if (((newVal >= 40 || prevVal >= 40) && num <= 5) || newVal >= num * 10 || prevVal >= num * 10) {
+                                double delta;
+                                int k, m;
+                                if (prevVal > newVal) {
+                                    delta = prevVal / num;
+                                    k = i - 1;
+                                    m = emptyIdx - 1;
+                                    adjTotal[k] = adjTotal._nth(m);
+                                } else {
+                                    delta = newVal / num;
+                                    k = i;
+                                    m = emptyIdx;
+                                }
+                                for (int j = k - 1; j >= m; --j) adjTotal[j] = adjTotal[j + 1] - delta;
+                            }
+                        }
+                        emptyIdx = -1;
+                    } else {
+                        if (emptyIdx < 0) emptyIdx = i;
+                    }
+                }
+                return adjTotal;
+            }
+
             InfectData makeData(PrefInfectData data)
             {
                 int predatanum = data.PreDataNum;
                 double total(int i) => data.Total._nth(i + predatanum);
                 double newly(int i) => total(i) - total(i - 1);
-                double weekly(int i) => total(i) - total(i - 7);
-                double average(int i) => weekly(i) / 7;
-                double rt(int i) { double w7 = weekly(i - 7); return w7 > 0 ? Math.Pow(weekly(i) / w7, 5.0 / 7.0) : 0.0; };
                 var dates = data.Dates.Skip(predatanum).ToArray();
                 var newlies = (data.Total.Count - predatanum)._range().Select(i => newly(i)).ToArray();
+                double[] adjustedTotal = adjustTotal(data.Total.ToArray());
+                double adjTotal(int i) => adjustedTotal._nth(i + predatanum);
+                //double weekly(int i) => total(i) - total(i - 7);
+                double weekly(int i) => adjTotal(i) - adjTotal(i - 7);
+                double average(int i) => weekly(i) / 7;
                 var averages = (data.Total.Count - predatanum)._range().Select(i => average(i)).ToArray();
+                double rt(int i) { double w7 = weekly(i - 7); return w7 > 0 ? Math.Pow(weekly(i) / w7, 5.0 / 7.0) : 0.0; };
                 var rts = (data.Total.Count - predatanum)._range().Select(i => rt(i)).ToArray();
                 int newlyMax = (int)newlies.Max();
                 var y1_max = data.Y1_Max > 0 ? data.Y1_Max : newlyMax < 20 ? 20 : (newlyMax < 50 ? 50 : ((newlyMax + 100) / 100) * 100);
                 var y1_step = y1_max / 10;
                 var y2_max = data.Y2_Max > 0 ? data.Y2_Max : (rts[Math.Max(rts.Length - 90, 0)..].Max() > 2.5) ? 5.0 : 2.5;
                 var y2_step = y2_max / 5;
-                if (data.DecayParam.StartDate._notValid()) data.DecayParam.StartDate = dates[0].AddDays(findRecentMaxIndex(rts));
-                return new InfectData {
+                //以下を有効にしてしまうと、システム既定基準日とシステム既定検出遡及日による基準日との区別ができなくなってしまう。
+                //if (data.DecayParam.StartDate._notValid()) data.DecayParam.StartDate = dates[0].AddDays(InfectData.FindRecentMaxIndex(rts));
+                var infectData = new InfectData {
                     Title = data.Title,
                     Y1_Max = y1_max,
                     Y1_Step = y1_step,
@@ -178,6 +219,8 @@ namespace ChartBlazorApp.Models
                     Rt = rts,
                     InitialDecayParam = data.DecayParam,
                 };
+                infectData.InitialSubParams = infectData.CalcDecaySubParams();
+                return infectData;
             }
 
             var infectList = new List<InfectData>();
@@ -194,8 +237,8 @@ namespace ChartBlazorApp.Models
         [JSInvokable]
         public string GetChartData(InfectData infData, int yAxisMax, string endDate, bool estimatedBar, bool onlyOnClick, bool bAnimation)
         {
-            (var json, var dispDays) = MakeJsonData(infData, yAxisMax, endDate._parseDateTime(), null, 0, estimatedBar, onlyOnClick, bAnimation);
-            return json?.chartData == null ? "" : JsonConvert.SerializeObject(json.chartData, new JsonSerializerSettings { NullValueHandling = NullValueHandling.Include, });
+            //(var jsonStr, var dispDays) = MakeJsonData(infData, yAxisMax, endDate._parseDateTime(), null, 0, estimatedBar, onlyOnClick, bAnimation);
+            return "";
         }
 
         private static List<string> getFiles(string dirPath, string type)
@@ -218,148 +261,18 @@ namespace ChartBlazorApp.Models
             }
         }
 
-        /// <summary>
-        /// Chart描画のためのJsonデータを構築して返す
-        /// </summary>
-        /// <param name="dataIdx">描画対象(0:全国/1:東京/...)</param>
-        /// <param name="endDate">グラフ表示最終日</param>
-        /// <param name="aheadParamIdx">事前作成予想データインデックス(負なら使わない)</param>
-        /// <param name="bAnimation">グラフアニメーションの有無</param>
-        /// <returns></returns>
-        public (JsonData, int) MakeJsonData(InfectData infData, double yAxisMax, DateTime endDate, RtDecayParam rtDecayParam, int extensionDays, bool estimatedBar, bool onlyOnClick, bool bAnimation = false)
+        public string[] GetDecayStartDates(int localMaxRtDulation)
         {
-            JsonData jsonData = null;
-            PredictInfectData predData = null;
-            string title = "";
-            int dispDays = 0;
-            if (infData != null) {
-                title = infData.Title;
-                var rtp = rtDecayParam;
-                Console.WriteLine($"{DateTime.Now} [MakeJsonData] pref={title}, expDt={rtp?.EffectiveStartDate.ToShortDateString()}, days={(rtp?.Fourstep == false ? rtp.DaysToOne.ToString() : "")}, est={estimatedBar}, clk={onlyOnClick}, days1/Rt1={(rtp?.Fourstep == true ? $"{rtp.DaysToRt1}/{rtp.Rt1}" : "")}");
-                //int x0 = infData.X0;
-                var chartData = new ChartJson { type = "bar" };
-                //var borderDash = new double[] { 10, 3 };
-                var fullDates = infData.Dates.Select(x => x._toShortDateString()).ToList();
-                var firstDate = infData.Dates?.First() ?? DateTime.MinValue;
-                var lastDate = infData.Dates?.Last() ?? DateTime.MinValue;
-                if (firstDate._isValid() && lastDate._isValid()) {
-                    if (endDate._isValid() && endDate > lastDate) {
-                        int days = Math.Min((endDate - lastDate).Days, 400);
-                        fullDates.AddRange(Enumerable.Range(1, days).Select(d => lastDate.AddDays(d)._toShortDateString()));
-                    }
-                    int realDays = (lastDate - firstDate).Days + 1;
-                    int predDays = realDays + 21;
-                    if (rtDecayParam != null) {
-                        predData = PredictInfectData.PredictValuesEx(infData, rtDecayParam, fullDates._length(), extensionDays);
-                        predDays = predData.PredDays;
-                    }
-                    dispDays = Math.Max(realDays + 21, predDays) + 1;
-                    if (predData != null) predData.DispDays = dispDays;
+            if (_infectDataList._isEmpty()) return new string[0];
 
-                    (double y1_max, double y1_step, double y2_max, double y2_step) = (infData.Y1_Max, infData.Y1_Step, infData.Y2_Max, infData.Y2_Step);
-                    if (yAxisMax > 0) {
-                        (y1_max, y1_step) = (yAxisMax, yAxisMax / 10);
-                    }
-                    Options options = Options.CreateTwoAxes(new Ticks(y1_max, y1_step), new Ticks(y2_max, y2_step));
-                    if (!bAnimation) options.AnimationDuration = 0;
-                    options.legend.SetAlignEnd();
-                    options.legend.reverse = true;  // 凡例の表示を登録順とは逆順にする
-                     options.SetOnlyClickEvent(onlyOnClick);
-                    chartData.options = options;
-
-                    var dataSets = new List<Dataset>();
-#if DEBUG
-                    if (predData != null) {
-                        dataSets.Add(Dataset.CreateDotLine("逆算移動平均", predData.RevAverage.Take(predData.DispDays)._toNullableArray(1), "darkblue"));
-                        //dataSets.Add(Dataset.CreateDotLine2("逆算Rt", predData.RevRt.Take(predData.DispDays)._toNullableArray(1), "crimson"));
-                    }
-#endif
-                    dataSets.Add(Dataset.CreateLine("                ", new double?[fullDates.Count], "rgba(0,0,0,0)", "rgba(0,0,0,0)"));
-
-                    double?[] predRts = null;
-                    double?[] predAverage = null;
-                    if (predData != null) {
-                        predRts = predData.FullPredRt.Take(predDays)._toNullableArray(3);
-                        dataSets.Add(Dataset.CreateDashLine2("予想実効再生産数", predRts, "brown").SetDispOrder(6));
-                        predAverage = predData.PredAverage.Take(predDays)._toNullableArray(1);
-                        dataSets.Add(Dataset.CreateDashLine("予想移動平均", predAverage, "darkgreen").SetDispOrder(4));
-                    }
-                    double?[] realRts = infData.Rt.Take(realDays)._toNullableArray(3);
-                    dataSets.Add(Dataset.CreateLine2("実効再生産数(右軸)", realRts, "darkorange", "yellow").SetDispOrder(5));
-                    double?[] realAverage = infData.Average.Take(realDays)._toNullableArray(1);
-                    dataSets.Add(Dataset.CreateLine("陽性者数移動平均", realAverage, "darkblue", "lightblue").SetDispOrder(3));
-                    double?[] positives = infData.Newly.Take(realDays)._toNullableArray(0, 0);
-                    var positiveDataset = Dataset.CreateBar("新規陽性者数", positives, "royalblue").SetHoverColors("mediumblue").SetDispOrder(1);
-                    if (predData != null && estimatedBar) {
-                        options.tooltips.intersect = false;
-                        options.tooltips.SetCustomHighest();
-                        dataSets.Add(positiveDataset);
-                        dataSets.Add(Dataset.CreateBar("推計陽性者数", predData.PredNewly.Take(predDays)._toNullableArray(0), "darkgray").SetHoverColors("darkseagreen").SetDispOrder(2));
-                    } else {
-                        options.AddStackedAxis();
-                        options.tooltips.SetCustomFixed();
-                        dataSets.Add(positiveDataset.SetStackedAxisId());
-                        //double?[] dummyBars = calcDummyData(predDays, positives, realAverage, predAverage, realRts, predRts, y1_max, y2_max);
-                        double?[] dummyBar = positives.Select(v => y1_max - (v ?? 0)).ToArray()._extend(predDays, y1_max)._toNullableArray(0, 0);
-                        dataSets.Add(Dataset.CreateBar("", dummyBar, "rgba(0,0,0,0)").SetStackedAxisId().SetHoverColors("rgba(10,10,10,0.1)").SetDispOrder(100));
-                        //double?[] dummyBars = Dataset.CalcDummyData(predDays,
-                        //    new double?[][] { positives }, new double?[][] { realAverage, predAverage }, new double?[][] { realRts, predRts },
-                        //    y1_max, y2_max);
-                        //dataSets.Add(Dataset.CreateBar("", dummyBars, "rgba(0,0,0,0)").SetStackedAxisId().SetHoverColors("rgba(10,10,10,0.1)").SetDispOrder(100));
-                    }
-                    double?[] rt1Line = new double?[fullDates.Count];
-                    rt1Line[0] = rt1Line[^1] = 1.0;
-                    var rtBaseline = Dataset.CreateLine2("RtBaseline", rt1Line, "grey", null).SetOrders(100, 100);
-                    rtBaseline.borderWidth = 1.2;
-                    rtBaseline.pointRadius = 0;
-                    rtBaseline.spanGaps = true;
-                    dataSets.Add(rtBaseline);
-
-                    chartData.data = new Data {
-                        labels = fullDates.Take(dispDays).ToArray(),
-                        datasets = dataSets.ToArray(),
-                    };
-
-                    jsonData = new JsonData() {
-                        chartData = chartData,
-                    };
-                }
-            }
-            return (jsonData, dispDays);
-        }
-
-        public string FindDecayStartDate(int dataIdx)
-        {
-            var data = InfectDataList._nth(dataIdx);
-            if (data != null) {
-                var dt = data.InitialDecayParam.StartDate;
-                if (dt._isValid()) {
-                    return dt._toShortDateString();
-                }
-            }
-            return "";
-        }
-
-        public int findRecentMaxIndex(double[] rt)
-        {
-            const int FIND_MAX_DURATION = 10;
-            int lastIdx = rt.Length - 1;
-            int maxIdx = lastIdx;
-            var maxVal = rt[lastIdx];
-            int count = FIND_MAX_DURATION;
-            while (count-- > 0 && --lastIdx >= 0) {
-                var v = rt[lastIdx];
-                if (v > maxVal) {
-                    maxVal = v;
-                    maxIdx = lastIdx;
-                    count = FIND_MAX_DURATION;
-                }
-            }
-            return maxIdx;
+            return _infectDataList.Select(data => (data == null) ? "" : data.GetDecayStartDateStr(localMaxRtDulation)).ToArray();
         }
 
     }
 
+    /// <summary>
+    /// 県別データファイルから作成される陽性者データクラス
+    /// </summary>
     public class InfectData
     {
         public string Title { get; set; }
@@ -385,431 +298,429 @@ namespace ChartBlazorApp.Models
 
         public double[] Rt { get; set; }
 
-        //public GompertzParam[][] GomParams { get; set; }
-
-        /// <summary> 事前に作成された予想データ </summary>
+        /// <summary> 県別データファイルから取得した設定値(Layer-3) </summary>
         public RtDecayParam InitialDecayParam { get; set; }
 
-    }
+        /// <summary> 県別データファイルから事前に作成された予測設定値(Layer-2) </summary>
+        public SubParams InitialSubParams { get; set; }
 
-    /// <summary>
-    /// 利用者用の予測データ
-    /// </summary>
-    public class PredictInfectData
-    {
-        /// <summary> 予想実効再生産数 </summary>
-        public double[] FullPredRt { get; private set; }
-        /// <summary> 逆算移動平均 </summary>
-        public double[] RevAverage { get; private set; }
-        /// <summary> 推計移動平均 </summary>
-        public double[] PredAverage { get; private set; }
-        /// <summary> 予想開始日位置 </summary>
-        public int PredStartIdx { get; private set; } = 0;
-        ///// <summary> 予想Rt </summary>
-        //public double[] PredRt { get; private set; }
-        /// <summary> 推計陽性者数 </summary>
-        public double[] PredNewly { get; private set; }
-        /// <summary> 逆算Rt </summary>
-        public double[] RevRt { get; private set; }
-        /// <summary> 表示日数 </summary>
-        public int DispDays { get; set; } = 1;
-        /// <summary> 予測日数 </summary>
-        public int PredDays { get; set; }
+        public static InfectData DummyData = new InfectData() {
+            InitialDecayParam = new RtDecayParam(),
+            InitialSubParams = new SubParams(),
+        };
 
-        /// <summary>
-        /// 各種推計値の計算
-        /// </summary>
-        /// <param name="rtDecayParam"></param>
-        /// <param name="numFullDays"></param>
-        /// <param name="predStartDt">予測開始日</param>
-        /// <returns>(PredictInfectData, 表示開始から予測終了までの日数)</returns>
-        public static PredictInfectData PredictValuesEx(InfectData infData, RtDecayParam rtDecayParam, int numFullDays, int extensionDays, DateTime? predStartDt = null)
+        public string GetDecayStartDateStr(int localMaxRtDulation)
         {
-            return new PredictInfectData().predictValuesEx(infData, rtDecayParam, numFullDays, extensionDays, predStartDt);
+            var dt = GetDecayStartDate(localMaxRtDulation);
+            return dt._isValid() ? dt.ToShortDateString() : "";
         }
 
-        public PredictInfectData predictValuesEx(InfectData infData, RtDecayParam rtDecayParam, int numFullDays, int extensionDays, DateTime? predStartDt) {
-            if (rtDecayParam == null) rtDecayParam = infData.InitialDecayParam.Clone();
-            var firstRealDate = infData.Dates.First();
-            DateTime realEndDate = predStartDt?.AddDays(-1) ?? DateTime.MaxValue;
-            if (realEndDate > infData.Dates.Last()) realEndDate = infData.Dates.Last();
-            int realDays = (realEndDate - firstRealDate).Days + 1;
-
-            RevAverage = new double[numFullDays];
-            FullPredRt = new double[numFullDays];
-
-            if (rtDecayParam.StartDate._notValid()) rtDecayParam.StartDate = infData.InitialDecayParam.StartDate;
-            if (rtDecayParam.StartDateFourstep._notValid()) rtDecayParam.StartDateFourstep = RtDecayParam.DefaultParam.StartDate;
-            if (rtDecayParam.StartDate > realEndDate) rtDecayParam.StartDate = realEndDate;
-            if (rtDecayParam.StartDateFourstep > realEndDate) rtDecayParam.StartDateFourstep = realEndDate;
-            PredStartIdx = (rtDecayParam.EffectiveStartDate - firstRealDate).Days;
-            Array.Copy(infData.Average, RevAverage, PredStartIdx);
-            int predRtLen = rtDecayParam.CalcAndCopyPredictRt(infData.Rt, PredStartIdx, FullPredRt, realDays, extensionDays);
-
-            for (int i = 0; i < predRtLen; ++i) {
-                int idx = PredStartIdx + i;
-                var rt = FullPredRt[idx];
-                if (idx >= 7 && idx < RevAverage.Length && rt > 0) {
-                    RevAverage[idx] = Math.Pow(rt, 7.0 / 5.0) * RevAverage[idx - 7];
-                }
+        public DateTime GetDecayStartDate(int localMaxRtDulation)
+        {
+            if (InitialDecayParam.StartDate._isValid()) {
+                // システム既定基準日が設定されていればそれを返す
+                return InitialDecayParam.StartDate;
             }
-
-            predRtLen -= 4;
-            double[] revAveAverage = new double[numFullDays];   // 逆算移動平均の平均
-            for (int i = 0; i < predRtLen; ++i) {
-                int idx = PredStartIdx + i;
-                int beg = idx - 3;
-                int end = idx + 4;
-                if (beg >= 0 && end <= RevAverage.Length) {
-                    revAveAverage[idx] = RevAverage[beg..end].Sum() / 7;
-                }
-            }
-            PredAverage = revAveAverage._extend(numFullDays);
-            PredNewly = predictInfect(infData.Newly, infData.Average, PredAverage, realDays, PredStartIdx);
-            double total = 0;
-            double[] totals = PredNewly.Select((n, i) => total += (n > 0 ? n : infData.Newly._nth(i))).ToArray();
-            RevRt = new double[numFullDays];
-            for (int i = PredStartIdx; i < PredNewly.Length; ++i) {
-                RevRt[i] = DailyData.CalcRt(totals, i);
-            }
-
-            PredDays = PredStartIdx + predRtLen;
-            return this;
+            return FindRecentMaxMinRtDate(localMaxRtDulation);
         }
 
-        private static double[] predictInfect(double[] newly, double[] average, double[] pred, int realDays, int predStartIdx)
+        public string FindRecentMaxRtDateStr(int localMaxRtDulation)
         {
-            double newly_offset = 3.0;
-            double pred_offset = 10.0;
-
-            // dayRatio: 当日増減率
-            double[] dayRatio = new double[pred.Length];
-            double calcRatio(double n, double? p) => (p > 0) ? Math.Pow((n + newly_offset) / (p.Value + pred_offset), 1.0) : 1.0;
-            for (int i = 0; i < realDays && i < dayRatio.Length; ++i) {
-                dayRatio[i] = calcRatio(newly._nth(i), (i < predStartIdx) ? average._nth(i) : pred._nth(i));
-            }
-
-            // dowRatio: 当日、-7日と-14日の平均増減率
-            double[] dowRatio = new double[pred.Length];
-            double calcRatio3(int idx) => Enumerable.Range(0, 3).Select(w => dayRatio._nth(idx - w*7, 1.0)).Sum() / 3;
-            for (int i = 0; i < dowRatio.Length; ++i) {
-                dowRatio[i] = (i < realDays) ? Math.Max(Math.Min(calcRatio3(i), 2.0), 0.3) : dowRatio._nth(i - 7, 1.0);
-            }
-
-            //return pred.Select((p, i) => i < realDays && i <= approxDayPos ? null : p * dowRatio._nth(i - 7)).ToArray();
-            // 一週間前の曜日増減率を参照する
-            return pred.Select((p, i) => (i <= predStartIdx) ? 0 : p * dowRatio._nth(i - 7)).ToArray();
+            DateTime dt = FindRecentMaxMinRtDate(localMaxRtDulation);
+            return dt._isValid() ? dt.ToShortDateString() : "";
         }
 
-    }
-
-    //public class ManualPredictData
-    //{
-    //    public GompertzParam GompParam { get; set; }
-    //    public DateTime PredDate { get; set; }
-    //}
-
-    public class JsonData
-    {
-        /// <summary>
-        /// 近似計算日
-        /// </summary>
-        //public string approxDate { get; set; }
-
-        public ChartJson chartData { get; set; }
-    }
-
-    /// <summary>
-    /// このクラスには値型だけを格納すること
-    /// </summary>
-    public class RtDecayParam
-    {
-        public bool UseDetail { get; set; }
-
-        public bool Fourstep { get; set; }
-
-        /// <summary>予測開始日</summary>
-        public DateTime StartDate { get; set; }
-
-        public DateTime StartDateFourstep { get; set; }
-
-        public DateTime EffectiveStartDate { get { return Fourstep ? StartDateFourstep : StartDate; } }
-
-        public int DaysToOne { get; set; }
-
-        public double DecayFactor { get; set; }
-
-        public int DaysToNext { get; set; }
-
-        public double DecayFactorNext { get; set; }
-
-        public double RtMax { get; set; }
-
-        public double RtMin { get; set; }
-
-        public int DaysToRt1 { get; set; }
-        public double Rt1 { get; set; }
-
-        public int DaysToRt2 { get; set; }
-        public double Rt2 { get; set; }
-
-        public int DaysToRt3 { get; set; }
-        public double Rt3 { get; set; }
-
-        public int DaysToRt4 { get; set; }
-        public double Rt4 { get; set; }
-
-        public const int DaysToNextRt = 15;
-
-        public RtDecayParam Clone()
+        public DateTime FindRecentMaxMinRtDate(int localMaxRtDulation)
         {
-            return (RtDecayParam)MemberwiseClone();
-        }
-
-        public static RtDecayParam CreateDefaultParam()
-        {
-            return new RtDecayParam() {
-                Fourstep = false,
-                StartDateFourstep = new DateTime(2020, 7, 4),
-                DaysToOne = DaysToNextRt,
-                DecayFactor = 1000,
-                DaysToNext = DaysToNextRt,
-                DecayFactorNext = 50,
-                RtMax = 1.2,
-                RtMin = 0.8,
-                DaysToRt1 = 45,
-                Rt1 = 0.83,
-                DaysToRt2 = 60,
-                Rt2 = 1,
-                DaysToRt3 = 26,
-                Rt3 = 1.4,
-                DaysToRt4 = 30,
-                Rt4 = 0.83,
-            };
-        }
-
-        public static RtDecayParam DefaultParam { get; } = CreateDefaultParam();
-
-        public const int ExtensionDays = 25;
-        public const int ExtensionDaysEx = 15;
-
-        /// <summary> y = (a / x) + b の形の関数として Rt の減衰を計算する </summary>
-        /// <returns>計算された予測Rtの日数を返す</returns>
-        public int CalcAndCopyPredictRt(double[] rts, int startIdx, double[] predRt, int realDays, int extensionDays)
-        {
-            if (extensionDays == 0) extensionDays = ExtensionDays;
-            double rt0 = rts[startIdx];
-            if (Fourstep) {
-                // 4段階モード
-                double decayFactor = 10000;
-                double rt1 = Rt1;
-                int daysToRt1 = DaysToRt1;
-                if (daysToRt1 < 1) daysToRt1 = DaysToNextRt;
-                double a1 = (rt0 - rt1) * (decayFactor + daysToRt1) * decayFactor / daysToRt1;
-                double b1 = rt0 - (a1 / decayFactor);
-                // Rt1に到達してから
-                double rt2 = Rt2;
-                int daysToRt2 = DaysToRt2;
-                if (daysToRt2 < 1) daysToRt2 = DaysToNextRt;
-                double a2 = (rt1 - rt2) * (decayFactor + daysToRt2) * decayFactor / daysToRt2;
-                double b2 = rt1 - (a2 / decayFactor);
-                // Rt2に到達してから
-                double rt3 = Rt3;
-                int daysToRt3 = DaysToRt3;
-                if (daysToRt3 < 1) daysToRt3 = DaysToNextRt;
-                double a3 = (rt2 - rt3) * (decayFactor + daysToRt3) * decayFactor / daysToRt3;
-                double b3 = rt2 - (a3 / decayFactor);
-                // Rt3に到達してから
-                double rt4 = Rt4;
-                int daysToRt4 = DaysToRt4;
-                if (daysToRt4 < 1) daysToRt4 = DaysToNextRt;
-                double a4 = (rt3 - rt4) * (decayFactor + daysToRt4) * decayFactor / daysToRt4;
-                double b4 = rt3 - (a4 / decayFactor);
-
-                int copyLen = Math.Min(Math.Max(daysToRt1 + daysToRt2 + daysToRt3 + daysToRt4 + ExtensionDaysEx, realDays - startIdx + extensionDays), predRt.Length - startIdx);
-                for (int i = 0; i < copyLen; ++i) {
-                    double rt;
-                    if (i <= daysToRt1) {
-                        rt = a1 / (decayFactor + i) + b1;
-                    } else if (i <= daysToRt1 + daysToRt2) {
-                        rt = a2 / (decayFactor + i - daysToRt1) + b2;
-                        if (rt1 > rt2) {
-                            if (rt < rt2) rt = rt2;
-                        } else {
-                            if (rt > rt2) rt = rt2;
-                        }
-                    } else if (i <= daysToRt1 + daysToRt2 + daysToRt3) {
-                        rt = a3 / (decayFactor + i - daysToRt1 - daysToRt2) + b3;
-                        if (rt2 > rt3) {
-                            if (rt < rt3) rt = rt3;
-                        } else {
-                            if (rt > rt3) rt = rt3;
-                        }
-                    } else {
-                        rt = a4 / (decayFactor + i - daysToRt1 - daysToRt2 - daysToRt3) + b4;
-                        if (rt3 > rt4) {
-                            if (rt < rt4) rt = rt4;
-                        } else {
-                            if (rt > rt4) rt = rt4;
-                        }
-                    }
-                    predRt[startIdx + i] = rt;
-                }
-                return copyLen;
+            DateTime firstDt = Dates._first();
+            if (firstDt._isValid()) {
+                return firstDt.AddDays(FindRecentMaxMinIndex(Rt, localMaxRtDulation));
             } else {
-                // 簡易モード
-                double rt1 = 1;
-                double factor1 = DecayFactor;
-                if (factor1 < 1) factor1 = 50;
-                double a1 = (rt0 - rt1) * (factor1 + DaysToOne) * factor1 / DaysToOne;
-                double b1 = rt0 - (a1 / factor1);
-                // Rt1に到達してから
-                double rt2 = rt0 >= rt1 ? RtMin : RtMax;
-                //double factor2 = Math.Min(DecayFactor, DecayFactorNext);
-                double factor2 = DecayFactorNext;
-                if (factor2 < 1) factor2 = 50;
-                double rt_ = ((rt0 > rt1 && rt2 > rt1) || (rt0 < rt1 && rt2 < rt1)) ? rt1 * 2 - rt0 : rt0;
-                double a2 = (rt_ - rt1) * (factor2 + DaysToOne) * factor2 / DaysToOne;
-                double b2 = rt_ - (a2 / factor2);
-                int copyLen = Math.Min(Math.Max(DaysToOne + ExtensionDaysEx, realDays - startIdx + extensionDays), predRt.Length - startIdx);
-                int toOneLen = Math.Min(DaysToOne, copyLen);
-                for (int i = 0; i < toOneLen; ++i) {
-                    predRt[startIdx + i] = a1 / (factor1 + i) + b1;
-                }
-                for (int i = toOneLen; i < copyLen; ++i) {
-                    if (rt2 == rt1) {
-                        predRt[startIdx + i] = rt2;
-                    } else {
-                        double rt = a2 / (factor2 + i) + b2;
-                        predRt[startIdx + i] = (rt2 < rt1 && rt < rt2) || (rt2 > rt1 && rt > rt2) ? rt2 : rt;
-                    }
-                }
-                return copyLen;
+                return Dates._last();
             }
         }
-    }
 
-    public class GompertzParam
-    {
-        public DateTime StartDate { get; set; }
+        public int FindRecentMaxMinIndex(int localMaxRtDulation)
+        {
+            return FindRecentMaxMinIndex(Rt, localMaxRtDulation);
+        }
 
-        public double StartValue { get; set; }
+        public static int FindRecentMaxMinIndex(double[] rt, int localMaxRtDulation)
+        {
+            return Math.Min(
+                findRecentMaxMinIndex(rt, (v, m) => v > m, localMaxRtDulation),
+                findRecentMaxMinIndex(rt, (v, m) => v < m, localMaxRtDulation));
+        }
 
-        public int StartOffset { get; set; }
+        public static int FindRecentMinIndex(double[] rt, int localMaxRtDulation)
+        {
+            return findRecentMaxMinIndex(rt, (v, m) => v < m, localMaxRtDulation);
+        }
 
-        public int PeakDays { get; set; }
+        private static int findRecentMaxMinIndex(double[] rt, Func<double, double, bool> comp, int localMaxRtDulation)
+        {
+            const double RT_THRESHOLD = 3.0;
+            const int GUARD_DURATION = 5; 
 
-        public double PeakValue { get; set; }
+            if (localMaxRtDulation < 0) localMaxRtDulation = UserSettings.LocalMaxRtDuration;
+            int mIdx = rt._safeCount();
+            if (rt._notEmpty()) {
+                int lastIdx = rt.Length - 1;
+                var mVal = rt[lastIdx];
+                mIdx = lastIdx;
+                int count = localMaxRtDulation;
+                while (count-- > 0 && --lastIdx >= 0) {
+                    var v = rt[lastIdx];
+                    if (v > RT_THRESHOLD && lastIdx < rt.Length - GUARD_DURATION) break;
+                    if (v <= RT_THRESHOLD && comp(v, mVal)) {
+                        mVal = v;
+                        mIdx = lastIdx;
+                        count = localMaxRtDulation;
+                    }
+                }
+            }
+            return mIdx;
+        }
 
-        /// <summary> Gompertz計算 </summary>
-        /// <param name="x">表示開始日を 0 とする</param>
+        const int TWO_STAGE_MIN_DURATION = 12;
+
+        public class MinParams
+        {
+            public int days = 0;
+            public double err = double.MaxValue;
+            public double err2 = double.MaxValue;
+            public double rt1 = 0;
+            public double rt2 = 0;
+            public int ftIdx1 = 0;
+            public int ftIdx2 = 8;
+
+            public SubParams MakeSubParams(DateTime dt)
+            {
+                return new SubParams() {
+                    StartDate = dt._toDateString(),
+                    Rt1 = rt1._round(3),
+                    Rt2 = rt2._round(3),
+                    DaysToOne = days,
+                    DecayFactor = Pages.MyChart._decayFactors._nth(ftIdx1),
+                    DecayFactorNext = Pages.MyChart._decayFactors2._nth(ftIdx2),
+                };
+            }
+
+            public RtDecayParam CopyToDecayParam(RtDecayParam param)
+            {
+                param.EasyRt1 = rt1;
+                param.EasyRt2 = rt2;
+                param.DaysToOne = days;
+                param.DecayFactor = Pages.MyChart._decayFactors[ftIdx1];
+                param.DecayFactorNext = Pages.MyChart._decayFactors2[ftIdx2];
+                return param;
+            }
+
+            public override string ToString()
+            {
+                return $"days={days}, err={(err < double.MaxValue ? err : 999999.999):f3}, err2={(err2 < double.MaxValue ? err2 : 999999.999):f3}, rt1={rt1:f3}, rt2={rt2:f3}, ftIdx1={ftIdx1}, ftIdx2={ftIdx2}";
+            }
+        }
+
+        const int AVERAGE_ERR_DURATION = 7;
+
+#if DEBUG
+        static int debugLevel = 0;
+        static void debugN(int n, Func<string> func)
+        {
+            if (debugLevel >= n) Console.WriteLine(func());
+        }
+
+        static void debug0(Func<string> func) { debugN(0, func); }
+        static void debug1(Func<string> func) { debugN(1, func); }
+        static void debug2(Func<string> func) { debugN(2, func); }
+        static void debug3(Func<string> func) { debugN(3, func); }
+        static void debug4(Func<string> func) { debugN(4, func); }
+        static void debug5(Func<string> func) { debugN(5, func); }
+#endif
+
+        /// <summary>
+        /// 基準日、変化点、傾きの推計
+        /// </summary>
+        /// <param name="localDuration"></param>
+        /// <param name="dt_"></param>
         /// <returns></returns>
-        public double gompertz(int x)
+        public SubParams CalcDecaySubParams(int localDuration = -1, DateTime? dt_ = null)
         {
-            if (!calculated) {
-                calculated = true;
-                if (PeakDays > 0 && PeakValue > 0) {
-                    if (StartValue < PeakValue) {
-                        if (PeakValue - StartValue < 2) PeakValue = StartValue + 2;
-                        calcW();
-                    } else {
-                        if (StartValue - PeakValue < 2) PeakValue = StartValue - 2;
-                        calcW2();
-                    }
+
+            var dt = dt_.HasValue ? dt_.Value : GetDecayStartDate(localDuration);
+            double[] rts = Rt;
+            int startIdx = (dt - Dates._first()).Days;
+            int len = Rt._length() - startIdx - 1;
+            //int days = Math.Max(len + 5, 15);
+            int days = (int)(len * (4.0 / 3.0));
+            MinParams minParam = new MinParams() { days = days, rt2 = -1 };
+
+            double rt0 = Rt._nth(startIdx);
+
+#if DEBUG
+            debugLevel = 0;
+           if (Title == "全国" || Title == "宮城県") {
+                debugLevel = 0;
+                debug0(() => $"{Title}_0: dt={dt._toDateString()}");
+            }
+#endif
+
+            (var err, var rt1) = find_rt1(Rt, startIdx);
+            minParam.err = err;
+            minParam.rt1 = rt1;
+#if DEBUG
+            debug1(() => $"{Title}_1: find_rt1: {minParam}");
+#endif
+            // find_rt1 後の調整
+            double adjustDelta = (rt1 == rt0 || len >= 10) ? 0 : (len >= 5) ? 0.01 : 0.02;
+            if (rt1 < rt0) adjustDelta = -adjustDelta;
+            rt1 -= adjustDelta;
+            // calc days' rt1
+            var days_rt1 = rt0 + (rt1 - rt0) * days / len;
+            if (days_rt1 < 0) {
+                days = (int)((rt0 * len) / (rt0 - rt1));
+                rt1 = rt0 + (rt1 - rt0) * days / len;
+            } else {
+                rt1 = days_rt1;
+            }
+            var rt2 = (rt1 > 1) ?   1 + (rt1 - 1) * 0.3 :
+                      (rt0 > rt1) ? 1 - (1 - rt1) * 1.2 :
+                                    1 - (1 - rt1) * 0.8;
+            minParam.days = days;
+            minParam.rt1 = rt1;
+            minParam.rt2 = Math.Max(rt2, 0.001);
+            minParam.err2 = calcErrByAverage(AVERAGE_ERR_DURATION, dt, minParam);
+#if DEBUG
+            debug1(() => $"{Title}_2: adjusted: {minParam}");
+#endif
+
+            if (len >= TWO_STAGE_MIN_DURATION) {
+                var minp = find_all(dt, Rt, startIdx);
+#if DEBUG
+                debug1(() => $"{Title}_3: find_all: {minp}");
+#endif
+                //if (minp.err < err) {
+                if (minp.err2 < minParam.err2) {
+                    minParam = minp;
                 }
             }
-            return _gompertz(x - StartOffset - (StartValue < PeakValue ? PeakDays : 0));
+            //if (a > 0) a *= 0.9;
+            const int TAIL_ERR_DURATION = 3;
+            adjustFactor1AndMakeSubParams(TAIL_ERR_DURATION, dt, minParam);
+#if DEBUG
+            debug1(() => $"{Title}_4: {minParam}");
+#endif
+            return minParam.MakeSubParams(dt);
         }
 
-        private double _gompertz(int x)
+        private (double, double) find_rt1(double[] rts, int startIdx)
         {
-            return H * Math.Exp(-Math.Exp(-w * x));
-        }
+            if (rts._isEmpty() || startIdx < 0 || startIdx >= rts.Length) return (0, 0);
+            double b = rts._nth(startIdx);
 
-        private bool calculated = false;
-        private double w = 0;
-        private double H = 0;
-
-        private void calcW()
-        {
-            double delta = 0.09999;
-            w = 0.1;
-            H = calcH();
-            for (int i = 0; i < 100; ++i) {
-                double sv = calcStartVal();
-                if (Math.Abs(sv - StartValue) < 0.1) break;
-                w += (sv > StartValue) ? delta : -delta;
-                H = calcH();
-                delta /= 2;
+            double calcSquareErr(double a, double b)
+            {
+                return rts.Skip(startIdx).Select((y, x) => Math.Pow(a * x + b - y, 2)).Sum();
             }
-        }
 
-        private void calcW2()
-        {
-            double delta = 0.09999;
-            w = 0.1;
-            H = calcH2();
-            for (int i = 0; i < 100; ++i) {
-                double pv = calcPeakVal();
-                if (Math.Abs(pv - PeakValue) < 0.1) break;
-                w += (pv > PeakValue) ? delta : -delta;
-                H = calcH2();
-                delta /= 2;
+            double calcErrdiff(double a)
+            {
+                return rts.Skip(startIdx).Select((y, x) => (a * x + b - y) * x).Sum();
             }
+
+            const double DOUBLING_THRESHOLD = 10.0;
+            bool bSwinged = false;
+            double a = 0.01;
+            double delta = a / 5;
+            double d = calcErrdiff(a);
+            bool positive = d > 0;
+            for (int i = 0; i < 100; ++i) {
+#if DEBUG
+                debug2(() => $"find_rt1({i}): a={a:f5}, d={d:f7}, delta={delta:f7}, posi={positive}");
+#endif
+                if (Math.Abs(d) < 0.0000001) break;
+                a += (d > 0) ? -delta : delta;
+                if ((positive && d < 0) || (!positive && d > 0)) {
+                    delta /= 2;
+                    positive = !positive;
+                    bSwinged = true;
+                } else if (Math.Abs(d) >= DOUBLING_THRESHOLD && !bSwinged) {
+                    delta *= 2;
+                }
+                d = calcErrdiff(a);
+            }
+#if DEBUG
+            debug1(() => $"find_rt1: a={a:f5}, b={b:f7}");
+#endif
+            return (calcSquareErr(a, b), a * (rts.Length - startIdx - 1) + b);
         }
 
-        private double calcH()
+        private MinParams find_all(DateTime dt, double[] rts, int startIdx)
         {
-            return PeakValue / (Math.Exp(-1) - Math.Exp(-Math.Exp(w)));
+            if (rts._isEmpty() || startIdx < 0 || startIdx >= rts.Length) return new MinParams();
+
+            double calcSquareErr(double a, double b, int begin, int end)
+            {
+                return rts.Skip(begin).Take(end - begin + 1).Select((y, x) => Math.Pow(a * x + b - y, 2)).Sum();
+            }
+
+            double calcSquareErr2(double rt0, double rt1, double rt2, double factor2, int DaysToOne, int begin, int end)
+            {
+                double a2, b2;
+                if (factor2 > 0) {
+                    double rt_ = ((rt0 > rt1 && rt2 > rt1) || (rt0 < rt1 && rt2 < rt1)) ? rt1 * 2 - rt0 : rt0;
+                    a2 = (rt_ - rt1) * (factor2 + DaysToOne) * factor2 / DaysToOne;
+                    b2 = rt_ - (a2 / factor2);
+                } else {
+                    double f2 = Math.Max(factor2, -4);
+                    a2 = (rt2 - rt1) / (DaysToOne * (1.0 + 0.2 * f2));
+                    b2 = rt1;
+                }
+                return rts.Skip(begin).Take(end - begin + 1).Select((y, x) => {
+                    double rt = rt2;
+                    if (rt2 != rt1) {
+                        rt = (factor2 > 0) ? a2 / (factor2 + DaysToOne + x) + b2 : a2 * x + b2;
+                        if ((rt2 < rt1 && rt < rt2) || (rt2 > rt1 && rt > rt2)) rt = rt2;
+                    }
+                    return Math.Pow(rt - y, 2);
+                }).Sum();
+            }
+
+            
+            int len = rts.Length - startIdx;
+            // 変化日ごとの最小エラー値を保存
+            MinParams[] minParams = new MinParams[len + 1];
+            for (int i = 0; i < minParams.Length; ++i) { minParams[i] = new MinParams() { days = i }; }  // days を初期化しておく
+
+            double rt0 = rts[startIdx];
+            int[] decayFactors1 = Pages.MyChart._decayFactors;
+            int[] decayFactors2 = Pages.MyChart._decayFactors2;
+
+            int cp_mid = len / 2;
+            int cp_margin = len / 4;
+            int cp_beg = cp_margin;
+            int cp_end = len - cp_margin;
+            double delta = 0.05;
+            foreach (var minp in minParams.Skip(cp_beg).Take(cp_margin + 1 + cp_margin)) {
+                int cp = minp.days;
+                int cp_idx = startIdx + cp;
+                int cp_nxt = cp_idx + 1;
+                double b1 = rt0;
+                double rt_beg = Math.Max(rts[cp_idx] - 0.25, 0);
+                double rt_end = rts[cp_idx] + 0.25;
+                //double rt2_beg = Math.Max(rts[^3..].Min() - 0.25, 0);
+                //double rt2_end = rts[^3..].Max() + 0.25;
+                double rt2_beg = Math.Max(rts[^1] - 0.25, 0);
+                double rt2_end = rts[^1] + 0.25;
+                for (double rt1 = rt_beg; rt1 <= rt_end; rt1 += delta) {
+                    var a1 = (rt1 - b1) / cp;
+                    double err1 = calcSquareErr(a1, b1, startIdx, cp_nxt);
+
+                    for (int ftIdx2 = 0; ftIdx2 < decayFactors2.Length; ++ftIdx2) {
+                        for (double rt2 = rt2_beg; rt2 <= rt2_end; rt2 += delta) {
+                            //var rt2 = rts.Last();
+                            double err2 = calcSquareErr2(rt0, rt1, rt2, decayFactors2[ftIdx2], cp, cp_nxt + 1, rts.Length);
+                            double err = err1 + err2;
+                            if (err < minp.err) {
+                                minp.err = err;
+                                minp.rt1 = rt1;
+                                minp.rt2 = rt2;
+                                minp.ftIdx2 = ftIdx2;
+#if DEBUG
+                                debug3(() => $"min1 {minp}");
+#endif
+                            }
+                        }
+                    }
+                }
+                minp.err2 = calcErrByAverage(AVERAGE_ERR_DURATION, dt, minp);
+#if DEBUG
+                debug2(() => $"min2 {minp}");
+#endif
+            }
+
+            delta = 0.005;
+            double delta2 = 0.01;
+
+            //var minps = minParams.OrderBy(p => p.err).Take(7).ToArray();
+            var minps = minParams.OrderBy(p => p.err2).Take(5).ToArray();
+            foreach (var minp in minps) {
+                int cp = minp.days;
+                int cp_idx = startIdx + cp;
+                int cp_nxt = cp_idx + 1;
+                double b1 = rt0;
+                double rt1_beg = minp.rt1 - 0.05;
+                double rt1_end = minp.rt1 + 0.05;
+                double rt2_beg = minp.rt2 - 0.05;
+                double rt2_end = minp.rt2 + 0.05;
+                int ft2_beg = Math.Max(minp.ftIdx2 - 2, 0);
+                int ft2_end = Math.Min(minp.ftIdx2 + 2, decayFactors2.Length);
+                for (double rt1 = rt1_beg; rt1 <= rt1_end; rt1 += delta) {
+                    var a1 = (rt1 - b1) / cp;
+                    double err1 = calcSquareErr(a1, b1, startIdx, cp_nxt);
+                    if (err1 < minp.err) {
+                        for (int ftIdx2 = ft2_beg; ftIdx2 < ft2_end; ++ftIdx2) {
+                            for (double rt2 = rt2_beg; rt2 <= rt2_end; rt2 += delta2) {
+                                double err2 = calcSquareErr2(rt0, rt1, rt2, decayFactors2[ftIdx2], cp, cp_nxt + 1, rts.Length);
+                                double err = err1 + err2;
+                                if (err < minp.err) {
+                                    minp.err = err;
+                                    minp.rt1 = rt1;
+                                    minp.rt2 = rt2;
+                                    minp.ftIdx2 = ftIdx2;
+#if DEBUG
+                                    debug3(() => $"min3 {minp}");
+#endif
+                                }
+                            }
+                        }
+                    }
+                }
+                minp.err2 = calcErrByAverage(AVERAGE_ERR_DURATION, dt, minp);
+#if DEBUG
+                debug2(() => $"min4 {minp}");
+#endif
+            }
+
+            //return minps.Aggregate((min, w) => min.err <= w.err ? min : w);
+            return minps.Aggregate((min, w) => min.err2 <= w.err2 ? min : w);
         }
 
-        private double calcH2()
+        MinParams adjustFactor1AndMakeSubParams(int duration, DateTime dt, MinParams minParam)
         {
-            return StartValue / (Math.Exp(-1) - Math.Exp(-Math.Exp(w)));
+            int min_ftIdx1 = 0;
+            double min_err = double.MaxValue;
+            for (int ftIdx1 = 0; ftIdx1 < Pages.MyChart._decayFactors.Length; ++ftIdx1) {
+                minParam.ftIdx1 = ftIdx1;
+                double err = calcErrByAverage(duration, dt, minParam);
+                if (err < min_err) {
+                    min_err = err;
+                    min_ftIdx1 = ftIdx1;
+                }
+#if DEBUG
+                debug3(() => $"min_ft Err={err:f3}, ftIdx1={ftIdx1}");
+#endif
+            }
+            minParam.err2 = min_err;
+            minParam.ftIdx1 = min_ftIdx1;
+#if DEBUG
+            debug2(() =>  $"{Title}: adjust: duration={duration}, dt={dt._toDateString()}, {minParam}");
+#endif
+            return minParam;
         }
 
-        /// <summary> 基準日の gompertz 増分 </summary>
-        private double calcStartVal()
+        double calcErrByAverage(int duration, DateTime dt, MinParams minParam)
         {
-            var g0 = _gompertz(-PeakDays);
-            var g1 = _gompertz(-PeakDays - 1);
-            return g0 - g1;
+            int realDays = Dates.Length;
+            RtDecayParam param = InitialDecayParam.Clone();
+            param.StartDate = dt;
+            minParam.CopyToDecayParam(param);
+            var predData = UserPredictData.PredictValuesEx(this, param, realDays + 10, 5);  // 10 と 5 は適当
+            return realDays._range(realDays - duration).Select(i => Math.Pow(predData.PredAverage[i] - Average[i], 2)).Sum();
         }
 
-        private double calcPeakVal()
-        {
-            var g0 = _gompertz(PeakDays);
-            var g1 = _gompertz(PeakDays - 1);
-            return g0 - g1;
-        }
-
-        public void PrintValues(string title)
-        {
-            Console.WriteLine($"{title}: StartDate={StartDate._dateString()}, PeakDays={PeakDays}, H={H:f1}, w={w:f5}");
-        }
     }
 
-    public static partial class GompertzExtensions
-    {
-        public static string[] _toString(this IEnumerable<double> data)
-        {
-            return data.Select(x => $"{x:f1}").ToArray();
-        }
-
-        public static string[] _toString(this IEnumerable<double?> data)
-        {
-            return data.Select(x => x.HasValue ? $"{x:f1}" : null).ToArray();
-        }
-
-        public static double[] _toDiff(this double[] data)
-        {
-            return data.Select((x, i) => i > 0 ? x - data[i - 1] : 0).ToArray();
-        }
-
-        public static double?[] _toNullableArray(this IEnumerable<double> array, int roundDigit, double? defval = null)
-        {
-            return array.Select(x => x > 0 ? Math.Round(x, roundDigit) : defval).ToArray();
-        }
-    }
 }
 
