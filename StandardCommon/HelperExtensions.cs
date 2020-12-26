@@ -112,6 +112,11 @@ namespace StandardCommon
             return val > 0 ? val : defval;
         }
 
+        public static int _gtZeroOr(this int val, Func<int> defval)
+        {
+            return val > 0 ? val : defval?.Invoke() ?? 0;
+        }
+
         /// <summary>
         /// 0 より大きければ自身を返し、0 以下なら defval を返す
         /// </summary>
@@ -121,6 +126,70 @@ namespace StandardCommon
         public static double _gtZeroOr(this double val, double defval)
         {
             return val > 0 ? val : defval;
+        }
+
+        public static double _gtZeroOr(this double val, Func<double> defval)
+        {
+            return val > 0 ? val : defval?.Invoke() ?? 0;
+        }
+
+        /// <summary>
+        /// 0 以上ならば自身を返し、0 未満なら defval を返す
+        /// </summary>
+        /// <param name="val"></param>
+        /// <param name="defval"></param>
+        /// <returns></returns>
+        public static int _geZeroOr(this int val, int defval)
+        {
+            return val >= 0 ? val : defval;
+        }
+
+        public static int _geZeroOr(this int? val, int defval)
+        {
+            return val >= 0 ? (int)val : defval;
+        }
+
+        /// <summary>
+        /// 0 以上ならば自身を返し、0 未満なら defval を返す
+        /// </summary>
+        /// <param name="val"></param>
+        /// <param name="defval"></param>
+        /// <returns></returns>
+        public static double _geZeroOr(this double val, double defval)
+        {
+            return val >= 0 ? val : defval;
+        }
+
+        /// <summary>
+        /// 0 でなければ自身を返し、0 なら defval を返す
+        /// </summary>
+        /// <param name="val"></param>
+        /// <param name="defval"></param>
+        /// <returns></returns>
+        public static int _neZeroOr(this int val, int defval)
+        {
+            return val != 0 ? val : defval;
+        }
+
+        public static int _neZeroOr(this int? val, int defval)
+        {
+            return val != 0 ? (int)val : defval;
+        }
+
+        /// <summary>
+        /// 0 でなければ自身を返し、0 なら defval を返す
+        /// </summary>
+        /// <param name="val"></param>
+        /// <param name="defval"></param>
+        /// <returns></returns>
+        public static double _neZeroOr(this double val, double defval)
+        {
+            return val != 0 ? val : defval;
+        }
+
+        public static double _neZeroOr(this double val, Func<double> defval)
+        {
+            return val != 0 ? val : defval?.Invoke() ?? 0;
         }
 
         /// <summary>
@@ -151,6 +220,17 @@ namespace StandardCommon
         public static bool _isNaN(this double val)
         {
             return double.IsNaN(val);
+        }
+
+        /// <summary>
+        /// val を Round する
+        /// </summary>
+        /// <param name="val"></param>
+        /// <param name="digits"></param>
+        /// <returns></returns>
+        public static double _round(this double val, int digits)
+        {
+            return Math.Round(val, digits);
         }
 
         /// <summary>
@@ -200,6 +280,28 @@ namespace StandardCommon
         public static double _value(this double? val)
         {
             return val.HasValue ? val.Value : 0;
+        }
+
+        /// <summary>
+        /// pair の Max を返す
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="pair"></param>
+        /// <returns></returns>
+        public static T _max<T>(this (T a, T b) pair) where T: IComparable
+        {
+            return pair.a.CompareTo(pair.b) >= 0 ? pair.a : pair.b;
+        }
+
+        /// <summary>
+        /// pair の Min を返す
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="pair"></param>
+        /// <returns></returns>
+        public static T _min<T>(this (T a, T b) pair) where T: IComparable
+        {
+            return pair.a.CompareTo(pair.b) <= 0 ? pair.a : pair.b;
         }
 
     } // IntExtensions
@@ -384,6 +486,13 @@ namespace StandardCommon
             return array._notEmpty() ? string.Join(delim, array) : "";
         }
 
+        /// <summary>
+        ///  述語を満たす配列の要素を探してその位置を返す。なければ -1を返す。
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="array"></param>
+        /// <param name="predicate"></param>
+        /// <returns></returns>
         public static int _findIndex<T>(this T[] array, Func<T, bool> predicate)
         {
             if (array != null)
@@ -394,6 +503,18 @@ namespace StandardCommon
                 }
             }
             return -1;
+        }
+
+        /// <summary>
+        ///  配列の要素を探してその位置を返す。なければ -1を返す。
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="array"></param>
+        /// <param name="predicate"></param>
+        /// <returns></returns>
+        public static int _findIndex<T>(this T[] array, T elem) where T : IComparable
+        {
+            return array._findIndex(x => x.CompareTo(elem) == 0);
         }
 
         /// <summary>
@@ -443,6 +564,34 @@ namespace StandardCommon
             int origLen = array._safeCount();
             array = array._extend(num);
             for (int i = origLen; i < num; ++i) array[i] = fillVal;
+            return array;
+        }
+
+        /// <summary>
+        /// 配列を指定の値で初期化する
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="array"></param>
+        /// <param name="fillVal"></param>
+        /// <returns></returns>
+        public static T[] _fill<T>(this T[] array, T fillVal)
+        {
+            for (int i = 0; i < array._safeLength(); ++i) array[i] = fillVal;
+            return array;
+        }
+
+        /// <summary>
+        /// 配列を指定の値で初期化する
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="array"></param>
+        /// <param name="fillVal"></param>
+        /// <returns></returns>
+        public static T[] _fill<T>(this T[] array, int begin, int length, T fillVal)
+        {
+            begin = (0, begin)._max();
+            int end = (begin + length, array._safeLength())._min();
+            for (int i = begin; i < end; ++i) array[i] = fillVal;
             return array;
         }
 
@@ -1809,15 +1958,61 @@ namespace StandardCommon
         }
 
         /// <summary>
+        /// 最小値とそれのインデックスを返す
+        /// </summary>
+        /// <param name="list"></param>
+        /// <returns></returns>
+        public static (int index, T value) _bottom1<T>(this IEnumerable<T> list) where T: IComparable
+        {
+            return list._enumerate().Aggregate((min, w) => min.value.CompareTo(w.value) <= 0 ? min : w);
+        }
+
+        /// <summary>
         /// 値の大きいほうから k 個を取得して返す
         /// </summary>
         /// <param name="list"></param>
         /// <returns></returns>
-        public static IEnumerable<(int index, T value)> _topk<T>(this IEnumerable<T> list, int k) where T: IComparable
+        public static IEnumerable<(int index, T value)> _topk<T>(this IEnumerable<T> list, int k) where T : IComparable
         {
             return list._enumerate().OrderByDescending(x => x.value).Take(k);
         }
 
+        /// <summary>
+        /// 値の大きいほうから k 個を取得して返す
+        /// </summary>
+        /// <param name="list"></param>
+        /// <returns></returns>
+        public static IEnumerable<(int index, T value)> _topk<T, V>(this IEnumerable<T> list, int k, Func<T, V> valGetter) where V : IComparable
+        {
+            return list._enumerate().OrderByDescending(x => valGetter(x.value)).Take(k);
+        }
+
+        /// <summary>
+        /// 値の小さいほうから k 個を取得して返す
+        /// </summary>
+        /// <param name="list"></param>
+        /// <returns></returns>
+        public static IEnumerable<(int index, T value)> _bottomk<T>(this IEnumerable<T> list, int k) where T : IComparable
+        {
+            return list._enumerate().OrderBy(x => x.value).Take(k);
+        }
+
+        /// <summary>
+        /// 値の小さいほうから k 個を取得して返す
+        /// </summary>
+        /// <param name="list"></param>
+        /// <returns></returns>
+        public static IEnumerable<(int index, T value)> _bottomk<T, V>(this IEnumerable<T> list, int k, Func<T, V> valGetter) where V : IComparable
+        {
+            return list._enumerate().OrderBy(x => valGetter(x.value)).Take(k);
+        }
+
+        /// <summary>
+        /// python enumerate と同じ動作
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="list"></param>
+        /// <returns></returns>
         public static IEnumerable<(int index, T value)> _enumerate<T>(this IEnumerable<T> list)
         {
             return list.Select((value, index) => (index, value));
@@ -2183,6 +2378,11 @@ namespace StandardCommon
         public static DateTime _orElse(this DateTime dt, DateTime dtElse)
         {
             return dt._isValid() ? dt : dtElse;
+        }
+
+        public static DateTime _orElse(this DateTime dt, Func<DateTime> defFunc = null)
+        {
+            return dt._isValid() || defFunc == null ? dt : defFunc.Invoke();
         }
 
         public static DateTime _safeAddDays(this DateTime dt, int val)

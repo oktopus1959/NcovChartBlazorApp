@@ -41,20 +41,20 @@ namespace ChartBlazorApp.Pages
 
         private EffectiveParams _effectiveParams = new EffectiveParams(null, null);
 
-        private async Task insertStaticDescription()
-        {
-            var html = Helper.GetFileContent("wwwroot/html/Description2.html", System.Text.Encoding.UTF8);
-            if (html._notEmpty()) await JSRuntime.InvokeAsync<string>("insertStaticDescription2", html);
-        }
+        //private async Task insertStaticDescription()
+        //{
+        //    var html = Helper.GetFileContent("wwwroot/html/Description2.html", System.Text.Encoding.UTF8);
+        //    if (html._notEmpty()) await JSRuntime.InvokeAsync<string>("insertStaticDescription2", html);
+        //}
 
         private async Task selectStaticDescription()
         {
-            //await JSRuntime.InvokeAsync<string>("selectDescription", "forecast-page", "infect-rate-ave-weeks", forecastData.RateAveWeeks.ToString());
-            await JSRuntime.InvokeAsync<string>("selectDescription", "forecast-page");
+            await JSRuntime._selectDescription("forecast-page");
         }
 
         private async Task getSettings()
         {
+            ConsoleLog.Info($"[Forecast.getSettings] CALLED");
             _effectiveParams = await EffectiveParams.CreateByGettingUserSettings(JSRuntime, dailyData);
         }
 
@@ -70,6 +70,7 @@ namespace ChartBlazorApp.Pages
         protected override async Task OnAfterRenderAsync(bool firstRender)
         {
             if (firstRender) {
+                ConsoleLog.Info($"[Forecast.OnAfterRenderAsync] CALLED");
                 await getSettings();
                 await RenderDeathAndSeriousChart();
                 await selectStaticDescription();
@@ -99,33 +100,35 @@ namespace ChartBlazorApp.Pages
         /// <returns></returns>
         public async Task RenderDeathAndSeriousChart(bool bAnimation = true)
         {
-            // ユーザ設定を使うか
-            //bool useSettings = _effectiveParams.UseOnForecast || (_effectiveParams.DrawExpectation && _effectiveParams.FourstepSettings);
-            //bool useSettings = _effectiveParams.DetailSettings || (_effectiveParams.DrawExpectation && _effectiveParams.FourstepSettings);
-            RtDecayParam rtParam = _effectiveParams.MakeRtDecayParam(0);  // 0: 全国
+            // システム設定によるパラメータ
+            RtDecayParam rtParam = _effectiveParams.MakeRtDecayParam(0, true);  // 0: 全国
+            // ユーザ設定によるパラメータ
+            RtDecayParam rtParamByUser = _effectiveParams.DetailSettings && !_effectiveParams.FourstepSettings ? _effectiveParams.MakeRtDecayParam(0, false) : null;
+
             // 予測に必要なデータの準備
             _userData = new UserForecastData().MakeData(forecastData, _infectData0, rtParam);
+            var userDataByUser = rtParamByUser != null ? new UserForecastData().MakeData(forecastData, _infectData0, rtParamByUser) : null;
 
             bool onlyOnClick = _effectiveParams.OnlyOnClick;
 
-            var jsonStr = forecastData.MakeDeathJsonData(_userData, onlyOnClick, bAnimation);
-            await JSRuntime.InvokeAsync<string>("renderChart2", "chart-wrapper-death", -2, newlyDaysRatio(), jsonStr);
+            var jsonStr = forecastData.MakeDeathJsonData(_userData, userDataByUser, onlyOnClick, bAnimation);
+            await JSRuntime._renderChart2("chart-wrapper-death", -2, newlyDaysRatio(), jsonStr);
 
-            jsonStr = forecastData.MakeSeriousJsonData(_userData, onlyOnClick, bAnimation);
-            await JSRuntime.InvokeAsync<string>("renderChart2", "chart-wrapper-serious", -2, newlyDaysRatio(), jsonStr);
+            jsonStr = forecastData.MakeSeriousJsonData(_userData, userDataByUser, onlyOnClick, bAnimation);
+            await JSRuntime._renderChart2("chart-wrapper-serious", -2, newlyDaysRatio(), jsonStr);
 
             if (_showOtherCharts) {
-                jsonStr = forecastData.MakeDailyDeathJonData(_userData, onlyOnClick);
-                await JSRuntime.InvokeAsync<string>("renderChart2", "chart-wrapper-dailydeath", -2, 100, jsonStr);
+                jsonStr = forecastData.MakeDailyDeathJonData(_userData, userDataByUser, onlyOnClick);
+                await JSRuntime._renderChart2("chart-wrapper-dailydeath", -2, 100, jsonStr);
 
                 jsonStr = forecastData.MakeSeriousDiffJsonData(_userData, onlyOnClick);
-                await JSRuntime.InvokeAsync<string>("renderChart2", "chart-wrapper-seriousdiff", -2, 100, jsonStr);
+                await JSRuntime._renderChart2("chart-wrapper-seriousdiff", -2, 100, jsonStr);
 
                 jsonStr = forecastData.MakeDeathDiffJsonData(_userData, onlyOnClick);
-                await JSRuntime.InvokeAsync<string>("renderChart2", "chart-wrapper-deathdiff", -2, 100, jsonStr);
+                await JSRuntime._renderChart2("chart-wrapper-deathdiff", -2, 100, jsonStr);
 
                 jsonStr = forecastData.MakeBothDiffJsonData(_userData, onlyOnClick);
-                await JSRuntime.InvokeAsync<string>("renderChart2", "chart-wrapper-bothsum", -2, 100, jsonStr);
+                await JSRuntime._renderChart2("chart-wrapper-bothsum", -2, 100, jsonStr);
             }
         }
 

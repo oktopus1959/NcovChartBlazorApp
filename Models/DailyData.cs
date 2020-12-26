@@ -45,25 +45,23 @@ namespace ChartBlazorApp.Models
         private DateTime _lastInitializedDt;
         private DateTime _lastFileDt;
 
-        public void Initialize(bool bForce = false)
+        public void Initialize(bool bForce = false, DateTime? lastRealDt = null)
         {
-#if DEBUG
-            //Console.WriteLine($"{DateTime.Now} [DailyData.Initialize] CALLED");
-#endif
+            //ConsoleLog.Debug($"{DateTime.Now} [DailyData.Initialize] CALLED");
             if (m_syncBool.BusyCheck()) return;
             using (m_syncBool) {
                 // OnInitialized は2回呼び出される可能性があるので、30秒以内の再呼び出しの場合は、 DailyData の初期化をスキップする
                 var prevDt = _lastInitializedDt;
                 _lastInitializedDt = DateTime.Now;
-                if (_lastInitializedDt < prevDt.AddSeconds(30)) return;
+                if (!bForce && _lastInitializedDt < prevDt.AddSeconds(30)) return;
 
-                const string filePath = "Data/csv/prefectures_ex.csv";
+                string filePath = Constants.PREF_FILE_PATH;
                 var fileInfo = Helper.GetFileInfo(filePath);
                 if (bForce || fileInfo.ModifyDt > _lastFileDt) {
                     // ファイルが更新されていたら再ロードする
                     _lastFileDt = fileInfo.ModifyDt;
-                    _infectDataList = loadPrefectureData(readFile(filePath));
-                    Console.WriteLine($"{_lastInitializedDt} [DailyData.Initialize] Reload:{filePath}");
+                    _infectDataList = loadPrefectureData(readFile(filePath), lastRealDt);
+                    ConsoleLog.Info($"[DailyData.Initialize] lastInitialized at {prevDt}, Reload:{filePath}");
                 }
             }
         }
@@ -88,7 +86,7 @@ namespace ChartBlazorApp.Models
             return w7 > 0 ? Math.Pow(weekly(idx) / w7, 5.0 / 7.0) : 0.0;
         }
 
-        private List<InfectData> loadPrefectureData(IEnumerable<string> lines)
+        private List<InfectData> loadPrefectureData(IEnumerable<string> lines, DateTime? lastRealDt = null)
         {
             List<string> prefOrder = new List<string>();
             var prefDataDict = new Dictionary<string, PrefInfectData>();
@@ -132,17 +130,19 @@ namespace ChartBlazorApp.Models
                     var data = getOrNewData(items, true);
                     if (data != null) {
                         var dt = items._nth(0)._parseDateTime();
-                        var val = items._nth(3)._parseDouble(0);
-                        if (data.Dates._isEmpty() || data.Dates.Last() < dt) {
-                            data.Total.Add(val);
-                            data.Dates.Add(dt);
-                            if (dt < _firstDate) ++data.PreDataNum;
-                        } else {
-                            for (int i = data.Dates.Count() - 1; i >= 0; --i) {
-                                if (data.Dates[i] == dt) {
-                                    data.Total[i] = val;
-                                } else if (data.Dates[i] > dt) {
-                                    break;
+                        if (lastRealDt == null || dt <= lastRealDt) {
+                            var val = items._nth(3)._parseDouble(0);
+                            if (data.Dates._isEmpty() || data.Dates.Last() < dt) {
+                                data.Total.Add(val);
+                                data.Dates.Add(dt);
+                                if (dt < _firstDate) ++data.PreDataNum;
+                            } else {
+                                for (int i = data.Dates.Count() - 1; i >= 0; --i) {
+                                    if (data.Dates[i] == dt) {
+                                        data.Total[i] = val;
+                                    } else if (data.Dates[i] > dt) {
+                                        break;
+                                    }
                                 }
                             }
                         }
@@ -304,9 +304,14 @@ namespace ChartBlazorApp.Models
         /// <summary> 県別データファイルから事前に作成された予測設定値(Layer-2) </summary>
         public SubParams InitialSubParams { get; set; }
 
-        public static InfectData DummyData = new InfectData() {
+        public static InfectData DummyData { get {
+                //ConsoleLog.Warn($"[InfectData.DummyData] Used");
+                return _dummyData;
+            } }
+
+        private static readonly InfectData _dummyData = new InfectData() {
             InitialDecayParam = new RtDecayParam(),
-            InitialSubParams = new SubParams(),
+            InitialSubParams = new SubParams() { StartDate = "2020/12/1" },
         };
 
         public string GetDecayStartDateStr(int localMaxRtDulation)
@@ -359,20 +364,18 @@ namespace ChartBlazorApp.Models
 
         private static int findRecentMaxMinIndex(double[] rt, Func<double, double, bool> comp, int localMaxRtDulation)
         {
-            const double RT_THRESHOLD = 3.0;
-            const int GUARD_DURATION = 5; 
-
-            if (localMaxRtDulation < 0) localMaxRtDulation = UserSettings.LocalMaxRtDuration;
+            if (localMaxRtDulation < 0) localMaxRtDulation = Constants.LOCAL_MAX_RT_BACK_DURATION;
             int mIdx = rt._safeCount();
             if (rt._notEmpty()) {
+                int lastBackIdx = (rt.Length - Constants.MAX_BACK_DAYS - 1, 0)._max();
                 int lastIdx = rt.Length - 1;
                 var mVal = rt[lastIdx];
                 mIdx = lastIdx;
                 int count = localMaxRtDulation;
-                while (count-- > 0 && --lastIdx >= 0) {
+                while (count-- > 0 && --lastIdx >= lastBackIdx) {
                     var v = rt[lastIdx];
-                    if (v > RT_THRESHOLD && lastIdx < rt.Length - GUARD_DURATION) break;
-                    if (v <= RT_THRESHOLD && comp(v, mVal)) {
+                    if (v > Constants.RT_THRESHOLD && lastIdx < rt.Length - Constants.TAIL_GUARD_DURATION) break;
+                    if (v <= Constants.RT_THRESHOLD && comp(v, mVal)) {
                         mVal = v;
                         mIdx = lastIdx;
                         count = localMaxRtDulation;
@@ -382,11 +385,10 @@ namespace ChartBlazorApp.Models
             return mIdx;
         }
 
-        const int TWO_STAGE_MIN_DURATION = 12;
-
         public class MinParams
         {
-            public int days = 0;
+            /// <summary> 変化日までの日数(基準日を0としたときのインデックス; 誤差の計算日数-1 なので注意)</summary>
+            public int dayIdx = 0;
             public double err = double.MaxValue;
             public double err2 = double.MaxValue;
             public double rt1 = 0;
@@ -394,15 +396,18 @@ namespace ChartBlazorApp.Models
             public int ftIdx1 = 0;
             public int ftIdx2 = 8;
 
+            public int ft1 { get { return Pages.MyChart._decayFactors._nth(ftIdx1); } }
+            public int ft2 { get { return Pages.MyChart._decayFactors2._nth(ftIdx2); } }
+
             public SubParams MakeSubParams(DateTime dt)
             {
                 return new SubParams() {
                     StartDate = dt._toDateString(),
                     Rt1 = rt1._round(3),
                     Rt2 = rt2._round(3),
-                    DaysToOne = days,
-                    DecayFactor = Pages.MyChart._decayFactors._nth(ftIdx1),
-                    DecayFactorNext = Pages.MyChart._decayFactors2._nth(ftIdx2),
+                    DaysToOne = dayIdx,
+                    DecayFactor = ft1,
+                    DecayFactorNext = ft2,
                 };
             }
 
@@ -410,25 +415,58 @@ namespace ChartBlazorApp.Models
             {
                 param.EasyRt1 = rt1;
                 param.EasyRt2 = rt2;
-                param.DaysToOne = days;
-                param.DecayFactor = Pages.MyChart._decayFactors[ftIdx1];
-                param.DecayFactorNext = Pages.MyChart._decayFactors2[ftIdx2];
+                param.DaysToOne = dayIdx;
+                param.DecayFactor = ft1;
+                param.DecayFactorNext = ft2;
                 return param;
             }
 
             public override string ToString()
             {
-                return $"days={days}, err={(err < double.MaxValue ? err : 999999.999):f3}, err2={(err2 < double.MaxValue ? err2 : 999999.999):f3}, rt1={rt1:f3}, rt2={rt2:f3}, ftIdx1={ftIdx1}, ftIdx2={ftIdx2}";
+                return $"days={dayIdx}, "
+                    + $"err={(err < double.MaxValue ? err : 999999.999):f3}, "
+                    + $"err2={(err2 < double.MaxValue ? err2 : 999999.999):f3}, "
+                    + $"rt1={rt1:f3}, "
+                    + $"rt2={rt2:f3}, "
+                    + $"ftIdx1={ftIdx1}, "
+                    + $"ftIdx2={ftIdx2}";
+            }
+
+            public double calcCoefficientA1(double rt0)
+            {
+                return Constants.CalcCoefficientA1(rt0, rt1, ft1, dayIdx);
+            }
+
+            public double calcCoefficientB1(double rt0, double a1)
+            {
+                return Constants.CalcCoefficientB1(rt0, a1, ft1);
+            }
+
+            public double calcExtendedRt1(double rt0, int dtIdx)
+            {
+                double a = calcCoefficientA1(rt0);
+                double b = calcCoefficientB1(rt0, a);
+                return Constants.CalcRt1(a, b, ft1, dtIdx);
+            }
+
+            public MinParams extendDaysAndCalcRt1(double rt0, int extendedDayIdx)
+            {
+                double a = calcCoefficientA1(rt0);
+                double b = calcCoefficientB1(rt0, a);
+                var rt = Constants.CalcRt1(a, b, ft1, extendedDayIdx);
+                if (rt > 0) {
+                    rt1 = rt;
+                    dayIdx = extendedDayIdx;
+                }
+                return this;
             }
         }
 
-        const int AVERAGE_ERR_DURATION = 7;
+        public static int DebugLevel = 0;
 
-#if DEBUG
-        static int debugLevel = 0;
         static void debugN(int n, Func<string> func)
         {
-            if (debugLevel >= n) Console.WriteLine(func());
+            if (DebugLevel >= n) ConsoleLog.Debug(func());
         }
 
         static void debug0(Func<string> func) { debugN(0, func); }
@@ -437,7 +475,6 @@ namespace ChartBlazorApp.Models
         static void debug3(Func<string> func) { debugN(3, func); }
         static void debug4(Func<string> func) { debugN(4, func); }
         static void debug5(Func<string> func) { debugN(5, func); }
-#endif
 
         /// <summary>
         /// 基準日、変化点、傾きの推計
@@ -445,144 +482,146 @@ namespace ChartBlazorApp.Models
         /// <param name="localDuration"></param>
         /// <param name="dt_"></param>
         /// <returns></returns>
-        public SubParams CalcDecaySubParams(int localDuration = -1, DateTime? dt_ = null)
+        public SubParams CalcDecaySubParams(int localDuration = -1, DateTime? dt_ = null, int debugLevel = 0)
         {
-
+#if DEBUG
+            DebugLevel = debugLevel;
+#endif
+            if (debugLevel > 0) {
+                // ブレークポイントを仕掛ける場所
+                debug1(() => $"[InfectData.CalcDecaySubParams] ENTER ----");
+            }
             var dt = dt_.HasValue ? dt_.Value : GetDecayStartDate(localDuration);
+            debug1(() => $"[InfectData.CalcDecaySubParams] {Title}_0: dt: {dt_?._toDateString()}");
+
             double[] rts = Rt;
             int startIdx = (dt - Dates._first()).Days;
-            int len = Rt._length() - startIdx - 1;
-            //int days = Math.Max(len + 5, 15);
-            int days = (int)(len * (4.0 / 3.0));
-            MinParams minParam = new MinParams() { days = days, rt2 = -1 };
 
             double rt0 = Rt._nth(startIdx);
 
-#if DEBUG
-            debugLevel = 0;
-           if (Title == "全国" || Title == "宮城県") {
-                debugLevel = 0;
-                debug0(() => $"{Title}_0: dt={dt._toDateString()}");
-            }
-#endif
-
-            (var err, var rt1) = find_rt1(Rt, startIdx);
-            minParam.err = err;
-            minParam.rt1 = rt1;
-#if DEBUG
+           // 1st stage
+            var minParam = find_rt1(Rt, startIdx);
             debug1(() => $"{Title}_1: find_rt1: {minParam}");
-#endif
-            // find_rt1 後の調整
-            double adjustDelta = (rt1 == rt0 || len >= 10) ? 0 : (len >= 5) ? 0.01 : 0.02;
-            if (rt1 < rt0) adjustDelta = -adjustDelta;
-            rt1 -= adjustDelta;
-            // calc days' rt1
-            var days_rt1 = rt0 + (rt1 - rt0) * days / len;
-            if (days_rt1 < 0) {
-                days = (int)((rt0 * len) / (rt0 - rt1));
-                rt1 = rt0 + (rt1 - rt0) * days / len;
-            } else {
-                rt1 = days_rt1;
+            // rt1 と days の調整： days は STAGE1_MIN_DURATION 以上とする
+            if (minParam.dayIdx < Constants.STAGE1_MIN_DURATION) {
+                int dura = minParam.dayIdx * 2;
+                if (dura > Constants.STAGE1_MIN_DURATION) dura = Constants.STAGE1_MIN_DURATION;
+                minParam.extendDaysAndCalcRt1(rt0, dura);
             }
-            var rt2 = (rt1 > 1) ?   1 + (rt1 - 1) * 0.3 :
-                      (rt0 > rt1) ? 1 - (1 - rt1) * 1.2 :
-                                    1 - (1 - rt1) * 0.8;
-            minParam.days = days;
-            minParam.rt1 = rt1;
-            minParam.rt2 = Math.Max(rt2, 0.001);
-            minParam.err2 = calcErrByAverage(AVERAGE_ERR_DURATION, dt, minParam);
-#if DEBUG
+            var rt1 = minParam.rt1;
+            // rt2 の調整： rt1 の80%にする
+            //var rt2 = (rt1 > 1) ? 1 + (rt1 - 1) * 0.8 : rt1 * 1.2 - rt0 * 0.2;
+            // rt2 の調整： 上昇中なら上昇分*30%、下降中なら下降分*20%、さらに下げる
+            var rt2 = (rt1 > rt0) ? rt1 - (rt1 - rt0) * 0.3 : rt1 - (rt0 - rt1) * 0.2;
+            minParam.rt2 = (rt2, 0.001)._max();
+            minParam.ftIdx2 = (minParam.ftIdx1 - Pages.MyChart._decayFactors2Start, minParam.ftIdx2)._max();
+            minParam.err2 = calcErrByAverage(Constants.AVERAGE_ERR_DURATION, dt, minParam);
             debug1(() => $"{Title}_2: adjusted: {minParam}");
-#endif
 
-            if (len >= TWO_STAGE_MIN_DURATION) {
-                var minp = find_all(dt, Rt, startIdx);
-#if DEBUG
+           // both stage
+            int duration = Rt._length() - startIdx - 1;
+            if (duration >= Constants.STAGE2_MIN_DURATION) {
+                var minp = find_both(dt, Rt, startIdx);
                 debug1(() => $"{Title}_3: find_all: {minp}");
-#endif
+                adjustFactor1AndMakeSubParams(Constants.TAIL_ERR_DURATION, dt, minp);
                 //if (minp.err < err) {
                 if (minp.err2 < minParam.err2) {
                     minParam = minp;
                 }
             }
             //if (a > 0) a *= 0.9;
-            const int TAIL_ERR_DURATION = 3;
-            adjustFactor1AndMakeSubParams(TAIL_ERR_DURATION, dt, minParam);
-#if DEBUG
-            debug1(() => $"{Title}_4: {minParam}");
-#endif
+            debug1(() => $"[InfectData.CalcDecaySubParams] LEAVE ---- {Title}_4: {minParam}");
             return minParam.MakeSubParams(dt);
         }
 
-        private (double, double) find_rt1(double[] rts, int startIdx)
-        {
-            if (rts._isEmpty() || startIdx < 0 || startIdx >= rts.Length) return (0, 0);
-            double b = rts._nth(startIdx);
-
-            double calcSquareErr(double a, double b)
-            {
-                return rts.Skip(startIdx).Select((y, x) => Math.Pow(a * x + b - y, 2)).Sum();
-            }
-
-            double calcErrdiff(double a)
-            {
-                return rts.Skip(startIdx).Select((y, x) => (a * x + b - y) * x).Sum();
-            }
-
-            const double DOUBLING_THRESHOLD = 10.0;
-            bool bSwinged = false;
-            double a = 0.01;
-            double delta = a / 5;
-            double d = calcErrdiff(a);
-            bool positive = d > 0;
-            for (int i = 0; i < 100; ++i) {
-#if DEBUG
-                debug2(() => $"find_rt1({i}): a={a:f5}, d={d:f7}, delta={delta:f7}, posi={positive}");
-#endif
-                if (Math.Abs(d) < 0.0000001) break;
-                a += (d > 0) ? -delta : delta;
-                if ((positive && d < 0) || (!positive && d > 0)) {
-                    delta /= 2;
-                    positive = !positive;
-                    bSwinged = true;
-                } else if (Math.Abs(d) >= DOUBLING_THRESHOLD && !bSwinged) {
-                    delta *= 2;
-                }
-                d = calcErrdiff(a);
-            }
-#if DEBUG
-            debug1(() => $"find_rt1: a={a:f5}, b={b:f7}");
-#endif
-            return (calcSquareErr(a, b), a * (rts.Length - startIdx - 1) + b);
-        }
-
-        private MinParams find_all(DateTime dt, double[] rts, int startIdx)
+        /// <summary>
+        /// Rt1, dasyTo1, factor1 を求める
+        /// </summary>
+        /// <param name="rts"></param>
+        /// <param name="startIdx"></param>
+        /// <returns></returns>
+        private MinParams find_rt1(double[] rts, int startIdx)
         {
             if (rts._isEmpty() || startIdx < 0 || startIdx >= rts.Length) return new MinParams();
 
-            double calcSquareErr(double a, double b, int begin, int end)
+            int chgDtIdx = rts.Length - startIdx - 1;  // 変日化のインデックス
+            double calcSquareErr(double rt0, double rt1, double factor1)
+            {
+                double a = Constants.CalcCoefficientA1(rt0, rt1, factor1, chgDtIdx);
+                double b = Constants.CalcCoefficientB1(rt0, a, factor1);
+                return rts.Skip(startIdx).Select((y, x) => Math.Pow(Constants.CalcRt1(a, b, factor1, x) - y, 2)).Sum();
+            }
+
+            MinParams minp = new MinParams() { dayIdx = chgDtIdx };
+            double rt0 = rts[startIdx];
+            int[] decayFactors1 = Pages.MyChart._decayFactors;
+
+            double delta = 0.05;
+            double rt_beg = Math.Max(rts[^1] - 0.5, 0);
+            double rt_end = rts[^1] + 0.5;
+            for (double rt1 = rt_beg; rt1 <= rt_end; rt1 += delta) {
+                for (int ftIdx1 = 0; ftIdx1 < decayFactors1.Length; ++ftIdx1) {
+                    double err = calcSquareErr(rt0, rt1, decayFactors1[ftIdx1]);
+#if DEBUG
+                    debug4(() => $"find_rt1: err={err}, rt1={rt1}, ftIdx1={ftIdx1}");
+#endif
+                    if (err < minp.err) {
+                        minp.err = err;
+                        minp.rt1 = rt1;
+                        minp.ftIdx1 = ftIdx1;
+#if DEBUG
+                        debug2(() => $"find_rt1: min1 {minp}");
+#endif
+                    }
+                }
+            }
+
+            delta = 0.005;
+            rt_beg = Math.Max(minp.rt1 - 0.05, 0);
+            rt_end = minp.rt1 + 0.05;
+            int ftIdx1_beg = Math.Max(minp.ftIdx1 - 1, 0);
+            int ftIdx1_end = Math.Min(minp.ftIdx1 + 1, decayFactors1.Length - 1);
+            for (double rt1 = rt_beg; rt1 <= rt_end; rt1 += delta) {
+                for (int ftIdx1 = ftIdx1_beg; ftIdx1 <= ftIdx1_end; ++ftIdx1) {
+                    double err = calcSquareErr(rt0, rt1, decayFactors1[ftIdx1]);
+#if DEBUG
+                    debug4(() => $"find_rt1: err={err}, rt1={rt1}, ftIdx1={ftIdx1}");
+#endif
+                    if (err < minp.err) {
+                        minp.err = err;
+                        minp.rt1 = rt1;
+                        minp.ftIdx1 = ftIdx1;
+#if DEBUG
+                        debug2(() => $"find_rt1: min2 {minp}");
+#endif
+                    }
+                }
+            }
+            debug1(() => $"find_rt1: {minp}");
+            return minp;
+        }
+
+        /// <summary>
+        /// Rt1, Rt2, factor1, factor2 を求める
+        /// </summary>
+        /// <param name="dt"></param>
+        /// <param name="rts"></param>
+        /// <param name="startIdx"></param>
+        /// <returns></returns>
+        private MinParams find_both(DateTime dt, double[] rts, int startIdx)
+        {
+            if (rts._isEmpty() || startIdx < 0 || startIdx >= rts.Length) return new MinParams();
+
+            double calcSquareErrForLinearRt1(double a, double b, int begin, int end)
             {
                 return rts.Skip(begin).Take(end - begin + 1).Select((y, x) => Math.Pow(a * x + b - y, 2)).Sum();
             }
 
-            double calcSquareErr2(double rt0, double rt1, double rt2, double factor2, int DaysToOne, int begin, int end)
+            double calcSquareErr2(double rt0, double rt1, double rt2, double factor2, int daysToOne, int begin, int end)
             {
-                double a2, b2;
-                if (factor2 > 0) {
-                    double rt_ = ((rt0 > rt1 && rt2 > rt1) || (rt0 < rt1 && rt2 < rt1)) ? rt1 * 2 - rt0 : rt0;
-                    a2 = (rt_ - rt1) * (factor2 + DaysToOne) * factor2 / DaysToOne;
-                    b2 = rt_ - (a2 / factor2);
-                } else {
-                    double f2 = Math.Max(factor2, -4);
-                    a2 = (rt2 - rt1) / (DaysToOne * (1.0 + 0.2 * f2));
-                    b2 = rt1;
-                }
+                (double a2, double b2) = Constants.CalcCoefficients2(rt0, rt1, rt2, factor2, daysToOne);
                 return rts.Skip(begin).Take(end - begin + 1).Select((y, x) => {
-                    double rt = rt2;
-                    if (rt2 != rt1) {
-                        rt = (factor2 > 0) ? a2 / (factor2 + DaysToOne + x) + b2 : a2 * x + b2;
-                        if ((rt2 < rt1 && rt < rt2) || (rt2 > rt1 && rt > rt2)) rt = rt2;
-                    }
+                    double rt = Constants.CalcRt2(a2, b2, rt1, rt2, factor2, x + daysToOne, x);
                     return Math.Pow(rt - y, 2);
                 }).Sum();
             }
@@ -591,7 +630,7 @@ namespace ChartBlazorApp.Models
             int len = rts.Length - startIdx;
             // 変化日ごとの最小エラー値を保存
             MinParams[] minParams = new MinParams[len + 1];
-            for (int i = 0; i < minParams.Length; ++i) { minParams[i] = new MinParams() { days = i }; }  // days を初期化しておく
+            for (int i = 0; i < minParams.Length; ++i) { minParams[i] = new MinParams() { dayIdx = i }; }  // days を初期化しておく
 
             double rt0 = rts[startIdx];
             int[] decayFactors1 = Pages.MyChart._decayFactors;
@@ -603,7 +642,7 @@ namespace ChartBlazorApp.Models
             int cp_end = len - cp_margin;
             double delta = 0.05;
             foreach (var minp in minParams.Skip(cp_beg).Take(cp_margin + 1 + cp_margin)) {
-                int cp = minp.days;
+                int cp = minp.dayIdx;
                 int cp_idx = startIdx + cp;
                 int cp_nxt = cp_idx + 1;
                 double b1 = rt0;
@@ -615,7 +654,7 @@ namespace ChartBlazorApp.Models
                 double rt2_end = rts[^1] + 0.25;
                 for (double rt1 = rt_beg; rt1 <= rt_end; rt1 += delta) {
                     var a1 = (rt1 - b1) / cp;
-                    double err1 = calcSquareErr(a1, b1, startIdx, cp_nxt);
+                    double err1 = calcSquareErrForLinearRt1(a1, b1, startIdx, cp_nxt);
 
                     for (int ftIdx2 = 0; ftIdx2 < decayFactors2.Length; ++ftIdx2) {
                         for (double rt2 = rt2_beg; rt2 <= rt2_end; rt2 += delta) {
@@ -628,15 +667,15 @@ namespace ChartBlazorApp.Models
                                 minp.rt2 = rt2;
                                 minp.ftIdx2 = ftIdx2;
 #if DEBUG
-                                debug3(() => $"min1 {minp}");
+                                debug3(() => $"find_both: min1 {minp}");
 #endif
                             }
                         }
                     }
                 }
-                minp.err2 = calcErrByAverage(AVERAGE_ERR_DURATION, dt, minp);
+                minp.err2 = calcErrByAverage(Constants.AVERAGE_ERR_DURATION, dt, minp);
 #if DEBUG
-                debug2(() => $"min2 {minp}");
+                debug2(() => $"find_both: min2 {minp}");
 #endif
             }
 
@@ -646,7 +685,7 @@ namespace ChartBlazorApp.Models
             //var minps = minParams.OrderBy(p => p.err).Take(7).ToArray();
             var minps = minParams.OrderBy(p => p.err2).Take(5).ToArray();
             foreach (var minp in minps) {
-                int cp = minp.days;
+                int cp = minp.dayIdx;
                 int cp_idx = startIdx + cp;
                 int cp_nxt = cp_idx + 1;
                 double b1 = rt0;
@@ -658,7 +697,7 @@ namespace ChartBlazorApp.Models
                 int ft2_end = Math.Min(minp.ftIdx2 + 2, decayFactors2.Length);
                 for (double rt1 = rt1_beg; rt1 <= rt1_end; rt1 += delta) {
                     var a1 = (rt1 - b1) / cp;
-                    double err1 = calcSquareErr(a1, b1, startIdx, cp_nxt);
+                    double err1 = calcSquareErrForLinearRt1(a1, b1, startIdx, cp_nxt);
                     if (err1 < minp.err) {
                         for (int ftIdx2 = ft2_beg; ftIdx2 < ft2_end; ++ftIdx2) {
                             for (double rt2 = rt2_beg; rt2 <= rt2_end; rt2 += delta2) {
@@ -670,16 +709,16 @@ namespace ChartBlazorApp.Models
                                     minp.rt2 = rt2;
                                     minp.ftIdx2 = ftIdx2;
 #if DEBUG
-                                    debug3(() => $"min3 {minp}");
+                                    debug3(() => $"find_both: min3 {minp}");
 #endif
                                 }
                             }
                         }
                     }
                 }
-                minp.err2 = calcErrByAverage(AVERAGE_ERR_DURATION, dt, minp);
+                minp.err2 = calcErrByAverage(Constants.AVERAGE_ERR_DURATION, dt, minp);
 #if DEBUG
-                debug2(() => $"min4 {minp}");
+                debug2(() => $"find_both: min4 {minp}");
 #endif
             }
 
@@ -699,7 +738,7 @@ namespace ChartBlazorApp.Models
                     min_ftIdx1 = ftIdx1;
                 }
 #if DEBUG
-                debug3(() => $"min_ft Err={err:f3}, ftIdx1={ftIdx1}");
+                debug3(() => $"adjust: min_ft Err={err:f3}, ftIdx1={ftIdx1}");
 #endif
             }
             minParam.err2 = min_err;

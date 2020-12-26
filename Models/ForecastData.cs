@@ -111,9 +111,6 @@ namespace ChartBlazorApp.Models
     /// </summary>
     public class ForecastData
     {
-        /// <summary> 7日移動平均の中央までシフトする日数 </summary>
-        public const int AverageShiftDays = 3;
-
         /// <summary> グラフ表示開始日 </summary>
         public DateTime ChartStartDate { get; set; }
 
@@ -122,6 +119,8 @@ namespace ChartBlazorApp.Models
 
         /// <summary> 予測に利用する実データの終了日(の翌日) </summary>
         public DateTime PredictStartDate { get; set; }
+
+        public int ChartRealDays { get { return (PredictStartDate - ChartStartDate).Days; } }
 
         public double StartSeriousTotal { get; set; }
 
@@ -197,22 +196,20 @@ namespace ChartBlazorApp.Models
 
         public void Initialize()
         {
-#if DEBUG
-            Console.WriteLine($"{DateTime.Now} [ForecastData.Initialize] CALLED");
-#endif
+            ConsoleLog.Debug($"[ForecastData.Initialize] CALLED");
             if (m_syncBool.BusyCheck()) return;
             using (m_syncBool) {
                 // OnInitialized は2回呼び出される可能性があるので、30秒以内の再呼び出しの場合は、 DailyData の初期化をスキップする
-                var _prevDt = _lastInitializedDt;
+                var prevDt = _lastInitializedDt;
                 _lastInitializedDt = DateTime.Now;
-                if (_lastInitializedDt < _prevDt.AddSeconds(30)) return;
+                if (_lastInitializedDt < prevDt.AddSeconds(30)) return;
 
                 InfectRatesByAges = loadInfectByAgesData();
                 loadDeathAndSerious();
-                DeathRatesByAges = loadRatesFile("Data/csv/death_rate.csv", 10);        // 死亡率CSVのロード
-                SeriousRatesByAges = loadRatesFile("Data/csv/serious_rate.csv", 10);    // 重症化率CSVのロード
-                RecoverRates = loadRatesFile("Data/csv/recover_rate.csv", 2);           // 改善率CSVのロード
-                Console.WriteLine($"{_lastInitializedDt} [ForecastData.Initialize] Files reloaded");
+                DeathRatesByAges = loadRatesFile(Constants.DEATH_RATE_FILE_PATH, 10);        // 死亡率CSVのロード
+                SeriousRatesByAges = loadRatesFile(Constants.SERIOUS_RATE_FILE_PATH, 10);    // 重症化率CSVのロード
+                RecoverRates = loadRatesFile(Constants.RECOVER_RATE_FILE_PATH, 2);           // 改善率CSVのロード
+                ConsoleLog.Info($"[ForecastData.Initialize] lastInitialized at {prevDt}, Files reloaded");
             }
         }
 
@@ -236,7 +233,7 @@ namespace ChartBlazorApp.Models
             List<DatedDataSeries> list = new List<DatedDataSeries>();
             double[] prevCounts = new double[9];
             double prevTotal = 0;
-            foreach (var items in readFile("Data/csv/infect_by_ages.csv").Select(line => line.Trim().Split(','))) {
+            foreach (var items in readFile(Constants.INFECTION_RATE_FILE_PATH).Select(line => line.Trim().Split(','))) {
                 if (items[0]._startsWith("#")) {
                     if (items[0]._startsWith("#aveWeek")) {
                         RateAveWeeks = items._nth(1)._parseInt(3);
@@ -279,7 +276,7 @@ namespace ChartBlazorApp.Models
         /// </summary>
         private void loadDeathAndSerious()
         {
-            var items = readFile("Data/csv/death_and_serious.csv").Select(line => line.Trim().Split(',')).ToArray();
+            var items = readFile(Constants.DEATH_AND_SERIOUS_FILE_PATH).Select(line => line.Trim().Split(',')).ToArray();
             ChartStartDate = items[0][0]._parseDateTime();
             PredDispStartDate = items[1][0]._parseDateTime();
             StartSeriousTotal = items[2][0]._parseDouble();
@@ -303,9 +300,9 @@ namespace ChartBlazorApp.Models
         /// 死亡者数予測グラフ用データの作成
         /// </summary>
         /// <returns></returns>
-        public string MakeDeathJsonData(UserForecastData userData, bool onlyOnClick, bool bAnimation)
+        public string MakeDeathJsonData(UserForecastData userData, UserForecastData userDataByUser, bool onlyOnClick, bool bAnimation)
         {
-            double maxPredDeath = userData.LastPredictDeath;
+            double maxPredDeath = (userData.LastPredictDeath, userDataByUser?.LastPredictDeath ?? 0)._max();
             double y1_max = roundYAxis(maxPredDeath, YAxisMaxDeath);
             double y1_min = maxPredDeath > YAxisMaxDeath ? 0 : YAxisMinDeath;
             double y1_step = (y1_max - y1_min) / 10;
@@ -322,6 +319,10 @@ namespace ChartBlazorApp.Models
 
             var dataSets = new List<Dataset>();
             dataSets.Add(Dataset.CreateLine("  ", new double?[userData.FullPredictDeath.Length], "rgba(0,0,0,0)", "rgba(0,0,0,0)")); // 凡例の右端マージン用ダミー
+            if (userDataByUser != null) {
+                double?[] predLineByUser = userDataByUser.FullPredictDeath._toNullableArray(0)._fill(0, ChartRealDays, null);
+                dataSets.Add(Dataset.CreateLine("by利用者設定", predLineByUser, "royalblue", "royalblue").SetHoverColors("royalblue").SetOrders(2, 3).SetBorderWidth(0.8).SetPointRadius(0));
+            }
             double?[] predLine = userData.FullPredictDeath._toNullableArray(0);
             dataSets.Add(Dataset.CreateDotLine("予測死亡者数", predLine, "indianred").SetHoverColors("firebrick").SetDispOrder(2));
             //dataSets.Add(Dataset.CreateDotLine("予測死亡者数(日次)", predDailyDeath._toNullableArray(0), "darkgreen"));
@@ -348,9 +349,9 @@ namespace ChartBlazorApp.Models
         /// 重症者数予測グラフ用データの作成
         /// </summary>
         /// <returns></returns>
-        public string MakeSeriousJsonData(UserForecastData userData, bool onlyOnClick, bool bAnimation)
+        public string MakeSeriousJsonData(UserForecastData userData, UserForecastData userDataByUser, bool onlyOnClick, bool bAnimation)
         {
-            double maxPredSerious = userData.MaxPredictSerious;
+            double maxPredSerious = (userData.MaxPredictSerious, userDataByUser?.MaxPredictSerious ?? 0)._max();
             double y1_max = roundYAxis(maxPredSerious, YAxisMaxSerious);
             double y1_min = maxPredSerious > YAxisMaxSerious ? 0 : YAxisMinSerious;
             //double y1_max = 3000;
@@ -368,6 +369,10 @@ namespace ChartBlazorApp.Models
 
             var dataSets = new List<Dataset>();
             dataSets.Add(Dataset.CreateLine("  ", new double?[userData.FullPredictSerious.Length], "rgba(0,0,0,0)", "rgba(0,0,0,0)")); // 凡例の右端マージン用ダミー
+            if (userDataByUser != null) {
+                double?[] predLineByUser = userDataByUser.FullPredictSerious._toNullableArray(0)._fill(0, ChartRealDays, null);
+                dataSets.Add(Dataset.CreateLine("by利用者設定", predLineByUser, "royalblue", "royalblue").SetHoverColors("royalblue").SetOrders(2, 3).SetBorderWidth(0.8).SetPointRadius(0));
+            }
             double?[] predLine = userData.FullPredictSerious._toNullableArray(0);
             dataSets.Add(Dataset.CreateDotLine("予測重症者数", predLine, "darkorange").SetHoverColors("firebrick").SetDispOrder(2));
             //dataSets.Add(Dataset.CreateDotLine("予測重症者数(累積)", fullPredictSeriousTotal._toNullableArray(0), "darkgreen"));
@@ -403,7 +408,7 @@ namespace ChartBlazorApp.Models
         /// 日別死亡者数グラフ用データの作成
         /// </summary>
         /// <returns></returns>
-        public string MakeDailyDeathJonData(UserForecastData userData, bool onlyOnClick)
+        public string MakeDailyDeathJonData(UserForecastData userData, UserForecastData userDataByUser, bool onlyOnClick)
         {
             double y1_max = 100;
             double y1_min = 0;
@@ -421,6 +426,10 @@ namespace ChartBlazorApp.Models
 
             var dataSets = new List<Dataset>();
             dataSets.Add(Dataset.CreateLine("  ", new double?[userData.DailyPredictDeath.Length], "rgba(0,0,0,0)", "rgba(0,0,0,0)")); // 凡例の右端マージン用ダミー
+            if (userDataByUser != null) {
+                double?[] predLineByUser = userDataByUser.DailyPredictDeath._toNullableArray(0)._fill(0, ChartRealDays, null);
+                dataSets.Add(Dataset.CreateLine("by利用者設定", predLineByUser, "royalblue", "royalblue").SetHoverColors("royalblue").SetOrders(2, 3).SetBorderWidth(0.8).SetPointRadius(0));
+            }
             double?[] dailyReal = userData.DailyRealDeath._extend(userData.DailyPredictDeath.Length)._toNullableArray(0);
             double?[] dailyPred = userData.DailyPredictDeath._toNullableArray(0);
             dataSets.Add(Dataset.CreateBar("日別死亡者予測数", dailyPred, "silver").SetHoverColors("black").SetStackedAxisId());
@@ -556,10 +565,11 @@ namespace ChartBlazorApp.Models
             var infectsByAges = infectPred.Select((n, i) => InfectRatesByAges.FindDataSeries(firstDate.AddDays(i)).DataSeries.Select(r => n * r).ToArray()).ToArray();
             var totals = new double[infectsByAges[0].Length];
             var totalByAges = infectsByAges.Select((array, i) => array.Select((n, j) => totals[j] += n).ToArray()).ToArray();
-            return totalByAges[AverageShiftDays..].Select((a, i) => {
-                int from = Math.Max(i - AverageShiftDays - 1, 0);
-                int to = i + AverageShiftDays;
-                int days = AverageShiftDays * 2 + 1;
+            const int shiftDays = Constants.FORECAST_AVERAGE_SHIFT_DAYS;
+            return totalByAges[shiftDays..].Select((a, i) => {
+                int from = Math.Max(i - shiftDays - 1, 0);
+                int to = i + shiftDays;
+                int days = shiftDays * 2 + 1;
                 return a.Select((_, j) => (totalByAges[to][j] - totalByAges[from][j]) / days).ToArray();
             }).ToArray();
         }
@@ -614,13 +624,7 @@ namespace ChartBlazorApp.Models
 
     public class UserForecastData
     {
-        /// <summary> 予測日数 </summary>
-        private const int _predictDays = 28;
-
-        /// <summary> 詳細設定用の予測日数 </summary>
-        private const int _predictDaysForDetail = 90;
-
-        private int PredictDays { get { return UseDetail ? _predictDaysForDetail : _predictDays; } }
+        private int PredictDays { get { return UseDetail ? Constants.FORECAST_PREDICTION_DAYS_FOR_DETAIL : Constants.FORECAST_PREDICTION_DAYS; } }
 
         public bool UseDetail { get; set; } = false;
 
@@ -674,7 +678,7 @@ namespace ChartBlazorApp.Models
         private double[] dailyPredInfect;
         private double[][] infectsByAges;
 
-        private int fullDays { get { return Math.Max((predStartDate - firstDate).Days, 0) + PredictDays + ForecastData.AverageShiftDays + 7; } }
+        private int fullDays { get { return Math.Max((predStartDate - firstDate).Days, 0) + PredictDays + Constants.FORECAST_AVERAGE_SHIFT_DAYS + 7; } }
 
         /// <summary>
         /// 予測に必要なデータの準備
@@ -698,13 +702,13 @@ namespace ChartBlazorApp.Models
             var predData = UserPredictData.PredictValuesEx(infectData, rtParam, fullDays, predDays + 7, predStartDate);
 
             dailyInfect = infectData.Newly.Take(fullRealDays).ToArray();
-            dailyPredInfect = predData.PredNewly.Take(fullDays).Select((x, i) => (i < fullRealDays && dailyInfect[i] > 0) ? dailyInfect[i] : x).ToArray();
+            dailyPredInfect = predData.PredNewly.Take(fullDays).Select((x, i) => (i < fullRealDays && dailyInfect._nth(i) > 0) ? dailyInfect[i] : x).ToArray();
             LabelDates = (fullPredDays + 1 - preambleDays)._range().Select(n => forecastData.ChartStartDate.AddDays(n)._toShortDateString()).ToArray();
 
             // 予測期間における新規陽性者数累計
             LastAccumPositive = (int)Math.Round(predData.PredNewly.Skip(fullRealDays).Take(predDays).Sum(), 0);
-            //foreach (var p in predData.PredNewly.Skip(realDays).Take(predDays)) Console.WriteLine(p.ToString("f1"));
-            Console.WriteLine($"{DateTime.Now} [Forecast.MakePreliminaryData] LastAccumPositive={LastAccumPositive}, Detail={UseDetail}, StartDt={rtParam?.EffectiveStartDate.ToShortDateString()}, Rt1={rtParam?.Rt1}");
+            //foreach (var p in predData.PredNewly.Skip(realDays).Take(predDays)) ConsoleLog.Debug(p.ToString("f1"));
+            ConsoleLog.Info($"[Forecast.MakePreliminaryData] LastAccumPositive={LastAccumPositive}, Detail={UseDetail}, StartDt={rtParam?.EffectiveStartDate.ToShortDateString()}, Rt1={rtParam?.Rt1}");
 
             // 年代ごとの日別陽性者数データ
             infectsByAges = forecastData.calcInfectsByAges(firstDate, dailyPredInfect);
@@ -734,23 +738,17 @@ namespace ChartBlazorApp.Models
             // death の差分
             DeathRealPredictDiff = RealDeath.Length._range().Select(i => RealDeath[i] - FullPredictDeath[i]).ToArray();
             DeathDiffMSE = calcMSE(DeathRealPredictDiff);
-#if DEBUG
-            Console.WriteLine($"Death MSE={DeathDiffMSE:f1}");
-#endif
+            ConsoleLog.Debug($"Death MSE={DeathDiffMSE:f1}");
 
             // serious の差分
             SeriousRealPredictDiff = RealSerious.Length._range().Select(i => RealSerious[i] - FullPredictSerious[i]).ToArray();
             SeriousDiffMSE = calcMSE(SeriousRealPredictDiff);
-#if DEBUG
-            Console.WriteLine($"Serious MSE={SeriousDiffMSE:f1}");
-#endif
+            ConsoleLog.Debug($"Serious MSE={SeriousDiffMSE:f1}");
 
             // death + serious の差分
             BothSumRealPredictDiff = RealDeath.Length._range().Select(i => (RealDeath[i] + RealSerious[i]) - (FullPredictDeath[i] + FullPredictSerious[i])).ToArray();
             BothDiffMSE = calcMSE(BothSumRealPredictDiff);
-#if DEBUG
-            Console.WriteLine($"BothSum MSE={BothDiffMSE:f1}");
-#endif
+            ConsoleLog.Debug($"BothSum MSE={BothDiffMSE:f1}");
 
             return this;
         }

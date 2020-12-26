@@ -1,0 +1,53 @@
+﻿@page "/reset"
+
+@using ChartBlazorApp.Models
+@using StandardCommon
+
+@inject IJSRuntime JSRuntime
+
+@code {
+    private bool bAfterRender = false;
+    private bool bInitialized = false;
+
+    private async Task clearStaticDescription()
+    {
+        await JSRuntime.InvokeAsync<string>("selectDescription", "reset-page");
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender) {
+            bAfterRender = true;
+            await clearStaticDescription();
+        }
+    }
+
+    public async Task InitializeAllParams()
+    {
+        ConsoleLog.Info($"[Reset.InitializeAllParams] CALLED");
+        if (bAfterRender) {
+            try {
+                await UserSettings.CreateInitialSettings().SetJsRuntime(JSRuntime).SaveSettings();
+                bInitialized = true;
+            } catch (Exception e) {
+                ConsoleLog.Error($"[Reset.InitializeAllParams] {e}");
+            }
+        }
+    }
+
+
+}
+
+<div class="inline-wrapper with-border" style="padding: 1em; align-items: center; display: @(bInitialized ? "none" : "inline-block")">
+<p>利用者設定をすべて初期設定に戻します。<br/>
+    よろしければ OK をクリックしてください。</p>
+<p></p>
+<p></p>
+
+    <div class="inline-wrapper" style="text-align: center"><button class="btn btn-primary btn-sm py-0" @onclick="InitializeAllParams">OK</button></div>
+</div>
+
+<div class="inline-wrapper with-border" style="padding: 2em; align-items: center; display: @(bInitialized ? "inline-block" : "none")">
+<p>利用者設定をすべて初期設定に戻しました。</p>
+</div>
+

@@ -49,8 +49,6 @@ namespace ChartBlazorApp.Models
         public int DaysToRt4 { get; set; }
         public double Rt4 { get; set; }
 
-        public const int DaysToNextRt = 15;
-
         public RtDecayParam Clone()
         {
             return (RtDecayParam)MemberwiseClone();
@@ -64,11 +62,11 @@ namespace ChartBlazorApp.Models
         {
             return new RtDecayParam() {
                 Fourstep = false,
-                StartDate = new DateTime(2020, 1, 1),
+                StartDate = new DateTime(2020, 12, 1),
                 StartDateFourstep = new DateTime(2020, 7, 4),
-                DaysToOne = DaysToNextRt,
+                DaysToOne = Constants.DAYS_TO_NEXT_RT,
                 DecayFactor = 1000,
-                DaysToNext = DaysToNextRt,
+                DaysToNext = Constants.DAYS_TO_NEXT_RT,
                 DecayFactorNext = 50,
                 RtMax = 1.2,
                 RtMin = 0.8,
@@ -88,43 +86,40 @@ namespace ChartBlazorApp.Models
         /// <summary> 最も基底となる予測設定値(Layer-1) </summary>
         public static RtDecayParam DefaultParam { get; } = CreateDefaultParam();
 
-        public const int ExtensionDays = 25;
-        public const int ExtensionDaysEx = 15;
-
         /// <summary> y = (a / x) + b の形の関数として Rt の減衰を計算する </summary>
         /// <returns>計算された予測Rtの日数を返す</returns>
         public int CalcAndCopyPredictRt(double[] rts, int startIdx, double[] predRt, int realDays, int extensionDays)
         {
-            if (extensionDays == 0) extensionDays = ExtensionDays;
+            if (extensionDays == 0) extensionDays = Constants.EXTENSION_DAYS;
             double rt0 = rts[startIdx];
             if (Fourstep) {
                 // 4段階モード
                 double decayFactor = 10000;
                 double rt1 = Rt1;
                 int daysToRt1 = DaysToRt1;
-                if (daysToRt1 < 1) daysToRt1 = DaysToNextRt;
+                if (daysToRt1 < 1) daysToRt1 = Constants.DAYS_TO_NEXT_RT;
                 double a1 = (rt0 - rt1) * (decayFactor + daysToRt1) * decayFactor / daysToRt1;
                 double b1 = rt0 - (a1 / decayFactor);
                 // Rt1に到達してから
                 double rt2 = Rt2;
                 int daysToRt2 = DaysToRt2;
-                if (daysToRt2 < 1) daysToRt2 = DaysToNextRt;
+                if (daysToRt2 < 1) daysToRt2 = Constants.DAYS_TO_NEXT_RT;
                 double a2 = (rt1 - rt2) * (decayFactor + daysToRt2) * decayFactor / daysToRt2;
                 double b2 = rt1 - (a2 / decayFactor);
                 // Rt2に到達してから
                 double rt3 = Rt3;
                 int daysToRt3 = DaysToRt3;
-                if (daysToRt3 < 1) daysToRt3 = DaysToNextRt;
+                if (daysToRt3 < 1) daysToRt3 = Constants.DAYS_TO_NEXT_RT;
                 double a3 = (rt2 - rt3) * (decayFactor + daysToRt3) * decayFactor / daysToRt3;
                 double b3 = rt2 - (a3 / decayFactor);
                 // Rt3に到達してから
                 double rt4 = Rt4;
                 int daysToRt4 = DaysToRt4;
-                if (daysToRt4 < 1) daysToRt4 = DaysToNextRt;
+                if (daysToRt4 < 1) daysToRt4 = Constants.DAYS_TO_NEXT_RT;
                 double a4 = (rt3 - rt4) * (decayFactor + daysToRt4) * decayFactor / daysToRt4;
                 double b4 = rt3 - (a4 / decayFactor);
 
-                int copyLen = Math.Min(Math.Max(daysToRt1 + daysToRt2 + daysToRt3 + daysToRt4 + ExtensionDaysEx, realDays - startIdx + extensionDays), predRt.Length - startIdx);
+                int copyLen = Math.Min(Math.Max(daysToRt1 + daysToRt2 + daysToRt3 + daysToRt4 + Constants.EXTENSION_DAYS_EX, realDays - startIdx + extensionDays), predRt.Length - startIdx);
                 for (int i = 0; i < copyLen; ++i) {
                     double rt;
                     if (i <= daysToRt1) {
@@ -155,42 +150,29 @@ namespace ChartBlazorApp.Models
                 }
                 return copyLen;
             } else {
-                // 簡易モード
+                // 2段階モード
+                // ここの extensionDays には、移動平均のための余分な4日分がすでに追加されているので、これを max としてよい
+                int copyLen = Math.Min(realDays - startIdx + extensionDays, predRt.Length - startIdx);
+                int toOneLen = Math.Min(DaysToOne, copyLen);
+
+                // 1st Stage (rt = a1 * / (factor1 + x) + b1)
                 double rt1 = EasyRt1;
                 double factor1 = DecayFactor;
                 if (factor1 < 1) factor1 = 50;
-                double a1 = (rt0 - rt1) * (factor1 + DaysToOne) * factor1 / DaysToOne;
-                double b1 = rt0 - (a1 / factor1);
-                // Rt1に到達してから
-                //double rt2 = rt0 >= rt1 ? RtMin : RtMax;
-                double rt2 = EasyRt2;
-                //double factor2 = Math.Min(DecayFactor, DecayFactorNext);
-                double factor2 = DecayFactorNext;
-                //if (factor2 < 1) factor2 = 50;
-                double a2, b2;
-                if (factor2 > 0) {
-                    double rt_ = ((rt0 > rt1 && rt2 > rt1) || (rt0 < rt1 && rt2 < rt1)) ? rt1 * 2 - rt0 : rt0;
-                    a2 = (rt_ - rt1) * (factor2 + DaysToOne) * factor2 / DaysToOne;
-                    b2 = rt_ - (a2 / factor2);
-                } else {
-                    double f2 = Math.Max(factor2, -4);
-                    a2 = (rt2 - rt1) / (DaysToOne * (1.0 + 0.2 * f2));
-                    b2 = rt1;
-                }
-                // ここの extensionDays には、移動平均のための余分な4日分がすでに追加されているので、これを max としてよい
-                //int copyLen = Math.Min(Math.Max(DaysToOne + ExtensionDaysEx, realDays - startIdx + extensionDays), predRt.Length - startIdx);
-                int copyLen = Math.Min(realDays - startIdx + extensionDays, predRt.Length - startIdx);
-                int toOneLen = Math.Min(DaysToOne, copyLen);
+                double a1 = Constants.CalcCoefficientA1(rt0, rt1, factor1, DaysToOne);
+                double b1 = Constants.CalcCoefficientB1(rt0, a1, factor1);
+
                 for (int i = 0; i < toOneLen; ++i) {
-                    predRt[startIdx + i] = a1 / (factor1 + i) + b1;
+                    predRt[startIdx + i] = Constants.CalcRt1(a1, b1, factor1, i);
                 }
+
+                // 2nd Stage
+                double tgtRt2 = EasyRt2;
+                double factor2 = DecayFactorNext;
+                (double a2, double b2) = Constants.CalcCoefficients2(rt0, rt1, tgtRt2, factor2, DaysToOne);
+
                 for (int i = toOneLen; i < copyLen; ++i) {
-                    if (rt2 == rt1) {
-                        predRt[startIdx + i] = rt2;
-                    } else {
-                        double rt = (factor2 > 0) ? a2 / (factor2 + i) + b2 : a2 * (i - toOneLen) + b2;
-                        predRt[startIdx + i] = (rt2 < rt1 && rt < rt2) || (rt2 > rt1 && rt > rt2) ? rt2 : rt;
-                    }
+                    predRt[startIdx + i] = Constants.CalcRt2(a2, b2, rt1, tgtRt2, factor2, i, i - toOneLen);
                 }
                 return copyLen;
             }

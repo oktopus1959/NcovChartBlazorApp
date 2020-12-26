@@ -11,9 +11,9 @@
     // グラフ表示の最終日
     private string _endDate = "2021/5/31";
 
-    private const int _mainPrefNum = UserSettings.MainPrefNum;
+    private const int _mainPrefNum = Constants.MAIN_PREF_NUM;
 
-    private const int _favorPrefMax = UserSettings.FavorPrefMax;
+    private const int _favorPrefMax = Constants.FAVORITE_PREF_MAX;
 }
 
 <h4><span>新型コロナ</span> <span>陽性者数グラフ</span></h4>
@@ -48,7 +48,7 @@
         <div class="vertical-center">
             <label for="他">
             <input type="radio" name="chart-data-id" id="他" value="@_selectorPos" @onchange="ChangeChart" checked="@(_radioIdx == _selectorPos)"/>
-            <span style="font-size: 1.25em; color: @(_radioIdx == _selectorPos ? "darkgreen" : "rgb(30,30,30)"); font-weight: @(_radioIdx == _selectorPos ? "bold" : "normal")">他  </span>
+            <span style="font-size: 1.25em; color: @(_radioIdx == _selectorPos ? "darkgreen" : "rgb(30,30,30)"); font-weight: @(_radioIdx == _selectorPos ? "bold" : "normal")">他 </span>
             </label>
             @*<select class="mt-0 mb-1" style="padding: 1px" name="other-pref" value="@_prefIdx" @onchange="ChangePref" disabled="@(_radioIdx != _selectorPos)">*@
             <select style="margin-left: 4px; padding: 2px;" name="other-pref" value="@_prefIdx" @onchange="ChangePref">
@@ -75,18 +75,18 @@
 @code{ private string _fontColor(bool enabled) { return enabled ? null : "grey"; } }
 
 <div class="vertical-align" style="margin-top: 1.0em; line-height: 1.5em">
-    <div class="inline-wrapper">
+    <div class="inline-wrapper-narrow">
         <label for="gompertz">
             <input type="checkbox" name="gompertz" id="gompertz" @onchange="RenderExpectationCurveMethod" checked="@(_drawExpectation)"  />
-            予想曲線
+            <span>予想曲線</span>
         </label></div>
-    <div class="inline-wrapper">
+    <div class="inline-wrapper-narrow">
         <label for="estimated-bar">
             <input type="checkbox" name="estimated-bar" id="estimated-bar" @onchange="RenderEstimatedBarMethod" checked="@(_estimatedBar)" disabled="@(!_drawExpectation)" />
             <span class="@_fontColor(_drawExpectation)">推計陽性数</span>
         </label></div>
     
-    <div class="inline-wrapper position-right">
+    <div class="inline-wrapper-narrow position-right-narrow">
         <label for="detail-settings">
             <input type="checkbox" name="detail-settings" id="detail-settings" @onchange="ShowDetailSettings" checked="@(_detailSettings)" disabled="@(!_drawExpectation || _fourstepSettings)" />
             <span class="@_fontColor(_drawExpectation)">利用者設定</span>
@@ -209,9 +209,11 @@
             <!-- <div class="inline-wrapper"><button class="btn btn-primary btn-sm py-0" @onclick="InitializeDetailParams" disabled="@(_fourstepDisable())">RESET</button></div> -->
         </div>
     </div>
-    <div class="indent" style="display: @(_drawExpectation ? "block" : "none")">
-        <p class="small">※既定値は過去のRtの推移を基に自動的に計算したものです。将来において必ずしもこの通りに推移するわけではないことにご留意ください。</p>
-    </div>
+    @if (_drawExpectation && !_detailSettings) {
+        <div class="indent">
+            <p class="small">※上記は過去のRtの推移を基に自動的に計算したものです。将来において必ずしもこの通りに推移するわけではないことにご留意ください。</p>
+        </div>
+    }
 </div>
 
 <div class="vertical-align" style="margin-top: 0.5em; line-height: 1.5em">
@@ -227,6 +229,7 @@
             @for (int n = 50000; n > 10000; n -= 10000) { <option value="@n" selected="@(n == _yAxisMax)">@n</option> }
             @for (int n = 10000; n > 5000; n -= 1000) { <option value="@n" selected="@(n == _yAxisMax)">@n</option> }
             @for (int n = 5000; n > 1000; n -= 500) { <option value="@n" selected="@(n == _yAxisMax)">@n</option> }
+            @for (int n = 1200; n >= 1200; n -= 100) { <option value="@n" selected="@(n == _yAxisMax)">@n</option> }
             @for (int n = 1000; n >= 100; n -= 100) { <option value="@n" selected="@(n == _yAxisMax)">@n</option> }
             @for (int n = 50; n >= 20; n -= 30) { <option value="@n" selected="@(n == _yAxisMax)">@n</option> }
         </select></div>
@@ -236,13 +239,37 @@
             <input type="checkbox" name="only-on-click" id="only-on-click" @onchange="ChangeOnlyOnClick" checked="@(_onlyOnClick)" />
             <span>クリック時のみツールチップ表示</span>
         </label></div>
+    @* 予想曲線を実数曲線より上に描画 *@
+    <div class="inline-wrapper" style="display: @(_drawExpectation ? "inline-block" : "none")">
+        <label for="exp-over-real">
+            <input type="checkbox" name="exp-over-real" id="exp-over-real" @onchange="ChangeExpOverReal" checked="@(_expectOverReal)" />
+        <span>予想曲線を前面に表示</span>
+        </label></div>
     @* 推計陽性者数を表示する棒グラフの最小幅 *@
-    <br/><div class="inline-wrapper">
-        <span>推計陽性者数 棒グラフの最小幅：</span>
-        <select style="padding: 1px" name="est-bar-min-width" value="@_estimatedBarMinWidth" @onchange="RenderEstimatedBarMinWidthMethod">
-            @for (int n = 4; n >= -4; --n) { <option value="@n" selected="@(n == _estimatedBarMinWidth)">@n</option> }
-        </select></div>
+    @if (_drawExpectation && _estimatedBar) {
+        <br/>
+        <div class="inline-wrapper">
+            <span>推計陽性者数 棒グラフの最小幅：</span>
+            <select style="padding: 1px" name="est-bar-min-width" value="@_estimatedBarMinWidth" @onchange="RenderEstimatedBarMinWidthMethod">
+                @for (int n = 4; n >= -4; --n) { <option value="@n" selected="@(n == _estimatedBarMinWidth)">@n</option> }
+            </select></div>
+    }
+    @* 予測日の遡及 *@
+    @if (_debugLevel > 0) {
+        <br/>
+        <div class="inline-wrapper">
+            <span>予測遡及日：</span>
+            <input type="text" class="text-date" value="@_predictBackDt" @onchange="ChangePredBackDays" /></div>
+    }
+    @* デバッグレベル *@
+    @if (_debugLevel > 0) {
+        <div class="inline-wrapper">
+            <span>デバッグレベル：</span>
+            <select style="padding: 1px" name="debug-level" value="@_debugLevel" @onchange="ChangeDebugLevel">
+                @for (int n = 1; n <= 5; ++n) { <option value="@n" selected="@(n == _debugLevel)">@n</option> }
+            </select></div>
+    }
 </div>
 
-<div id="static-description" style="margin-top: 20px;"></div>
+@*<div id="static-description" style="margin-top: 10px;"></div>*@
 

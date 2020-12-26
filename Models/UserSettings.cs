@@ -10,15 +10,7 @@ namespace ChartBlazorApp.Models
 {
     public class UserSettings
     {
-        public const int MainPrefNum = 3;
-
-        public const int FavorPrefMax = 10;
-
-        public const int ExtensionDays = 25;
-
-        public const int LocalMaxRtDuration = 10;
-
-        public const int RadioIdxMax = MainPrefNum + FavorPrefMax;
+        private const int MainPrefNum = Constants.MAIN_PREF_NUM;
 
         // ---- ここから下が LocalStorage に保存される (すべてのメンバーを public かつ { get; set; } にしておくこと)
 
@@ -38,6 +30,7 @@ namespace ChartBlazorApp.Models
         public bool detailSettings { get; set; }
         public bool fourstepSettings { get; set; }
         public bool onlyOnClick { get; set; }
+        public bool expectOverReal { get; set; }
         public int extensionDays { get; set; }
         //public bool useOnForecast { get; set; }
         public int? localMaxRtDuration { get; set; }
@@ -104,7 +97,7 @@ namespace ChartBlazorApp.Models
         {
             radioIdx = 0;
             prefIdx = MainPrefNum;
-            favorPrefIdxes = new int[FavorPrefMax];
+            favorPrefIdxes = new int[Constants.FAVORITE_PREF_MAX];
             barWidth = 0;
             yAxisMax = new int[numData];
             drawExpectation = false;
@@ -113,6 +106,7 @@ namespace ChartBlazorApp.Models
             detailSettings = false;
             fourstepSettings = false;
             onlyOnClick = false;
+            expectOverReal = false;
             extensionDays = 0;
             //useOnForecast = false;
             localMaxRtDuration = null;
@@ -147,17 +141,17 @@ namespace ChartBlazorApp.Models
             return array;
         }
 
-        private const string SettingsKey = "net.oktopus59.ncov.settings.v4"; // v1008
+        private const string SettingsKey = Constants.SETTINGS_KEY;
 
         /// <summary>
         /// ブラウザの LocalStorage から値を取得
         /// </summary>
-        /// <param name="key"></param>
         /// <returns></returns>
-        private static async ValueTask<UserSettings> getLocalStorage(IJSRuntime jsRuntime, string key, int numData)
+        private static async ValueTask<UserSettings> getLocalStorage(IJSRuntime jsRuntime, int numData)
         {
-            if (key._isEmpty()) throw new Exception("Empty key");
-            return (await jsRuntime.InvokeAsync<string>("getLocalStorage", key))._jsonDeserialize<UserSettings>().SetJsRuntime(jsRuntime).fillEmptyValues(numData);
+            var jsonStr = await jsRuntime._getSettings();
+            if (jsonStr._isEmpty()) throw new Exception("Settings is empty");
+            return jsonStr._jsonDeserialize<UserSettings>().SetJsRuntime(jsRuntime).fillEmptyValues(numData);
         }
 
         /// <summary>
@@ -167,8 +161,10 @@ namespace ChartBlazorApp.Models
         public static async ValueTask<UserSettings> GetSettings(IJSRuntime jsRuntime, int numData, DailyData dailyData)
         {
             try {
-                return await getLocalStorage(jsRuntime, SettingsKey, numData);
-            } catch {
+                return await getLocalStorage(jsRuntime, numData);
+            } catch (Exception e) {
+                ConsoleLog.Warn($"[UserSettings.GetSettings] settings read failed.\n{e}");
+                ConsoleLog.Info($"[UserSettings.GetSettings] Use initail settings instead.");
                 return (new UserSettings().SetJsRuntime(jsRuntime)).Initialize(numData);
             }
         }
@@ -180,16 +176,16 @@ namespace ChartBlazorApp.Models
         public async Task SaveSettings()
         {
             try {
-                await JSRuntime.InvokeAsync<string>("setLocalStorage", SettingsKey, this._jsonSerialize());
-            } catch {
-                Console.WriteLine($"settings write failed");
+                await JSRuntime._saveSettings(this._jsonSerialize());
+            } catch (Exception e) {
+                ConsoleLog.Error($"[UserSettings.SaveSettings] settings write failed.\n{e}");
             }
         }
 
         public UserSettings fillEmptyValues(int numData)
         {
             yAxisMax = _extendArray(yAxisMax, numData);
-            favorPrefIdxes = _extendArray(favorPrefIdxes, FavorPrefMax);
+            favorPrefIdxes = _extendArray(favorPrefIdxes, Constants.FAVORITE_PREF_MAX);
             paramRtStartDate = _extendArray(paramRtStartDate, numData);
             paramRtStartDateFourstep = _extendArray(paramRtStartDateFourstep, numData);
             paramRtDaysToOne = _extendArray(paramRtDaysToOne, numData);
@@ -209,21 +205,19 @@ namespace ChartBlazorApp.Models
             paramRtRt4 = _extendArray(paramRtRt4, numData);
 
             if (_oldValuesCopied) {
-#if DEBUG
-                Console.WriteLine($"Old value already copied");
-#endif
+                ConsoleLog.Debug($"Old value already copied");
                 paramRtEasyRt2 = _extendArray(paramRtEasyRt2, numData);
             } else {
                 paramRtEasyRt2 = new double[paramRtMinRt.Length];
                 Array.Copy(paramRtMinRt, paramRtEasyRt2, paramRtMinRt.Length);
                 _oldValuesCopied = true;
-                Console.WriteLine($"Old value now copied");
+                ConsoleLog.Info($"Old value now copied");
             }
             return this;
         }
 
-        public int myExtensionDays() { return extensionDays._gtZeroOr(ExtensionDays); }
-        public int myLocalMaxRtDuration() { return localMaxRtDuration._geZeroOr(LocalMaxRtDuration); }
+        public int myExtensionDays() { return extensionDays._gtZeroOr(Constants.EXTENSION_DAYS); }
+        public int myLocalMaxRtDuration() { return localMaxRtDuration._geZeroOr(Constants.LOCAL_MAX_RT_BACK_DURATION); }
 
         public int dataIdx { get { return prefIdxByRadio(radioIdx); } }
 
@@ -264,7 +258,7 @@ namespace ChartBlazorApp.Models
         {
             int radioPos; // 移動先の位置
             if (delta < 0) {
-                radioPos = (radioIdx >= selectorRadioPos) ? Math.Min(radioIdx, RadioIdxMax - 1) : radioIdx - 1;
+                radioPos = (radioIdx >= selectorRadioPos) ? Math.Min(radioIdx, Constants.RADIO_IDX_MAX - 1) : radioIdx - 1;
                 if (radioPos < MainPrefNum) return;
             } else {
                 radioPos = (radioIdx < selectorRadioPos - 1) ? radioIdx + 1 : -1;
@@ -373,6 +367,10 @@ namespace ChartBlazorApp.Models
         public void setOnlyOnClick(bool value)
         {
             onlyOnClick = value;
+        }
+        public void setExpectOverReal(bool value)
+        {
+            expectOverReal = value;
         }
         public void setExtensionDays(int value)
         {

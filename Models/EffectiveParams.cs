@@ -21,19 +21,22 @@ namespace ChartBlazorApp.Models
 
         public DailyData DailyData;
 
+        public int DebugLevel { get; set; }
+
         /// <summary> ユーザ設定値(Layer-5) </summary>
         public UserSettings CurrentSettings;
 
-        public EffectiveParams(DailyData dailyData, UserSettings settings)
+        public EffectiveParams(DailyData dailyData, UserSettings settings, int debugLevel = Constants.DEBUG_LEVEL)
         {
             DailyData = dailyData;
+            DebugLevel = debugLevel;
             CurrentSettings = settings ?? UserSettings.CreateInitialSettings();
         }
 
-        public static async ValueTask<EffectiveParams> CreateByGettingUserSettings(IJSRuntime jsRuntime, DailyData dailyData)
+        public static async ValueTask<EffectiveParams> CreateByGettingUserSettings(IJSRuntime jsRuntime, DailyData dailyData, int debugLevel = 0)
         {
             var settings = (await UserSettings.GetSettings(jsRuntime, dailyData.InfectDataCount, dailyData)).Cleanup();
-            return new EffectiveParams(dailyData, settings).RenewDecaySubParams();
+            return new EffectiveParams(dailyData, settings, debugLevel).RenewDecaySubParams();
         }
 
         /// <summary> ユーザ設定から作成した予測設定値(Layer-4) </summary>
@@ -54,10 +57,12 @@ namespace ChartBlazorApp.Models
                     if (data != null) {
                         int duration = CurrentSettings.localMaxRtDuration ?? -1;
                         var dt = CurrentSettings.myParamStartDate(dataIdx)._parseDateTime();
-                        _subParamsCache[dataIdx] = subParam = data.CalcDecaySubParams(duration, dt._isValid() ? (DateTime?)dt : null);
+                        _subParamsCache[dataIdx] = subParam = data.CalcDecaySubParams(duration, dt._isValid() ? (DateTime?)dt : null, idx == -1 ? DebugLevel : 0);
                     }
                 }
-                return subParam.HasValue ? subParam.Value : new SubParams();
+                if (subParam.HasValue) return subParam.Value;
+                ConsoleLog.Warn("[EffectiveParams.getOrNewDecaySubParams] No effective SubParams. Return new SubParams().");
+                return new SubParams();
             }
         }
 
@@ -74,7 +79,17 @@ namespace ChartBlazorApp.Models
 
         private int myDataIdx(int idx = -1) { return idx < 0 ? MyDataIdx : idx; }
 
-        public InfectData NthInfectData(int n) { return DailyData?.InfectDataList._nth(myDataIdx(n)) ?? InfectData.DummyData; }
+        public InfectData NthInfectData(int n) {
+            if (DailyData == null) return InfectData.DummyData;
+
+            int myIdx = myDataIdx(n);
+            var data = DailyData.InfectDataList._nth(myIdx);
+            if (data == null) {
+                ConsoleLog.Warn($"[EffectiveParams.NthInfectData] n={n}, myDataIdx({n})={myIdx}, DailyData.InfectDataList.Length={DailyData.InfectDataList._length()}");
+                data = InfectData.DummyData;
+            }
+            return data;
+        }
 
         public InfectData MyInfectData { get { return NthInfectData(MyDataIdx); } }
 
@@ -86,7 +101,7 @@ namespace ChartBlazorApp.Models
 
         public int RadioIdx { get { return CurrentSettings.radioIdx; } set { CurrentSettings.radioIdx = value; } }
 
-        public int PrefIdx { get { return Math.Max(CurrentSettings.prefIdx, UserSettings.MainPrefNum); } set { CurrentSettings.prefIdx = value; } }
+        public int PrefIdx { get { return Math.Max(CurrentSettings.prefIdx, Constants.MAIN_PREF_NUM); } set { CurrentSettings.prefIdx = value; } }
 
         public int BarWidth { get { return CurrentSettings.barWidth; } }
 
@@ -104,6 +119,8 @@ namespace ChartBlazorApp.Models
 
         public bool OnlyOnClick { get { return CurrentSettings.onlyOnClick; } }
 
+        public bool ExpectOverReal { get { return CurrentSettings.expectOverReal; } }
+
         public int ExtensionDays { get { return CurrentSettings.myExtensionDays(); } }
 
         //public bool UseOnForecast { get { return CurrentSettings.useOnForecast; } }
@@ -111,15 +128,23 @@ namespace ChartBlazorApp.Models
         public int LocalMaxRtDuration { get { return CurrentSettings.myLocalMaxRtDuration(); } }
 
         public string ParamStartDate { get { return getParamStartDate(); } }
-        public string getParamStartDate(int idx = -1) {
-            if (DetailSettings) {
-                var dt = CurrentSettings.myParamStartDate(idx)._orElse(() => getOrNewDecaySubParams(idx).StartDate);
-                if (dt._notEmpty()) return dt;
+        public string getParamStartDate(int idx = -1, bool bSystem = false) {
+            if (!bSystem && DetailSettings) {
+                var dt = CurrentSettings.myParamStartDate(idx);
+                if (dt._parseDateTime()._isValid()) return dt;
+                if (dt._notEmpty()) ConsoleLog.Warn($"[EffectiveParams.getParamStartDate] CurrentSettings.myParamStartDate({idx})={dt} is invalid.");
+                dt = getOrNewDecaySubParams(idx).StartDate;
+                if (dt._parseDateTime()._isValid()) return dt;
+                if (dt._notEmpty()) ConsoleLog.Warn($"[EffectiveParams.getParamStartDate] getOrNewDecaySubParams({idx}).StartDate={dt} is invalid.");
             }
             var startDt = NthInfectData(idx).InitialDecayParam.StartDate;
             if (startDt._isValid()) return startDt._toDateString();
 
-            return NthInfectData(idx).InitialSubParams.StartDate._orElse(() => RtDecayParam.DefaultParam.StartDate._toDateString());
+            var dts = NthInfectData(idx).InitialSubParams.StartDate;
+            if (dts._parseDateTime()._isValid()) return dts;
+            dts = RtDecayParam.DefaultParam.StartDate._toDateString();
+            ConsoleLog.Info($"[EffectiveParams.getParamStartDate] RtDecayParam.DefaultParam.StartDat={dts} is returned.");
+            return dts;
         }
 
         public string ParamStartDateFourstepStr { get { return getParamStartDateFourstepStr(); } }
@@ -136,8 +161,8 @@ namespace ChartBlazorApp.Models
         //public string DefaultDaysToOne { get { var v = CurrentSettings.myParamDaysToOne(); return v > 0 ? "" : $"({NthInfectData(idx).InitialDecayParam.DaysToOne})"; } }
 
         public int ParamDaysToOne { get { return getParamDaysToOne(); } }
-        public int getParamDaysToOne(int idx = -1) {
-            if (DetailSettings) {
+        public int getParamDaysToOne(int idx = -1, bool bSystem = false) {
+            if (!bSystem && DetailSettings) {
                 int days = CurrentSettings.myParamDaysToOne(idx)._gtZeroOr(() => getOrNewDecaySubParams(idx).DaysToOne);
                 if (days > 0) return days;
             }
@@ -147,8 +172,8 @@ namespace ChartBlazorApp.Models
         }
 
         public double ParamDecayFactor { get { return getParamDecayFactor(); } }
-        public double getParamDecayFactor(int idx = -1) {
-            if (DetailSettings) {
+        public double getParamDecayFactor(int idx = -1, bool bSystem = false) {
+            if (!bSystem && DetailSettings) {
                 var factor = CurrentSettings.myParamDecayFactor(idx)._neZeroOr(() => getOrNewDecaySubParams(idx).DecayFactor);
                 if (factor != 0) return factor;
             }
@@ -158,8 +183,8 @@ namespace ChartBlazorApp.Models
         }
 
         public int ParamDaysToNext { get { return getParamDaysToNext(); } }
-        public int getParamDaysToNext(int idx = 1) {
-            if (DetailSettings) {
+        public int getParamDaysToNext(int idx = 1, bool bSystem = false) {
+            if (!bSystem && DetailSettings) {
                 var days = CurrentSettings.myParamDaysToNext(idx);
                 if (days > 0) return days;
             }
@@ -167,8 +192,8 @@ namespace ChartBlazorApp.Models
         }
 
         public double ParamDecayFactorNext { get { return getParamDecayFactorNext(); } }
-        public double getParamDecayFactorNext(int idx = -1) {
-            if (DetailSettings) {
+        public double getParamDecayFactorNext(int idx = -1, bool bSystem = false) {
+            if (!bSystem && DetailSettings) {
                 var factor = CurrentSettings.myParamDecayFactorNext(idx)._neZeroOr(() => getOrNewDecaySubParams(idx).DecayFactorNext);
                 if (factor != 0) return factor;
             }
@@ -192,18 +217,18 @@ namespace ChartBlazorApp.Models
         }
 
         public double ParamEasyRt1 { get { return getParamEasyRt1();} }
-        public double getParamEasyRt1(int idx = -1) {
+        public double getParamEasyRt1(int idx = -1, bool bSystem = false) {
             double rt = 0;
-            if (DetailSettings) { rt = CurrentSettings.myParamEasyRt1(idx)._gtZeroOr(() => getOrNewDecaySubParams(idx).Rt1); }
+            if (!bSystem && DetailSettings) { rt = CurrentSettings.myParamEasyRt1(idx)._gtZeroOr(() => getOrNewDecaySubParams(idx).Rt1); }
             return rt._gtZeroOr(() => NthInfectData(idx).InitialDecayParam.EasyRt1).
                 _gtZeroOr(() => NthInfectData(idx).InitialSubParams.Rt1).
                 _gtZeroOr(() => RtDecayParam.DefaultParam.EasyRt1);
         }
 
         public double ParamEasyRt2 { get { return getParamEasyRt2();} }
-        public double getParamEasyRt2(int idx = -1) {
+        public double getParamEasyRt2(int idx = -1, bool bSystem = false) {
             double rt = 0;
-            if (DetailSettings) { rt = CurrentSettings.myParamEasyRt2(idx)._gtZeroOr(() => getOrNewDecaySubParams(idx).Rt2); }
+            if (!bSystem && DetailSettings) { rt = CurrentSettings.myParamEasyRt2(idx)._gtZeroOr(() => getOrNewDecaySubParams(idx).Rt2); }
             return rt._gtZeroOr(() => NthInfectData(idx).InitialDecayParam.EasyRt2).
                 _gtZeroOr(() => NthInfectData(idx).InitialSubParams.Rt2).
                 _gtZeroOr(() => RtDecayParam.DefaultParam.EasyRt2);
@@ -269,21 +294,21 @@ namespace ChartBlazorApp.Models
 
         public int SelectorPos { get { return CurrentSettings.selectorRadioPos; } }
 
-        public RtDecayParam MakeRtDecayParam(int idx = -1)
+        public RtDecayParam MakeRtDecayParam(int idx = -1, bool bSystem = false)
         {
             return new RtDecayParam {
                 //UseOnForecast = UseOnForecast,
                 Fourstep = FourstepSettings,
-                StartDate = getParamStartDate(idx)._parseDateTime(),
+                StartDate = getParamStartDate(idx, bSystem)._parseDateTime(),
                 StartDateFourstep = getParamStartDateFourstepStr(idx)._parseDateTime(),
-                DaysToOne = getParamDaysToOne(idx),
-                DecayFactor = getParamDecayFactor(idx),
-                DaysToNext = getParamDaysToNext(idx),
+                DaysToOne = getParamDaysToOne(idx, bSystem),
+                DecayFactor = getParamDecayFactor(idx, bSystem),
+                DaysToNext = getParamDaysToNext(idx, bSystem),
                 RtMax = getParamMaxRt(idx),
                 RtMin = getParamMinRt(idx),
-                EasyRt1 = getParamEasyRt1(idx),
-                EasyRt2 = getParamEasyRt2(idx),
-                DecayFactorNext = getParamDecayFactorNext(idx),
+                EasyRt1 = getParamEasyRt1(idx, bSystem),
+                EasyRt2 = getParamEasyRt2(idx, bSystem),
+                DecayFactorNext = getParamDecayFactorNext(idx, bSystem),
                 DaysToRt1 = getParamDaysToRt1(idx),
                 Rt1 = getParamRt1(idx),
                 DaysToRt2 = getParamDaysToRt2(idx),

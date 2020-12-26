@@ -14,6 +14,10 @@ function insertOthersDescription(html) {
     document.getElementById("others-description").innerHTML = html;
 }
 
+function insertResetDescription(html) {
+    document.getElementById("about-description").innerHTML = html;
+}
+
 function showOrHideDiv(descDivId, targetId) {
     document.getElementById(targetId).style.display = descDivId == targetId ? "block" : "none";
 }

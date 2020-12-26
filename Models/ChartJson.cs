@@ -110,6 +110,18 @@ namespace ChartBlazorApp.Models
             return this;
         }
 
+        public Dataset SetBorderWidth(double width)
+        {
+            borderWidth = width;
+            return this;
+        }
+
+        public Dataset SetPointRadius(double radius)
+        {
+            pointRadius = radius;
+            return this;
+        }
+
         public Dataset SetDispOrder(int order)
         {
             dispOrder = order;

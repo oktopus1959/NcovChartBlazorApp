@@ -5,7 +5,7 @@
 <div class="chart-block" style="@(_userData.UseDetail ? "max-width: 100%" : null)">
 <h4><span>新型コロナ</span> <span>重症者数グラフ</span> <span>@(_userData.UseDetail ? "（詳細設定使用）" : "")</span></h4>
 <span>最大予測：@(_userData.MaxPredictSeriousDateStr)：@(_userData.MaxPredictSerious._formatComma())名</span>／<span>@(_userData.LastPredictDateStr)の予測値：@(_userData.LastPredictSerious._formatComma())名</span>
-<span>（予測日：@(forecastData.PredictStartDateStr)）</span>
+@*<span>（予測日：@(forecastData.PredictStartDateStr)）</span>*@
 @* Chart の Canvas *@
 <div class="scrollableChartWrapper" style="" id="chart-wrapper-serious">
     <div id="scrollWrapper-sc">
@@ -14,11 +14,13 @@
     <canvas id="sc-yAxis1" style="left: 0" width="0"></canvas>
     <canvas id="sc-yAxis2" style="right: 0" width="0"></canvas>
 </div>
+<div style="margin-top: 2px;"><span style="margin-left: 4px; font-size: small">
+    ※青の縦線の日付は「年代別の陽性者割合」の最終行の日付</span></div> 
 </div>
 
 <div class="chart-block right-block" style="@(_userData.UseDetail ? "max-width: 100%" : null)">
 <h4><span>新型コロナ</span> <span>累計死亡者数グラフ</span> <span>@(_userData.UseDetail ? "（詳細設定使用）" : "")</span></h4>
-<span>@(_userData.LastPredictDateStr)の予測値：@(_userData.LastPredictDeath._formatComma())名</span> <span>（予測日：@(forecastData.PredictStartDateStr)）</span>
+<span>@(_userData.LastPredictDateStr)の予測値：@(_userData.LastPredictDeath._formatComma())名</span> @*<span>（予測日：@(forecastData.PredictStartDateStr)）</span>*@
 @* Chart の Canvas *@
 <div class="scrollableChartWrapper" style="" id="chart-wrapper-death">
     <div id="scrollWrapper">
@@ -27,6 +29,8 @@
     <canvas id="yAxis1" style="left: 0" width="0"></canvas>
     <canvas id="yAxis2" style="right: 0" width="0"></canvas>
 </div>
+<div style="margin-top: 2px;"><span style="margin-left: 4px; font-size: small">
+    ※青の縦線の日付は「年代別の陽性者割合」の最終行の日付</span></div>
 </div>
 </div>
 
@@ -167,7 +171,8 @@
     </tbody>
 </table>
 </div>
-<div style="position: absolute; bottom: 0px; margin-top: 2px;"><span style="margin-left: 20px; font-size: small">※最終行は直前@(forecastData.RateAveWeeks)週の平均</span></div> 
+<div style="position: absolute; bottom: 0px; margin-top: 2px;">
+    <span style="margin-left: 20px; font-size: small">※最終行は直前@(forecastData.RateAveWeeks)週の平均</span></div> 
 </div>
 
 <div class="table-block">

@@ -103,6 +103,17 @@ namespace ChartBlazorApp.Pages
 
         private bool _cancellable = false;
 
+        private static string _predictBackDt { get; set; }
+
+#if DEBUG
+        private int _debugLevel {
+            get { return _effectiveParams?.DebugLevel ?? Constants.DEBUG_LEVEL; }
+            set { if (_effectiveParams != null) _effectiveParams.DebugLevel = value; }
+        }
+#else
+        private int _debugLevel = 0;
+#endif
+
         private InfectData _infectData { get { return _effectiveParams.MyInfectData; } }
 
         private int _radioIdx { get { return _effectiveParams.RadioIdx; } }
@@ -126,6 +137,8 @@ namespace ChartBlazorApp.Pages
         private bool _fourstepSettings { get { return _effectiveParams.FourstepSettings; } }
 
         private bool _onlyOnClick { get { return _effectiveParams.OnlyOnClick; } }
+
+        private bool _expectOverReal { get { return _effectiveParams.ExpectOverReal; } }
 
         private int _extensionDays { get { return _effectiveParams.ExtensionDays; } }
 
@@ -182,18 +195,19 @@ namespace ChartBlazorApp.Pages
 
         private async Task getSettings()
         {
-            _effectiveParams = await EffectiveParams.CreateByGettingUserSettings(JSRuntime, dailyData);
+            ConsoleLog.Info($"[MyChart.getSettings] CALLED");
+            _effectiveParams = await EffectiveParams.CreateByGettingUserSettings(JSRuntime, dailyData, _debugLevel);
         }
 
-        private async Task insertStaticDescription()
-        {
-            var html = Helper.GetFileContent("wwwroot/html/Description.html", System.Text.Encoding.UTF8);
-            if (html._notEmpty()) await JSRuntime.InvokeAsync<string>("insertStaticDescription", html);
-        }
+        //private async Task insertStaticDescription()
+        //{
+        //    var html = Helper.GetFileContent("wwwroot/html/Description.html", System.Text.Encoding.UTF8);
+        //    if (html._notEmpty()) await JSRuntime.InvokeAsync<string>("insertStaticDescription", html);
+        //}
 
         private async Task selectStaticDescription()
         {
-            await JSRuntime.InvokeAsync<string>("selectDescription", "home-page");
+            await JSRuntime._selectDescription("home-page");
         }
 
         /// <summary>
@@ -208,6 +222,7 @@ namespace ChartBlazorApp.Pages
         protected override async Task OnAfterRenderAsync(bool firstRender)
         {
             if (firstRender) {
+                ConsoleLog.Info($"[MyChart.OnAfterRenderAsync] CALLED");
                 await getSettings();
                 await RenderChartMethod(true, true);
                 await selectStaticDescription();
@@ -236,6 +251,12 @@ namespace ChartBlazorApp.Pages
             //_lastDate = infectData?.Dates.Last() ?? DateTime.MinValue;
             //await getSettings();
             //await RenderChartMethod(true, true);
+        }
+
+        public async Task ChangeDebugLevel(ChangeEventArgs args)
+        {
+            _debugLevel = args.Value.ToString()._parseInt();
+            await RenderChartMethod();
         }
 
         public async Task ChangeChart(ChangeEventArgs args)
@@ -277,17 +298,7 @@ namespace ChartBlazorApp.Pages
         {
             _effectiveParams.CurrentSettings.moveRadioPref(delta);
             _cancellable = false;
-#if DEBUG
-            Console.WriteLine($"movePref: radioIdx={_radioIdx}");
-#endif
-        }
-
-        public async Task ChangeFile(ChangeEventArgs args)
-        {
-            var file = args.Value.ToString();
-            Console.WriteLine($"selected file={file}");
-            var text = await JSRuntime.InvokeAsync<string>("uploadFile");
-            Console.WriteLine(text);
+            ConsoleLog.Debug($"[MyChart.movePref] radioIdx={_radioIdx}");
         }
 
         public async Task ChangeYAxisMax(ChangeEventArgs args)
@@ -305,8 +316,9 @@ namespace ChartBlazorApp.Pages
         /// <summary> 基準日<summary>
         public async Task ChangeExpectationParamDate(ChangeEventArgs args)
         {
-            string dt = args.Value.ToString();
+            string dt = args.Value.ToString().Trim();
             if (dt._reMatch(@"^\d+/\d+$")) dt = $"{DateTime.Now._yyyy()}/{dt}";
+            dt = getValidStartDt(dt);
             await changeRtParamCustom(dt, "2020/1/1",
                 _effectiveParams.CurrentSettings.setParamStartDate,
                 () => _effectiveParams.RenewDecaySubParams(),
@@ -317,8 +329,9 @@ namespace ChartBlazorApp.Pages
         /// <summary>4段階の基準日<summary>
         public async Task ChangeExpectationParamDateForestep(ChangeEventArgs args)
         {
-            string dt = args.Value.ToString();
+            string dt = args.Value.ToString().Trim();
             if (dt._reMatch(@"^\d+/\d+$")) dt = $"{DateTime.Now._yyyy()}/{dt}";
+            dt = getValidStartDt(dt);
             await changeRtParamCustom(dt, "2020/1/1",
                 _effectiveParams.CurrentSettings.setParamStartDateFourstep,
                 null,
@@ -326,9 +339,26 @@ namespace ChartBlazorApp.Pages
                 _effectiveParams.CurrentSettings.setParamStartDateFourstep);
         }
 
+        private string getValidStartDt(string dts)
+        {
+            if (dts._isEmpty()) return dts;
+            DateTime dt = dts._parseDateTime();
+            var firstDt = _infectData.Dates._first();
+            var lastDt = _infectData.Dates._last();
+            if (dt._isValid() && dt >= firstDt && dt <= lastDt) return dts;
+            ConsoleLog.Warn($"[MyChart.getValidStartDt] StartDate({dts}) is invalid. Use empty value instead.");
+            return "";
+        }
+
         public async Task ChangeOnlyOnClick(ChangeEventArgs args)
         {
             _effectiveParams.CurrentSettings.setOnlyOnClick((bool)args.Value);
+            await RenderChartMethod();
+        }
+
+        public async Task ChangeExpOverReal(ChangeEventArgs args)
+        {
+            _effectiveParams.CurrentSettings.setExpectOverReal((bool)args.Value);
             await RenderChartMethod();
         }
 
@@ -339,6 +369,25 @@ namespace ChartBlazorApp.Pages
                 _effectiveParams.SetExtensionDays,
                 () => _effectiveParams.CurrentSettings.myExtensionDays(),
                 _effectiveParams.CurrentSettings.setExtensionDays);
+        }
+
+        public async Task ChangePredBackDays(ChangeEventArgs args)
+        {
+#if DEBUG
+            string dts = args.Value.ToString().Trim();
+            if (dts._reMatch(@"^\d+/\d+$"))
+                dts = $"{DateTime.Now._yyyy()}/{dts}";
+            else if (dts._reMatch(@"^\d+$"))
+                dts = $"{DateTime.Now.ToString("yyyy/MM")}/{dts}";
+            //dts = getValidStartDt(dts);
+            _predictBackDt = dts;
+            var dt = dts._parseDateTime();
+            if (dt._isValid()) {
+                dailyData.Initialize(true, dt);
+                forecastData.Initialize();
+                await RenderChartMethod();
+            }
+#endif
         }
 
         //public async Task ChangeUseOnForecast(ChangeEventArgs args)
@@ -519,6 +568,21 @@ namespace ChartBlazorApp.Pages
             }
         }
 
+        private async Task changeRtParamCustom2(ChangeEventArgs args, int outVal, Action<string> mySetter, Action custom, Func<int> getter, Action<int> setter)
+        {
+            var oldval = getter();
+            mySetter(args.Value.ToString());
+            custom?.Invoke();
+            await RenderChartMethod();
+            var newval = getter();
+            if (newval.CompareTo(oldval) == 0) {
+                setter(outVal);
+                StateHasChanged();
+                setter(newval);
+                StateHasChanged();
+            }
+        }
+
         public async Task RenderEstimatedBarMethod(ChangeEventArgs args)
         {
             _effectiveParams.CurrentSettings.setEstimatedBar((bool)args.Value);
@@ -560,10 +624,12 @@ namespace ChartBlazorApp.Pages
 
         private void reloadData(bool bForce = false)
         {
+            ConsoleLog.Info($"[MyChart.reloadData] CALLED");
             // 5秒経過後、10秒以内に再度呼び出されたら、データの再読み込みを行う
             var dtNow = DateTime.Now;
             if (bForce || (dtNow > _prevReloadDt.AddSeconds(5) && dtNow < _prevReloadDt.AddSeconds(10))) {
-                dailyData.Initialize(bForce);
+                ConsoleLog.Info($"[MyChart.reloadData] CALL dailyData.Initialize(true)");
+                dailyData.Initialize(true);
                 forecastData.Initialize();
             }
             _prevReloadDt = dtNow;
@@ -571,6 +637,7 @@ namespace ChartBlazorApp.Pages
 
         public async Task InitializeParams()
         {
+            ConsoleLog.Info($"[MyChart.InitializeParams] CALLED");
             if (_cancellable) {
                 await getSettings();
             } else {
@@ -595,6 +662,7 @@ namespace ChartBlazorApp.Pages
 
         public async Task InitializeFourstepParams()
         {
+            ConsoleLog.Info($"[MyChart.InitializeFourstepParams] CALLED");
             if (_cancellable) {
                 await getSettings();
             } else {
@@ -634,7 +702,7 @@ namespace ChartBlazorApp.Pages
 
             double scrlbarRatio = bResetScrollBar || barWidth != _barWidth ? newlyDaysRatio(dispDays) : 0;
             _cancellable = bCancellable;
-            await JSRuntime.InvokeAsync<string>("renderChart2", "chart-wrapper-home", barWidth, scrlbarRatio, jsonStr);
+            await JSRuntime._renderChart2("chart-wrapper-home", barWidth, scrlbarRatio, jsonStr);
 
             if (!bFirst && !_cancellable) await _effectiveParams.CurrentSettings.SaveSettings();
         }
@@ -665,13 +733,17 @@ namespace ChartBlazorApp.Pages
             if (infData != null) {
                 title = infData.Title;
                 var rtp = rtDecayParam;
-                Console.WriteLine(
-                    $"{DateTime.Now} [MakeJsonData] " +
+                ConsoleLog.Info(
+                    $"[MyChart.MakeJsonData] " +
                     $"pref={title}, " +
+                    $"exp={_drawExpectation}, " +
+                    $"det={_detailSettings}, " +
+                    $"est={_estimatedBar}, " +
+                    $"rtDur={_localMaxRtDuration}, " +
                     $"expDt={rtp?.EffectiveStartDate.ToShortDateString()}, " +
                     $"days={(rtp?.Fourstep == false ? rtp.DaysToOne.ToString() : "")}, " +
-                    $"est={_estimatedBar}, " +
-                    $"clk={_onlyOnClick}, " +
+                    $"rt1={rtp?.EasyRt1}, ft1={rtp?.DecayFactor}, " +
+                    $"rt2={rtp?.EasyRt2}, ft1={rtp?.DecayFactorNext}, " +
                     $"days1/Rt1={(rtp?.Fourstep == true ? $"{rtp.DaysToRt1}/{rtp.Rt1}" : "")}");
                 //int x0 = infData.X0;
                 chartData = new ChartJson { type = "bar" };
@@ -719,15 +791,17 @@ namespace ChartBlazorApp.Pages
                     double?[] predRts = null;
                     double?[] predAverage = null;
                     if (predData != null) {
+                        int dashLineOrder = _expectOverReal ? 1 : 3;
                         predRts = predData.FullPredRt.Take(predDays)._toNullableArray(3);
-                        dataSets.Add(Dataset.CreateDashLine2("予想実効再生産数", predRts, "brown").SetDispOrder(6));
+                        dataSets.Add(Dataset.CreateDashLine2("予想実効再生産数", predRts, "brown").SetOrder(dashLineOrder).SetDispOrder(6));
                         predAverage = predData.PredAverage.Take(predDays)._toNullableArray(1);
-                        dataSets.Add(Dataset.CreateDashLine("予想移動平均", predAverage, "darkgreen").SetDispOrder(4));
+                        dataSets.Add(Dataset.CreateDashLine("予想移動平均", predAverage, "darkgreen").SetOrder(dashLineOrder).SetDispOrder(4));
                     }
+                    int lineOrder = _expectOverReal ? 3 : 1;
                     double?[] realRts = infData.Rt.Take(realDays)._toNullableArray(3);
-                    dataSets.Add(Dataset.CreateLine2("実効再生産数(右軸)", realRts, "darkorange", "yellow").SetDispOrder(5));
+                    dataSets.Add(Dataset.CreateLine2("実効再生産数(右軸)", realRts, "darkorange", "yellow").SetOrder(lineOrder).SetDispOrder(5));
                     double?[] realAverage = infData.Average.Take(realDays)._toNullableArray(1);
-                    dataSets.Add(Dataset.CreateLine("陽性者数移動平均", realAverage, "darkblue", "lightblue").SetDispOrder(3));
+                    dataSets.Add(Dataset.CreateLine("陽性者数移動平均", realAverage, "darkblue", "lightblue").SetOrder(lineOrder).SetDispOrder(3));
                     double?[] positives = infData.Newly.Take(realDays)._toNullableArray(0, 0);
                     var positiveDataset = Dataset.CreateBar("新規陽性者数", positives, "royalblue").SetHoverColors("mediumblue").SetDispOrder(1);
                     if (predData != null && _estimatedBar) {
