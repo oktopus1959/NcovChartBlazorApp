@@ -17,11 +17,7 @@ namespace ChartBlazorApp.Pages
 {
     public partial class Forecast : ComponentBase
     {
-#if DEBUG
-        private static bool _debug = true;
-#else
-        private static bool _debug = false;
-#endif
+        private static ConsoleLog logger = ConsoleLog.GetLogger();
 
         // IJSRuntime はシステムが既定で用意している
         [Inject]
@@ -54,7 +50,7 @@ namespace ChartBlazorApp.Pages
 
         private async Task getSettings()
         {
-            ConsoleLog.Info($"[Forecast.getSettings] CALLED");
+            logger.Info($"CALLED");
             _effectiveParams = await EffectiveParams.CreateByGettingUserSettings(JSRuntime, dailyData);
         }
 
@@ -70,7 +66,7 @@ namespace ChartBlazorApp.Pages
         protected override async Task OnAfterRenderAsync(bool firstRender)
         {
             if (firstRender) {
-                ConsoleLog.Info($"[Forecast.OnAfterRenderAsync] CALLED");
+                logger.Info($"CALLED");
                 await getSettings();
                 await RenderDeathAndSeriousChart();
                 await selectStaticDescription();
@@ -84,7 +80,7 @@ namespace ChartBlazorApp.Pages
             //forecastData.Initialize();
         }
 
-        private bool _showOtherCharts = _debug;
+        private bool _showOtherCharts = Constants.DEBUG_LEVEL > 0;
 
         public async Task ShowOtherCharts(ChangeEventArgs args)
         {

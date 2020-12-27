@@ -13,6 +13,8 @@ namespace ChartBlazorApp.Models
     /// </summary>
     public class EffectiveParams
     {
+        private static ConsoleLog logger = ConsoleLog.GetLogger();
+
         /// <summary>
         /// 最も基底となる予測設定値(Layer-1)
         /// </summary>
@@ -55,13 +57,14 @@ namespace ChartBlazorApp.Models
                 if (bRenew || subParam == null) {
                     var data = DailyData?.InfectDataList._nth(dataIdx);
                     if (data != null) {
-                        int duration = CurrentSettings.localMaxRtDuration ?? -1;
+                        //int duration = CurrentSettings.localMaxRtDuration ?? -1;
+                        int duration = CurrentSettings.extremeRtDetectDuration ?? -1;
                         var dt = CurrentSettings.myParamStartDate(dataIdx)._parseDateTime();
                         _subParamsCache[dataIdx] = subParam = data.CalcDecaySubParams(duration, dt._isValid() ? (DateTime?)dt : null, idx == -1 ? DebugLevel : 0);
                     }
                 }
                 if (subParam.HasValue) return subParam.Value;
-                ConsoleLog.Warn("[EffectiveParams.getOrNewDecaySubParams] No effective SubParams. Return new SubParams().");
+                logger.Warn("No effective SubParams. Return new SubParams().");
                 return new SubParams();
             }
         }
@@ -85,7 +88,7 @@ namespace ChartBlazorApp.Models
             int myIdx = myDataIdx(n);
             var data = DailyData.InfectDataList._nth(myIdx);
             if (data == null) {
-                ConsoleLog.Warn($"[EffectiveParams.NthInfectData] n={n}, myDataIdx({n})={myIdx}, DailyData.InfectDataList.Length={DailyData.InfectDataList._length()}");
+                logger.Warn($"n={n}, myDataIdx({n})={myIdx}, DailyData.InfectDataList.Length={DailyData.InfectDataList._length()}");
                 data = InfectData.DummyData;
             }
             return data;
@@ -127,15 +130,17 @@ namespace ChartBlazorApp.Models
 
         public int LocalMaxRtDuration { get { return CurrentSettings.myLocalMaxRtDuration(); } }
 
+        public int ExtremeRtDetectDuration { get { return CurrentSettings.myExtremeRtDetectDuration(); } }
+
         public string ParamStartDate { get { return getParamStartDate(); } }
         public string getParamStartDate(int idx = -1, bool bSystem = false) {
             if (!bSystem && DetailSettings) {
                 var dt = CurrentSettings.myParamStartDate(idx);
                 if (dt._parseDateTime()._isValid()) return dt;
-                if (dt._notEmpty()) ConsoleLog.Warn($"[EffectiveParams.getParamStartDate] CurrentSettings.myParamStartDate({idx})={dt} is invalid.");
+                if (dt._notEmpty()) logger.Warn($"CurrentSettings.myParamStartDate({idx})={dt} is invalid.");
                 dt = getOrNewDecaySubParams(idx).StartDate;
                 if (dt._parseDateTime()._isValid()) return dt;
-                if (dt._notEmpty()) ConsoleLog.Warn($"[EffectiveParams.getParamStartDate] getOrNewDecaySubParams({idx}).StartDate={dt} is invalid.");
+                if (dt._notEmpty()) logger.Warn($"getOrNewDecaySubParams({idx}).StartDate={dt} is invalid.");
             }
             var startDt = NthInfectData(idx).InitialDecayParam.StartDate;
             if (startDt._isValid()) return startDt._toDateString();
@@ -143,7 +148,7 @@ namespace ChartBlazorApp.Models
             var dts = NthInfectData(idx).InitialSubParams.StartDate;
             if (dts._parseDateTime()._isValid()) return dts;
             dts = RtDecayParam.DefaultParam.StartDate._toDateString();
-            ConsoleLog.Info($"[EffectiveParams.getParamStartDate] RtDecayParam.DefaultParam.StartDat={dts} is returned.");
+            logger.Info($"RtDecayParam.DefaultParam.StartDat={dts} is returned.");
             return dts;
         }
 
@@ -323,6 +328,12 @@ namespace ChartBlazorApp.Models
         public void SetLocalMaxRtDuration(string value)
         {
             CurrentSettings.setLocalMaxRtDuration(value._parseInt(-1));
+            RenewDecaySubParams();
+        }
+
+        public void SetExtremeRtDetectDuration(string value)
+        {
+            CurrentSettings.setExtremeRtDetectDuration(value._parseInt(-1));
             RenewDecaySubParams();
         }
 

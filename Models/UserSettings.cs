@@ -10,6 +10,8 @@ namespace ChartBlazorApp.Models
 {
     public class UserSettings
     {
+        private static ConsoleLog logger = ConsoleLog.GetLogger();
+
         private const int MainPrefNum = Constants.MAIN_PREF_NUM;
 
         // ---- ここから下が LocalStorage に保存される (すべてのメンバーを public かつ { get; set; } にしておくこと)
@@ -34,6 +36,7 @@ namespace ChartBlazorApp.Models
         public int extensionDays { get; set; }
         //public bool useOnForecast { get; set; }
         public int? localMaxRtDuration { get; set; }
+        public int? extremeRtDetectDuration { get; set; }
 
         public string[] paramRtStartDate { get; set; }
         public string[] paramRtStartDateFourstep { get; set; }
@@ -110,6 +113,7 @@ namespace ChartBlazorApp.Models
             extensionDays = 0;
             //useOnForecast = false;
             localMaxRtDuration = null;
+            extremeRtDetectDuration = null;
             paramRtStartDate = new string[numData];
             paramRtStartDateFourstep = new string[numData];
             paramRtDaysToOne = new int[numData];
@@ -163,8 +167,8 @@ namespace ChartBlazorApp.Models
             try {
                 return await getLocalStorage(jsRuntime, numData);
             } catch (Exception e) {
-                ConsoleLog.Warn($"[UserSettings.GetSettings] settings read failed.\n{e}");
-                ConsoleLog.Info($"[UserSettings.GetSettings] Use initail settings instead.");
+                logger.Warn($"settings read failed.\n{e}");
+                logger.Info($"Use initail settings instead.");
                 return (new UserSettings().SetJsRuntime(jsRuntime)).Initialize(numData);
             }
         }
@@ -178,7 +182,7 @@ namespace ChartBlazorApp.Models
             try {
                 await JSRuntime._saveSettings(this._jsonSerialize());
             } catch (Exception e) {
-                ConsoleLog.Error($"[UserSettings.SaveSettings] settings write failed.\n{e}");
+                logger.Error($"settings write failed.\n{e}");
             }
         }
 
@@ -205,19 +209,20 @@ namespace ChartBlazorApp.Models
             paramRtRt4 = _extendArray(paramRtRt4, numData);
 
             if (_oldValuesCopied) {
-                ConsoleLog.Debug($"Old value already copied");
+                logger.Debug($"Old value already copied");
                 paramRtEasyRt2 = _extendArray(paramRtEasyRt2, numData);
             } else {
                 paramRtEasyRt2 = new double[paramRtMinRt.Length];
                 Array.Copy(paramRtMinRt, paramRtEasyRt2, paramRtMinRt.Length);
                 _oldValuesCopied = true;
-                ConsoleLog.Info($"Old value now copied");
+                logger.Info($"Old value now copied");
             }
             return this;
         }
 
         public int myExtensionDays() { return extensionDays._gtZeroOr(Constants.EXTENSION_DAYS); }
         public int myLocalMaxRtDuration() { return localMaxRtDuration._geZeroOr(Constants.LOCAL_MAX_RT_BACK_DURATION); }
+        public int myExtremeRtDetectDuration() { return extremeRtDetectDuration._geZeroOr(Constants.EXTREMUM_DETECTION_DURATION); }
 
         public int dataIdx { get { return prefIdxByRadio(radioIdx); } }
 
@@ -383,6 +388,10 @@ namespace ChartBlazorApp.Models
         public void setLocalMaxRtDuration(int value)
         {
             localMaxRtDuration = value;
+        }
+        public void setExtremeRtDetectDuration(int value)
+        {
+            extremeRtDetectDuration = value;
         }
         public void setParamStartDate(string value)
         {

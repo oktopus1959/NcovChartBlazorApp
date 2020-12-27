@@ -1,6 +1,9 @@
 ﻿@page "/forecast"
+@using ChartBlazorApp.Models;
 @using StandardCommon
-
+@code{
+    private bool _debug = Constants.DEBUG_LEVEL > 0;
+}
 <div style="width: 100%">
 <div class="chart-block" style="@(_userData.UseDetail ? "max-width: 100%" : null)">
 <h4><span>新型コロナ</span> <span>重症者数グラフ</span> <span>@(_userData.UseDetail ? "（詳細設定使用）" : "")</span></h4>
@@ -68,7 +71,7 @@
 
 <div style="margin-top: 10px; display: @(_showOtherCharts ? "blcok" : "none"); width: 100%">
 <div class="chart-block">
-<span style="font-size: 1.25em;">死亡者［実数－予測値］</span> @if (_debug) { <span>(@($"MSE={_userData.DeathDiffMSE:f1}"))</span> }
+<span style="font-size: 1.25em;">累計死亡者［実数－予測値］</span> @if (_debug) { <span>(@($"MSE={_userData.DeathDiffMSE:f1}"))</span> }
 @* Chart の Canvas *@
 <div class="scrollableChartWrapper" id="chart-wrapper-deathdiff">
     <div id="scrollWrapper-df">

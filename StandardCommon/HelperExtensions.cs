@@ -283,25 +283,99 @@ namespace StandardCommon
         }
 
         /// <summary>
-        /// pair の Max を返す
+        /// 引数と比較して大きい方を返す
         /// </summary>
-        /// <typeparam name="T"></typeparam>
-        /// <param name="pair"></param>
-        /// <returns></returns>
-        public static T _max<T>(this (T a, T b) pair) where T: IComparable
+        public static int _max(this int a, int b)
         {
-            return pair.a.CompareTo(pair.b) >= 0 ? pair.a : pair.b;
+            return a >= b ? a : b;
         }
 
         /// <summary>
-        /// pair の Min を返す
+        /// 引数と比較して大きい方を返す
         /// </summary>
-        /// <typeparam name="T"></typeparam>
-        /// <param name="pair"></param>
-        /// <returns></returns>
-        public static T _min<T>(this (T a, T b) pair) where T: IComparable
+        public static double _max(this double a, double b)
         {
-            return pair.a.CompareTo(pair.b) <= 0 ? pair.a : pair.b;
+            return a >= b ? a : b;
+        }
+
+        /// <summary>
+        /// 引数と比較して大きい方を返す
+        /// </summary>
+        public static T _max<T>(this T a, T b) where T: IComparable
+        {
+            return a.CompareTo(b) >= 0 ? a : b;
+        }
+
+        /// <summary>
+        /// 引数と比較して大きい方を返す
+        /// </summary>
+        public static int _lowLimit(this int a, int b)
+        {
+            return a._max(b);
+        }
+
+        /// <summary>
+        /// 引数と比較して大きい方を返す
+        /// </summary>
+        public static double _lowLimit(this double a, double b)
+        {
+            return a._max(b);
+        }
+
+        /// <summary>
+        /// 引数と比較して大きい方を返す
+        /// </summary>
+        public static T _lowLimit<T>(this T a, T b) where T: IComparable
+        {
+            return a._max(b);
+        }
+
+        /// <summary>
+        /// 引数と比較して小さい方を返す
+        /// </summary>
+        public static int _min(this int a, int b)
+        {
+            return a <= b ? a : b;
+        }
+
+        /// <summary>
+        /// 引数と比較して小さい方を返す
+        /// </summary>
+        public static double _min(this double a, double b)
+        {
+            return a <= b ? a : b;
+        }
+
+        /// <summary>
+        /// 引数と比較して小さい方を返す
+        /// </summary>
+        public static T _min<T>(this T a, T b) where T: IComparable
+        {
+            return a.CompareTo(b) <= 0 ? a : b;
+        }
+
+        /// <summary>
+        /// 引数と比較して小さい方を返す
+        /// </summary>
+        public static int _highLimit(this int a, int b)
+        {
+            return a._min(b);
+        }
+
+        /// <summary>
+        /// 引数と比較して小さい方を返す
+        /// </summary>
+        public static double _highLimit(this double a, double b)
+        {
+            return a._min(b);
+        }
+
+        /// <summary>
+        /// 引数と比較して小さい方を返す
+        /// </summary>
+        public static T _highLimit<T>(this T a, T b) where T: IComparable
+        {
+            return a._min(b);
         }
 
     } // IntExtensions
@@ -589,8 +663,8 @@ namespace StandardCommon
         /// <returns></returns>
         public static T[] _fill<T>(this T[] array, int begin, int length, T fillVal)
         {
-            begin = (0, begin)._max();
-            int end = (begin + length, array._safeLength())._min();
+            begin = begin._lowLimit(0);
+            int end = (begin + length)._highLimit(array._safeLength());
             for (int i = begin; i < end; ++i) array[i] = fillVal;
             return array;
         }

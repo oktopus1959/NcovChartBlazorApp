@@ -134,7 +134,7 @@
                     <input type="text" class="text-number-short" value="@_paramDaysToOne" @onchange="ChangeRtParamDaysToOne" disabled="@(_easyDisable())"/></div><br/>*@
                     <br/>
                     <div class="inline-wrapper"><span class="@_fontColor(!_easyDisable())">変化日Rt：</span>
-                        <input type="text" class="text-number" value="@_paramEasyRt1" @onchange="ChangeRtParamEasyRt1" disabled="@(_easyDisable())"/></div>
+                        <input type="text" class="text-number" value="@_paramEasyRt1" @onchange="ChangeRtParamEasyRt1" disabled="@(_easyDisable())"/>　</div>
                     <div class="inline-wrapper position-right"><span class="@_fontColor(!_easyDisable())">屈曲度：</span>
                     <select style="padding: 1px" name="decay-factory" value="@_paramDecayFactor" @onchange="ChangeRtParamDecayFactor" disabled="@(_easyDisable())">
                         @foreach ((var i, var v) in _decayFactors._enumerate()) {
@@ -163,10 +163,13 @@
                 <div class="inline-wrapper">
                     <span class="@_fontColor(!_easyDisable())">予想曲線表示日数：</span>
                     <input type="text" class="text-number-short" value="@_extensionDays" @onchange="ChangeExtensionDays" disabled="@(_easyDisable())"/></div>
-                <div class="inline-wrapper">
+                @*<div class="inline-wrapper">
                     <span class="@_fontColor(!_easyDisable())">基準日検出遡及日数：</span>
-                    <input type="text" class="text-number-short" value="@_localMaxRtDuration" @onchange="ChangeLocalMaxRtDuration" disabled="@(_easyDisable())"/>
-                    @*<span class="@_fontColor(!_easyDisable())">日</span>*@</div><br/>
+                    <input type="text" class="text-number-short" value="@_localMaxRtDuration" @onchange="ChangeLocalMaxRtDuration" disabled="@(_easyDisable())"/></div>*@
+                <div class="inline-wrapper">
+                    <span class="@_fontColor(!_easyDisable())">Rt極値検出期間：</span>
+                    <input type="text" class="text-number-short" value="@_extremeRtDetectDuration" @onchange="ChangeExtremeRtDetectDuration" disabled="@(_easyDisable())"/>
+                    <span class="@_fontColor(!_easyDisable())">日</span></div>
                 @*<div class="inline-wrapper">
                     <label for="use-on-forecast">
                         <input type="checkbox" name="use-on-forecast" id="use-on-forecast" @onchange="ChangeUseOnForecast" checked="@(_useOnForecast)" disabled="@(_radioIdx != 0)" />

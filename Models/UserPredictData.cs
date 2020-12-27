@@ -11,6 +11,8 @@ namespace ChartBlazorApp.Models
     /// </summary>
     public class UserPredictData
     {
+        private static ConsoleLog logger = ConsoleLog.GetLogger();
+
         /// <summary> 予想実効再生産数 </summary>
         public double[] FullPredRt { get; private set; }
         /// <summary> 逆算移動平均 </summary>
@@ -58,7 +60,7 @@ namespace ChartBlazorApp.Models
 
             if (rtDecayParam.StartDate > realEndDate) rtDecayParam.StartDate = realEndDate;
             if (rtDecayParam.StartDateFourstep > realEndDate) rtDecayParam.StartDateFourstep = realEndDate;
-            //ConsoleLog.Debug($"rtDecayParam.StartDate={rtDecayParam.StartDate.ToLongDateString()}, " +
+            //logger.Debug($"rtDecayParam.StartDate={rtDecayParam.StartDate.ToLongDateString()}, " +
             //    $"StartDateFourstep={rtDecayParam.StartDateFourstep.ToLongDateString()}, " +
             //    $"EffectiveStartDate={rtDecayParam.EffectiveStartDate.ToLongDateString()}");
             RevAverage = new double[numFullDays];
@@ -67,7 +69,7 @@ namespace ChartBlazorApp.Models
             const int ExtraDaysForAverage = Constants.EXTRA_DAYS_FOR_AVERAGE;
             PredStartIdx = (rtDecayParam.EffectiveStartDate - firstRealDate).Days;
             if (PredStartIdx < 0 || PredStartIdx >= infData.Average.Length) {
-                ConsoleLog.Error($"[predictValuesEx] PredStartIdx({PredStartIdx}) is out of range. "
+                logger.Error($"PredStartIdx({PredStartIdx}) is out of range. "
                     + $"rtDecayParam.EffectiveStartDate({rtDecayParam.EffectiveStartDate}) may not be valid. "
                     + $"Use realEndDate={realEndDate} instead");
                 PredStartIdx = (realEndDate - firstRealDate).Days;
