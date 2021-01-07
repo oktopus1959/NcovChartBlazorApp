@@ -1,8 +1,9 @@
 #! /bin/bash
 
-cd $(dirname $0)
+#cd $(dirname $0)
+BINDIR=$(dirname $0)
 
-. ./debug_util.sh
+. ${BINDIR}/debug_util.sh
 
 if [[ "$1" == -* ]]; then
     [[ "$1" == -*l* ]] && LOADFLAG=$1
@@ -14,8 +15,10 @@ WORKDIR=Data/work
 CSVDIR=Data/csv
 
 copy_files() {
-    [ "$BLAZOR_REMOTE_HOST" ] && \
-        RUN_CMD -m "scp -p $CSVDIR/*.csv ${BLAZOR_REMOTE_HOST}:dotnet/ChartBlazorApp/$CSVDIR"
+    if [ "$BLAZOR_REMOTE_HOST" ]; then
+        RUN_CMD -m "scp $CSVDIR/*.csv ${BLAZOR_REMOTE_HOST}:dotnet/ChartBlazorApp/$CSVDIR"
+        #RUN_CMD -m "ssh ${BLAZOR_REMOTE_HOST} touch dotnet/ChartBlazorApp/$CSVDIR/*"
+    fi
 }
 
 normalizeDate() {

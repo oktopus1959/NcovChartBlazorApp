@@ -35,6 +35,7 @@ $ git clone https://github.com/kaz-ogiwara/covid19.git
 ```
 
 プロジェクトフォルダに戻り、 update_data.sh を実行します。
+これは bash スクリプトになっているので、 Windows で実行したい場合は、 Windows Subsystem for Linux をインストールするか、 Git bash をインストールしてください。また一部 ruby スクリプトも使っているので、 ruby のインストールも必要となります。
 
 ```sh
 $ cd ..
