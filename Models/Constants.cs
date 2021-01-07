@@ -13,11 +13,22 @@ namespace ChartBlazorApp.Models
         /// <summary> 基準日検出の対象となるRtの最大値(これを超えるRtの日は対象外)</summary>
         public const double RT_THRESHOLD = 3.0;
 
+        public const double RT_THRESHOLD2 = 5.0;
+
         /// <summary> 基準日検出の対象外となる実数日末尾期間</summary>
         public const int TAIL_GUARD_DURATION = 5;
 
+        /// <summary> 基準日検出のための遡及日数のデフォルト </summary>
+        public const int LOCAL_MAX_RT_BACK_DURATION = 12;
+
         /// <summary> 基準日検出の最大遡及日数</summary>
         public const int MAX_BACK_DAYS = 90;
+
+        /// <summary> 基準日検出の最大遡及日数(OldestExremum検出用)</summary>
+        public const int MAX_EXTREMUM_BACK_DAYS = 28;
+
+        /// <summary> 極値検出のための期間(この期間内で最大/最小のものを極値として扱う) </summary>
+        public const int EXTREMUM_DETECTION_DURATION = 10;
 
         /// <summary> システムによる1段階設定において変化日までの最小日数(基準日を0日と数える)</summary>
         public const int STAGE1_MIN_DURATION = 10;
@@ -117,9 +128,6 @@ namespace ChartBlazorApp.Models
 
         /// <summary> 自治体選択用ラジオボタンに追加できる自治体の最大数 </summary>
         public const int FAVORITE_PREF_MAX = 10;
-
-        /// <summary> 基準日検出のための遡及日数のデフォルト </summary>
-        public const int LOCAL_MAX_RT_BACK_DURATION = 10;
 
         /// <summary> 自治体選択用ラジオボタンの最大数 </summary>
         public const int RADIO_IDX_MAX = MAIN_PREF_NUM + FAVORITE_PREF_MAX;

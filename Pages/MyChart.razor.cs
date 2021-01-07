@@ -22,6 +22,8 @@ namespace ChartBlazorApp.Pages
     /// </summary>
     public partial class MyChart : ComponentBase
     {
+        private static ConsoleLog logger = ConsoleLog.GetLogger();
+
         // IJSRuntime はシステムが既定で用意している
         [Inject]
         protected IJSRuntime JSRuntime { get; set; }
@@ -146,6 +148,8 @@ namespace ChartBlazorApp.Pages
 
         private int _localMaxRtDuration { get { return _effectiveParams.LocalMaxRtDuration; } }
 
+        private int _extremeRtDetectDuration { get { return _effectiveParams.ExtremeRtDetectDuration; } }
+
         //private string _paramDate { get { return _effectiveParams.MyParamStartDate()._orElse(() => _infectData.FindRecentMaxRtDateStr(_localMaxRtDuration))._orElse(() => _infectData.InitialDecayParam.StartDate._toDateString()); } }
         private string _paramDate { get { return _effectiveParams.ParamStartDate; } }
 
@@ -195,7 +199,7 @@ namespace ChartBlazorApp.Pages
 
         private async Task getSettings()
         {
-            ConsoleLog.Info($"[MyChart.getSettings] CALLED");
+            logger.Info($"CALLED");
             _effectiveParams = await EffectiveParams.CreateByGettingUserSettings(JSRuntime, dailyData, _debugLevel);
         }
 
@@ -222,7 +226,7 @@ namespace ChartBlazorApp.Pages
         protected override async Task OnAfterRenderAsync(bool firstRender)
         {
             if (firstRender) {
-                ConsoleLog.Info($"[MyChart.OnAfterRenderAsync] CALLED");
+                logger.Info($"CALLED");
                 await getSettings();
                 await RenderChartMethod(true, true);
                 await selectStaticDescription();
@@ -256,6 +260,7 @@ namespace ChartBlazorApp.Pages
         public async Task ChangeDebugLevel(ChangeEventArgs args)
         {
             _debugLevel = args.Value.ToString()._parseInt();
+            ConsoleLog.DEBUG_LEVEL = _debugLevel;
             await RenderChartMethod();
         }
 
@@ -298,7 +303,7 @@ namespace ChartBlazorApp.Pages
         {
             _effectiveParams.CurrentSettings.moveRadioPref(delta);
             _cancellable = false;
-            ConsoleLog.Debug($"[MyChart.movePref] radioIdx={_radioIdx}");
+            logger.Debug($"_radioIdx");
         }
 
         public async Task ChangeYAxisMax(ChangeEventArgs args)
@@ -346,7 +351,7 @@ namespace ChartBlazorApp.Pages
             var firstDt = _infectData.Dates._first();
             var lastDt = _infectData.Dates._last();
             if (dt._isValid() && dt >= firstDt && dt <= lastDt) return dts;
-            ConsoleLog.Warn($"[MyChart.getValidStartDt] StartDate({dts}) is invalid. Use empty value instead.");
+            logger.Warn($"rtDate({dts}) is invalid. Use empty value instead.");
             return "";
         }
 
@@ -371,24 +376,33 @@ namespace ChartBlazorApp.Pages
                 _effectiveParams.CurrentSettings.setExtensionDays);
         }
 
+#if DEBUG
         public async Task ChangePredBackDays(ChangeEventArgs args)
         {
-#if DEBUG
             string dts = args.Value.ToString().Trim();
             if (dts._reMatch(@"^\d+/\d+$"))
                 dts = $"{DateTime.Now._yyyy()}/{dts}";
             else if (dts._reMatch(@"^\d+$"))
                 dts = $"{DateTime.Now.ToString("yyyy/MM")}/{dts}";
             //dts = getValidStartDt(dts);
-            _predictBackDt = dts;
             var dt = dts._parseDateTime();
+            if (dt._notValid()) {
+                int backDays = dts._parseInt(0)._lowLimit(-7)._highLimit(0);
+                dt = (_infectData?.Dates)._last();
+                dts = dt._isValid() ? dt.AddDays(backDays)._toDateString() : "";
+            }
+            _predictBackDt = dts;
             if (dt._isValid()) {
                 dailyData.Initialize(true, dt);
                 forecastData.Initialize();
                 await RenderChartMethod();
             }
-#endif
         }
+#else
+        public void ChangePredBackDays(ChangeEventArgs args)
+        {
+        }
+#endif
 
         //public async Task ChangeUseOnForecast(ChangeEventArgs args)
         //{
@@ -404,6 +418,15 @@ namespace ChartBlazorApp.Pages
                 _effectiveParams.SetLocalMaxRtDuration,
                 () => _effectiveParams.CurrentSettings.myLocalMaxRtDuration(),
                 _effectiveParams.CurrentSettings.setLocalMaxRtDuration);
+        }
+
+        /// <summary> 極値Rt検出前後日数 </summary>
+        public async Task ChangeExtremeRtDetectDuration(ChangeEventArgs args)
+        {
+            await changeRtParam(args, 9999,
+                _effectiveParams.SetExtremeRtDetectDuration,
+                () => _effectiveParams.CurrentSettings.myExtremeRtDetectDuration(),
+                _effectiveParams.CurrentSettings.setExtremeRtDetectDuration);
         }
 
         /// <summary> 目標Rtになるまでの日数</summary>
@@ -624,11 +647,11 @@ namespace ChartBlazorApp.Pages
 
         private void reloadData(bool bForce = false)
         {
-            ConsoleLog.Info($"[MyChart.reloadData] CALLED");
+            logger.Info($"CALLED");
             // 5秒経過後、10秒以内に再度呼び出されたら、データの再読み込みを行う
             var dtNow = DateTime.Now;
             if (bForce || (dtNow > _prevReloadDt.AddSeconds(5) && dtNow < _prevReloadDt.AddSeconds(10))) {
-                ConsoleLog.Info($"[MyChart.reloadData] CALL dailyData.Initialize(true)");
+                logger.Info($"CALL dailyData.Initialize(true)");
                 dailyData.Initialize(true);
                 forecastData.Initialize();
             }
@@ -637,7 +660,7 @@ namespace ChartBlazorApp.Pages
 
         public async Task InitializeParams()
         {
-            ConsoleLog.Info($"[MyChart.InitializeParams] CALLED");
+            logger.Info($"CALLED");
             if (_cancellable) {
                 await getSettings();
             } else {
@@ -662,7 +685,7 @@ namespace ChartBlazorApp.Pages
 
         public async Task InitializeFourstepParams()
         {
-            ConsoleLog.Info($"[MyChart.InitializeFourstepParams] CALLED");
+            logger.Info($"CALLED");
             if (_cancellable) {
                 await getSettings();
             } else {
@@ -733,8 +756,7 @@ namespace ChartBlazorApp.Pages
             if (infData != null) {
                 title = infData.Title;
                 var rtp = rtDecayParam;
-                ConsoleLog.Info(
-                    $"[MyChart.MakeJsonData] " +
+                logger.Info(
                     $"pref={title}, " +
                     $"exp={_drawExpectation}, " +
                     $"det={_detailSettings}, " +

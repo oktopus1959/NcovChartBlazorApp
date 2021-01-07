@@ -24,13 +24,13 @@
 
     public async Task InitializeAllParams()
     {
-        ConsoleLog.Info($"[Reset.InitializeAllParams] CALLED");
+        ConsoleLog.INFO("CALLED", "Reset.InitializeAllParams");
         if (bAfterRender) {
             try {
                 await UserSettings.CreateInitialSettings().SetJsRuntime(JSRuntime).SaveSettings();
                 bInitialized = true;
             } catch (Exception e) {
-                ConsoleLog.Error($"[Reset.InitializeAllParams] {e}");
+                ConsoleLog.ERROR($"{e}", "Reset.InitializeAllParams");
             }
         }
     }
