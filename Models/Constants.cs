@@ -10,6 +10,9 @@ namespace ChartBlazorApp.Models
         /***  DailyData.cs ***/
         public const string PREF_FILE_PATH = "Data/csv/prefectures_ex.csv";
 
+        /// <summary> Y軸の最大値を計算するための期間 </summary>
+        public const int Y_MAX_CALC_DURATION = 60;
+
         /// <summary> 基準日検出の対象となるRtの最大値(これを超えるRtの日は対象外)</summary>
         public const double RT_THRESHOLD = 3.0;
 
@@ -25,10 +28,13 @@ namespace ChartBlazorApp.Models
         public const int MAX_BACK_DAYS = 90;
 
         /// <summary> 基準日検出の最大遡及日数(OldestExremum検出用)</summary>
-        public const int MAX_EXTREMUM_BACK_DAYS = 28;
+        public const int MAX_EXTREMUM_BACK_DAYS = 35;
 
         /// <summary> 極値検出のための期間(この期間内で最大/最小のものを極値として扱う) </summary>
         public const int EXTREMUM_DETECTION_DURATION = 10;
+
+        /// <summary> 極値検出時、複数候補があるときの末尾までの余裕日数</summary>
+        public const int EXTREMAL_POSTAMBLE_DAYS = 14;
 
         /// <summary> システムによる1段階設定において変化日までの最小日数(基準日を0日と数える)</summary>
         public const int STAGE1_MIN_DURATION = 10;
@@ -41,7 +47,13 @@ namespace ChartBlazorApp.Models
         public const int AVERAGE_ERR_DURATION = 7;
 
         /// <summary> 最終評価において、移動平均との誤差(ERR)を計算する末尾日数</summary>
-        public const int TAIL_ERR_DURATION = 3;
+        public const int AVERAGE_ERR_TAIL_DURATION = 5;
+
+        /// <summary> 極値間評価において、移動平均との誤差(ERR)を計算する末尾日数</summary>
+        //public const int AVERAGE_ERR_EXT_DURATION = 14;
+        public const int AVERAGE_ERR_EXT_DURATION = 10;
+
+        public const double MAX_ERROR = double.PositiveInfinity;
 
         /// <summary> ステージ1において、x日の Rt を計算する (rt = a1 / (factor1 + x) + b1)</summary>
         public static double CalcRt1(double a1, double b1, double factor1, int x)

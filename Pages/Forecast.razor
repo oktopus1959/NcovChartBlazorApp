@@ -5,8 +5,8 @@
     private bool _debug = Constants.DEBUG_LEVEL > 0;
 }
 <div style="width: 100%">
-<div class="chart-block" style="@(_userData.UseDetail ? "max-width: 100%" : null)">
-<h4><span>新型コロナ</span> <span>重症者数グラフ</span> <span>@(_userData.UseDetail ? "（詳細設定使用）" : "")</span></h4>
+<div class="chart-block" style="@(_userData.UseFourStep ? "max-width: 100%" : null)">
+<h4><span>新型コロナ</span> <span>重症者数グラフ</span> <span>@(_userData.UseFourStep ? "（詳細設定使用）" : "")</span></h4>
 <span>最大予測：@(_userData.MaxPredictSeriousDateStr)：@(_userData.MaxPredictSerious._formatComma())名</span>／<span>@(_userData.LastPredictDateStr)の予測値：@(_userData.LastPredictSerious._formatComma())名</span>
 @*<span>（予測日：@(forecastData.PredictStartDateStr)）</span>*@
 @* Chart の Canvas *@
@@ -21,8 +21,8 @@
     ※青の縦線の日付は「年代別の陽性者割合」の最終行の日付</span></div> 
 </div>
 
-<div class="chart-block right-block" style="@(_userData.UseDetail ? "max-width: 100%" : null)">
-<h4><span>新型コロナ</span> <span>累計死亡者数グラフ</span> <span>@(_userData.UseDetail ? "（詳細設定使用）" : "")</span></h4>
+<div class="chart-block right-block" style="@(_userData.UseFourStep ? "max-width: 100%" : null)">
+<h4><span>新型コロナ</span> <span>累計死亡者数グラフ</span> <span>@(_userData.UseFourStep ? "（詳細設定使用）" : "")</span></h4>
 <span>@(_userData.LastPredictDateStr)の予測値：@(_userData.LastPredictDeath._formatComma())名</span> @*<span>（予測日：@(forecastData.PredictStartDateStr)）</span>*@
 @* Chart の Canvas *@
 <div class="scrollableChartWrapper" style="" id="chart-wrapper-death">
@@ -38,9 +38,14 @@
 </div>
 
 <div class="inline-wrapper" style="margin-top: 10px;">
-    <label for="both-sum-diff">
-        <input type="checkbox" name="both-sum-diff" id="both-sum-diff" @onchange="ShowOtherCharts" checked="@_showOtherCharts" />
+    <label for="other-charts">
+        <input type="checkbox" name="other-charts" id="other-charts" @onchange="ShowOtherCharts" checked="@_showOtherCharts" />
         <span>その他グラフ</span>
+    </label></div>
+<div class="inline-wrapper position-right" style="margin-top: 10px;">
+    <label for="extend-disp-days">
+        <input type="checkbox" name="extend-disp-days" id="extend-disp-days" @onchange="ExtendDispDays" checked="@_extendDispDays" />
+        <span>表示期間延長</span>
     </label></div>
 
 <div style="margin-top: 10px; display: @(_showOtherCharts ? "blcok" : "none"); width: 100%">

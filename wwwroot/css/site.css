@@ -56,6 +56,16 @@ div.indent2 {
     padding-left: 2em;
 }
 
+div.indent2em {
+    text-indent: 0;
+    padding-left: 2em;
+}
+
+div.indent20px {
+    text-indent: 0;
+    padding-left: 20px;
+}
+
 div.flex-box {
     display: flex;
     flex-wrap: wrap;

@@ -27,6 +27,8 @@ namespace ChartBlazorApp.Models
 
         private List<InfectData> _infectDataList = null;
 
+        public static int ReloadMagicNumber { get; private set; } = 9999;
+
         public DailyData()
         {
             Initialize();
@@ -116,6 +118,9 @@ namespace ChartBlazorApp.Models
 
                 if (items[0]._startsWith("#order")) {
                     prefOrder.AddRange(items[1..]);
+                } else if (items[0]._startsWith("#reload")) {
+                    ReloadMagicNumber = items[1]._parseInt(9999);
+                    logger.Info($"ReloadMagicNumber: {ReloadMagicNumber}");
                 } else if (items[0]._startsWith("#params")) {
                     var data = getOrNewData(items, false);
                     if (data != null) {
@@ -187,6 +192,33 @@ namespace ChartBlazorApp.Models
                 return adjTotal;
             }
 
+            double calcY1Max(double[] newlies)
+            {
+                int newlyMax = (int)newlies[(newlies.Length - Constants.Y_MAX_CALC_DURATION)._lowLimit(0)..].Max();
+                if (newlyMax < 100) {
+                    return ((newlyMax + 10) / 10) * 10.0;
+                } else if (newlyMax < 1000) {
+                    return ((newlyMax + 100) / 100) * 100.0;
+                } else if (newlyMax < 10000) {
+                    return ((newlyMax + 1000) / 1000) * 1000.0;
+                } else if (newlyMax < 100000) {
+                    return ((newlyMax + 10000) / 10000) * 10000.0;
+                } else {
+                    return ((newlyMax + 100000) / 100000) * 100000.0;
+                }
+            }
+
+            double calcY2Max(double[] rts)
+            {
+                int nearPt = (rts.Length - 30)._lowLimit(0);
+                int longPt = (rts.Length - Constants.Y_MAX_CALC_DURATION)._lowLimit(0);
+                if (nearPt > 0 && rts[longPt..nearPt].Count((x) => x > 2.5) > 3)
+                    return 5.0;
+                if (rts.Length > 0 && rts[nearPt..].Max() > 2.5)
+                    return 5.0;
+                return 2.5;
+            }
+
             InfectData makeData(PrefInfectData data)
             {
                 int predatanum = data.PreDataNum;
@@ -202,10 +234,9 @@ namespace ChartBlazorApp.Models
                 var averages = (data.Total.Count - predatanum)._range().Select(i => average(i)).ToArray();
                 double rt(int i) { double w7 = weekly(i - 7); return w7 > 0 ? Math.Pow(weekly(i) / w7, 5.0 / 7.0) : 0.0; };
                 var rts = (data.Total.Count - predatanum)._range().Select(i => rt(i)).ToArray();
-                int newlyMax = (int)newlies.Max();
-                var y1_max = data.Y1_Max > 0 ? data.Y1_Max : newlyMax < 20 ? 20 : (newlyMax < 50 ? 50 : ((newlyMax + 100) / 100) * 100);
+                var y1_max = data.Y1_Max > 0 ? data.Y1_Max : calcY1Max(newlies);
                 var y1_step = y1_max / 10;
-                var y2_max = data.Y2_Max > 0 ? data.Y2_Max : (rts[Math.Max(rts.Length - 90, 0)..].Max() > 2.5) ? 5.0 : 2.5;
+                var y2_max = data.Y2_Max > 0 ? data.Y2_Max : calcY2Max(rts);
                 var y2_step = y2_max / 5;
                 //以下を有効にしてしまうと、システム既定基準日とシステム既定検出遡及日による基準日との区別ができなくなってしまう。
                 //if (data.DecayParam.StartDate._notValid()) data.DecayParam.StartDate = dates[0].AddDays(InfectData.FindRecentMaxIndex(rts));

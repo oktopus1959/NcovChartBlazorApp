@@ -128,8 +128,15 @@
                 <div style="margin-top: 4px">
                 <div class="inline-wrapper"><span class="@_fontColor(!_easyDisable())">基準日：</span>
                     <input type="text" class="text-date" value="@_paramDate" @onchange="ChangeExpectationParamDate" disabled="@(_easyDisable())"/></div>
-                <div class="inline-wrapper"><span class="@_fontColor(!_easyDisable())">変化日までの日数：</span>
-                    <input type="text" class="text-number-short" value="@_paramDaysToOne" @onchange="ChangeRtParamDaysToOne" disabled="@(_easyDisable())"/></div>
+                @if (_useDateForChangePoint) {
+                    <div class="inline-wrapper"><span class="@_fontColor(!_easyDisable())">変化日：</span>
+                        <input type="text" class="text-date" style="margin-right: 1.8rem;" value="@_dateOnOne" @onchange="ChangeDateOnOne" disabled="@(_easyDisable())"/>
+                        <button class="btn btn-primary btn-sm py-0 px-1" @onclick="UseDateOrDaysForChangePoint" disabled="@(_easyDisable())">日数</button></div>
+                } else {
+                    <div class="inline-wrapper"><span class="@_fontColor(!_easyDisable())">変化日までの日数：</span>
+                        <input type="text" class="text-number-short" value="@_paramDaysToOne" @onchange="ChangeRtParamDaysToOne" disabled="@(_easyDisable())"/>
+                        <button class="btn btn-primary btn-sm py-0 px-1" @onclick="UseDateOrDaysForChangePoint" disabled="@(_easyDisable())">日付</button></div>
+                }
                 @*<div class="inline-wrapper"><span class="@_fontColor(!_easyDisable())">目標Rtまでの日数：</span>
                     <input type="text" class="text-number-short" value="@_paramDaysToOne" @onchange="ChangeRtParamDaysToOne" disabled="@(_easyDisable())"/></div><br/>*@
                     <br/>
@@ -160,16 +167,21 @@
                         }
                     </select></div>
                 <hr class="narrow" style="background-color: silver"/>
-                <div class="inline-wrapper">
-                    <span class="@_fontColor(!_easyDisable())">予想曲線表示日数：</span>
-                    <input type="text" class="text-number-short" value="@_extensionDays" @onchange="ChangeExtensionDays" disabled="@(_easyDisable())"/></div>
                 @*<div class="inline-wrapper">
                     <span class="@_fontColor(!_easyDisable())">基準日検出遡及日数：</span>
                     <input type="text" class="text-number-short" value="@_localMaxRtDuration" @onchange="ChangeLocalMaxRtDuration" disabled="@(_easyDisable())"/></div>*@
                 <div class="inline-wrapper">
+                    <label for="post-decay-rt1">
+                        <input type="checkbox" name="post-decay-rt1" id="post-decay-rt1" @onchange="ChangePostDecayRt1" checked="@(_usePostDecayRt1)"  disabled="@(_easyDisable())"/>
+                        <span class="@_fontColor(!_easyDisable())">Rt=1への自動減衰</span>
+                    </label></div>
+                <div class="inline-wrapper">
                     <span class="@_fontColor(!_easyDisable())">Rt極値検出期間：</span>
                     <input type="text" class="text-number-short" value="@_extremeRtDetectDuration" @onchange="ChangeExtremeRtDetectDuration" disabled="@(_easyDisable())"/>
-                    <span class="@_fontColor(!_easyDisable())">日</span></div>
+                    <span class="@_fontColor(!_easyDisable())">日</span></div><br/>
+                <div class="inline-wrapper">
+                    <span>予想曲線表示日数：</span>
+                    <input type="text" class="text-number-short" value="@_extensionDays" @onchange="ChangeExtensionDays"/></div>
                 @*<div class="inline-wrapper">
                     <label for="use-on-forecast">
                         <input type="checkbox" name="use-on-forecast" id="use-on-forecast" @onchange="ChangeUseOnForecast" checked="@(_useOnForecast)" disabled="@(_radioIdx != 0)" />
@@ -195,21 +207,22 @@
                 <span class="@_fontColor(!_fourstepDisable())">日後のRt：</span>
                 <input type="text" class="text-number" value="@_paramRt1" @onchange="ChangeRtParamRt1" disabled="@(_fourstepDisable())"/></div><br/>
             <div class="inline-wrapper">
-                <span class="@_fontColor(!_fourstepDisable())">さらに</span>
+                <span class="@_fontColor(!_fourstepDisable() && _paramDaysToRt2 >= 0)">さらに</span>
                 <input type="text" class="text-number-short" value="@_paramDaysToRt2" @onchange="ChangeRtParamDaysToRt2" disabled="@(_fourstepDisable())"/>
-                <span class="@_fontColor(!_fourstepDisable())">日後のRt：</span>
-                <input type="text" class="text-number" value="@_paramRt2" @onchange="ChangeRtParamRt2" disabled="@(_fourstepDisable())"/></div><br/>
+                <span class="@_fontColor(!_fourstepDisable() && _paramDaysToRt2 >= 0)">日後のRt：</span>
+                <input type="text" class="text-number" value="@_paramRt2" @onchange="ChangeRtParamRt2" disabled="@(_fourstepDisable() || _paramDaysToRt2 < 0)"/></div><br/>
             <div class="inline-wrapper">
-                <span class="@_fontColor(!_fourstepDisable())">さらに</span>
+                <span class="@_fontColor(!_fourstepDisable() && _paramDaysToRt3 >= 0)">さらに</span>
                 <input type="text" class="text-number-short" value="@_paramDaysToRt3" @onchange="ChangeRtParamDaysToRt3" disabled="@(_fourstepDisable())"/>
-                <span class="@_fontColor(!_fourstepDisable())">日後のRt：</span>
-                <input type="text" class="text-number" value="@_paramRt3" @onchange="ChangeRtParamRt3" disabled="@(_fourstepDisable())"/></div><br/>
+                <span class="@_fontColor(!_fourstepDisable() && _paramDaysToRt3 >= 0)">日後のRt：</span>
+                <input type="text" class="text-number" value="@_paramRt3" @onchange="ChangeRtParamRt3" disabled="@(_fourstepDisable() || _paramDaysToRt3 < 0)"/></div><br/>
             <div class="inline-wrapper">
-                <span class="@_fontColor(!_fourstepDisable())">さらに</span>
+                <span class="@_fontColor(!_fourstepDisable() && _paramDaysToRt4 >= 0)">さらに</span>
                 <input type="text" class="text-number-short" value="@_paramDaysToRt4" @onchange="ChangeRtParamDaysToRt4" disabled="@(_fourstepDisable())"/>
-                <span class="@_fontColor(!_fourstepDisable())">日後のRt：</span>
-                <input type="text" class="text-number" value="@_paramRt4" @onchange="ChangeRtParamRt4" disabled="@(_fourstepDisable())"/></div>
+                <span class="@_fontColor(!_fourstepDisable() && _paramDaysToRt4 >= 0)">日後のRt：</span>
+                <input type="text" class="text-number" value="@_paramRt4" @onchange="ChangeRtParamRt4" disabled="@(_fourstepDisable() || _paramDaysToRt4 < 0)"/></div>
             <!-- <div class="inline-wrapper"><button class="btn btn-primary btn-sm py-0" @onclick="InitializeDetailParams" disabled="@(_fourstepDisable())">RESET</button></div> -->
+            <p class="small">※日数を負にするとそのステップを使用しない</p>
         </div>
     </div>
     @if (_drawExpectation && !_detailSettings) {
@@ -232,9 +245,10 @@
             @for (int n = 50000; n > 10000; n -= 10000) { <option value="@n" selected="@(n == _yAxisMax)">@n</option> }
             @for (int n = 10000; n > 5000; n -= 1000) { <option value="@n" selected="@(n == _yAxisMax)">@n</option> }
             @for (int n = 5000; n > 1000; n -= 500) { <option value="@n" selected="@(n == _yAxisMax)">@n</option> }
-            @for (int n = 1200; n >= 1200; n -= 100) { <option value="@n" selected="@(n == _yAxisMax)">@n</option> }
-            @for (int n = 1000; n >= 100; n -= 100) { <option value="@n" selected="@(n == _yAxisMax)">@n</option> }
-            @for (int n = 50; n >= 20; n -= 30) { <option value="@n" selected="@(n == _yAxisMax)">@n</option> }
+            @for (int n = 1000; n >= 200; n -= 100) { <option value="@n" selected="@(n == _yAxisMax)">@n</option> }
+            @for (int n = 150; n >= 50; n -= 50) { <option value="@n" selected="@(n == _yAxisMax)">@n</option> }
+            @for (int n = 40; n >= 10; n -= 10) { <option value="@n" selected="@(n == _yAxisMax)">@n</option> }
+            <option value="">既定</option>
         </select></div>
     @* クリック時のみ反応する *@
     <div class="inline-wrapper">
@@ -267,9 +281,9 @@
     @* デバッグレベル *@
     @if (_debugLevel > 0) {
         <div class="inline-wrapper">
-            <span>デバッグレベル：</span>
-            <select style="padding: 1px" name="debug-level" value="@_debugLevel" @onchange="ChangeDebugLevel">
-                @for (int n = 1; n <= 5; ++n) { <option value="@n" selected="@(n == _debugLevel)">@n</option> }
+            <span>トレースレベル：</span>
+            <select style="padding: 1px" name="debug-level" value="@_traceLevel" @onchange="ChangeDebugLevel">
+                @for (int n = 0; n <= 4; ++n) { <option value="@n" selected="@(n == _traceLevel)">@n</option> }
             </select></div>
     }
 </div>

@@ -89,6 +89,15 @@ namespace ChartBlazorApp.Pages
             StateHasChanged();
         }
 
+        private bool _extendDispDays = false;
+
+        public async Task ExtendDispDays(ChangeEventArgs args)
+        {
+            _extendDispDays = (bool)(args.Value);
+            await RenderDeathAndSeriousChart(false);
+            StateHasChanged();
+        }
+
         /// <summary>
         /// 死亡者数グラフと重症者数グラフの描画メソッド。
         /// JSRuntime を介して JavaScript を呼び出している。
@@ -102,8 +111,8 @@ namespace ChartBlazorApp.Pages
             RtDecayParam rtParamByUser = _effectiveParams.DetailSettings && !_effectiveParams.FourstepSettings ? _effectiveParams.MakeRtDecayParam(0, false) : null;
 
             // 予測に必要なデータの準備
-            _userData = new UserForecastData().MakeData(forecastData, _infectData0, rtParam);
-            var userDataByUser = rtParamByUser != null ? new UserForecastData().MakeData(forecastData, _infectData0, rtParamByUser) : null;
+            _userData = new UserForecastData(_extendDispDays).MakeData(forecastData, _infectData0, rtParam);
+            var userDataByUser = rtParamByUser != null ? new UserForecastData(_extendDispDays).MakeData(forecastData, _infectData0, rtParamByUser, true) : null;
 
             bool onlyOnClick = _effectiveParams.OnlyOnClick;
 
@@ -131,7 +140,7 @@ namespace ChartBlazorApp.Pages
         private double newlyDaysRatio()
         {
             int totalDays = _userData.LabelDates._safeCount();
-            if (!_userData.UseDetail || totalDays < 1) return 100;
+            if (!_userData.UseFourStep || totalDays < 1) return 100;
             return  (double)_userData.RealDeath._safeCount() / totalDays;
         }
     }

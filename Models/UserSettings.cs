@@ -37,6 +37,8 @@ namespace ChartBlazorApp.Models
         //public bool useOnForecast { get; set; }
         public int? localMaxRtDuration { get; set; }
         public int? extremeRtDetectDuration { get; set; }
+        public bool useDateForChangePoint { get; set; }
+        public bool usePostDecayRt1 { get; set; }
 
         public string[] paramRtStartDate { get; set; }
         public string[] paramRtStartDateFourstep { get; set; }
@@ -114,6 +116,8 @@ namespace ChartBlazorApp.Models
             //useOnForecast = false;
             localMaxRtDuration = null;
             extremeRtDetectDuration = null;
+            useDateForChangePoint = false;
+            usePostDecayRt1 = false;
             paramRtStartDate = new string[numData];
             paramRtStartDateFourstep = new string[numData];
             paramRtDaysToOne = new int[numData];
@@ -392,6 +396,14 @@ namespace ChartBlazorApp.Models
         public void setExtremeRtDetectDuration(int value)
         {
             extremeRtDetectDuration = value;
+        }
+        public void setUseDateForChangePoint(bool value)
+        {
+            useDateForChangePoint = value;
+        }
+        public void setUsePostDecayRt1(bool value)
+        {
+            usePostDecayRt1 = value;
         }
         public void setParamStartDate(string value)
         {

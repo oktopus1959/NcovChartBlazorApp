@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using StandardCommon;
 
 namespace ChartBlazorApp.Models
 {
@@ -49,9 +50,20 @@ namespace ChartBlazorApp.Models
         public int DaysToRt4 { get; set; }
         public double Rt4 { get; set; }
 
+        public bool UsePostDecayRt1 { get; set; } = true;
+
         public RtDecayParam Clone()
         {
             return (RtDecayParam)MemberwiseClone();
+        }
+
+        public override string ToString()
+        {
+            if (Fourstep) {
+                return $"4step={Fourstep}, StartDt={StartDate._toDateString()}, Days1={DaysToRt1}, Rt1={Rt1:f3}, Days2={DaysToRt2}, Rt2={Rt2:f3}, Days3={DaysToRt3}, Rt3={Rt3:f3}, Days4={DaysToRt4}, Rt4={Rt4:f3}";
+            } else {
+                return $"StartDt={StartDate._toDateString()}, Days1={DaysToOne}, Rt1={EasyRt1:f3}, Factor1={DecayFactor}, Rt2={EasyRt2:f3}, Factor2={DecayFactorNext}";
+            }
         }
 
         /// <summary>
@@ -103,25 +115,43 @@ namespace ChartBlazorApp.Models
                 // Rt1に到達してから
                 double rt2 = Rt2;
                 int daysToRt2 = DaysToRt2;
-                if (daysToRt2 < 1) daysToRt2 = Constants.DAYS_TO_NEXT_RT;
-                double a2 = (rt1 - rt2) * (decayFactor + daysToRt2) * decayFactor / daysToRt2;
-                double b2 = rt1 - (a2 / decayFactor);
+                if (daysToRt2 == 0) daysToRt2 = Constants.DAYS_TO_NEXT_RT;
+                double a2 = 0, b2 = 0;
+                if (daysToRt2 > 0) {
+                    a2 = (rt1 - rt2) * (decayFactor + daysToRt2) * decayFactor / daysToRt2;
+                    b2 = rt1 - (a2 / decayFactor);
+                } else {
+                    daysToRt2 = 0;
+                    rt2 = rt1;
+                }
                 // Rt2に到達してから
                 double rt3 = Rt3;
                 int daysToRt3 = DaysToRt3;
-                if (daysToRt3 < 1) daysToRt3 = Constants.DAYS_TO_NEXT_RT;
-                double a3 = (rt2 - rt3) * (decayFactor + daysToRt3) * decayFactor / daysToRt3;
-                double b3 = rt2 - (a3 / decayFactor);
+                if (daysToRt3 == 0) daysToRt3 = Constants.DAYS_TO_NEXT_RT;
+                double a3 = 0, b3 = 0;
+                if (daysToRt3 > 0) {
+                    a3 = (rt2 - rt3) * (decayFactor + daysToRt3) * decayFactor / daysToRt3;
+                    b3 = rt2 - (a3 / decayFactor);
+                } else {
+                    daysToRt3 = 0;
+                    rt3 = rt2;
+                }
                 // Rt3に到達してから
                 double rt4 = Rt4;
                 int daysToRt4 = DaysToRt4;
-                if (daysToRt4 < 1) daysToRt4 = Constants.DAYS_TO_NEXT_RT;
-                double a4 = (rt3 - rt4) * (decayFactor + daysToRt4) * decayFactor / daysToRt4;
-                double b4 = rt3 - (a4 / decayFactor);
+                if (daysToRt4 == 0) daysToRt4 = Constants.DAYS_TO_NEXT_RT;
+                double a4 = 0, b4 = 0;
+                if (daysToRt4 > 0) {
+                    a4 = (rt3 - rt4) * (decayFactor + daysToRt4) * decayFactor / daysToRt4;
+                    b4 = rt3 - (a4 / decayFactor);
+                } else {
+                    daysToRt4 = 0;
+                    rt4 = rt3;
+                }
 
-                int copyLen = Math.Min(Math.Max(daysToRt1 + daysToRt2 + daysToRt3 + daysToRt4 + Constants.EXTENSION_DAYS_EX, realDays - startIdx + extensionDays), predRt.Length - startIdx);
+                int copyLen = ((daysToRt1 + daysToRt2 + daysToRt3 + daysToRt4)._lowLimit(realDays - startIdx) + extensionDays)._highLimit(predRt.Length - startIdx);
+                double rt = 0;
                 for (int i = 0; i < copyLen; ++i) {
-                    double rt;
                     if (i <= daysToRt1) {
                         rt = a1 / (decayFactor + i) + b1;
                     } else if (i <= daysToRt1 + daysToRt2) {
@@ -138,7 +168,7 @@ namespace ChartBlazorApp.Models
                         } else {
                             if (rt > rt3) rt = rt3;
                         }
-                    } else {
+                    } else if (i <= daysToRt1 + daysToRt2 + daysToRt3 + daysToRt4){
                         rt = a4 / (decayFactor + i - daysToRt1 - daysToRt2 - daysToRt3) + b4;
                         if (rt3 > rt4) {
                             if (rt < rt4) rt = rt4;
@@ -171,8 +201,31 @@ namespace ChartBlazorApp.Models
                 double factor2 = DecayFactorNext;
                 (double a2, double b2) = Constants.CalcCoefficients2(rt0, rt1, tgtRt2, factor2, DaysToOne);
 
+                int ph3StartIdx = -1;
+                double rt3 = 0;
                 for (int i = toOneLen; i < copyLen; ++i) {
-                    predRt[startIdx + i] = Constants.CalcRt2(a2, b2, rt1, tgtRt2, factor2, i, i - toOneLen);
+                    int idx = startIdx + i;
+                    if (ph3StartIdx < 0) {
+                        var rt = Constants.CalcRt2(a2, b2, rt1, tgtRt2, factor2, i, i - toOneLen);
+                        predRt[idx] = rt;
+                        if (UsePostDecayRt1) {
+                            if (tgtRt2 >= 1 && rt > 1) {
+                                if ((idx + 1 >= realDays && rt == tgtRt2) || (idx >= realDays + 9)) {
+                                    ph3StartIdx = i;
+                                    rt3 = rt;
+                                }
+                            }
+                        }
+                    } else if (ph3StartIdx < copyLen) {
+                        var rt = rt3 - ((rt3 - 1) / 30) * (i - ph3StartIdx);
+                        if (rt < 1) {
+                            rt = 1;
+                            ph3StartIdx = copyLen;
+                        }
+                        predRt[idx] = rt;
+                    } else {
+                        predRt[idx] = 1;
+                    }
                 }
                 return copyLen;
             }

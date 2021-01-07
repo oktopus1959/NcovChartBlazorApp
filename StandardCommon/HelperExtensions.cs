@@ -171,6 +171,11 @@ namespace StandardCommon
             return val != 0 ? val : defval;
         }
 
+        public static int _neZeroOr(this int val, Func<int> defval)
+        {
+            return val != 0 ? val : defval?.Invoke() ?? 0;
+        }
+
         public static int _neZeroOr(this int? val, int defval)
         {
             return val != 0 ? (int)val : defval;
