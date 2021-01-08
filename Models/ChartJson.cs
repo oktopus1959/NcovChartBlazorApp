@@ -361,6 +361,7 @@ namespace ChartBlazorApp.Models
             position = "customHighest";
         }
 
+        /// <summary> startIdx から length 個の要素の平均。length <= 0 なら elements[elements.length+length-1]要素まで。</summary>
         public void SetCustomAverage(int startIdx, int endIdx)
         {
             position = "customAverage";

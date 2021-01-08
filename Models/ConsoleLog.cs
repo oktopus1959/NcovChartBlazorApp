@@ -33,6 +33,11 @@ namespace ChartBlazorApp.Models
             if (func != null) INFO(func(), caller ?? method);
         }
 
+        public void InfoNL(int nl = 1)
+        {
+            Console.WriteLine(new string[(nl - 1)._lowLimit(0)]._fill("\n")._join(""));
+        }
+
         public void Info(string msg, string caller = null,
             [System.Runtime.CompilerServices.CallerMemberName] string method = "")
         {
@@ -58,6 +63,11 @@ namespace ChartBlazorApp.Models
             [System.Runtime.CompilerServices.CallerMemberName] string method = "")
         {
             if (func != null) DEBUG(func(), caller ?? method);
+        }
+
+        public void DebugNL(int nl = 1)
+        {
+            if (DebugLevel >= 1) Console.WriteLine(new string[(nl - 1)._lowLimit(0)]._fill("\n")._join(""));
         }
 
         public void Debug(string msg, string caller = null,
@@ -97,25 +107,25 @@ namespace ChartBlazorApp.Models
         public void Trace(string msg, string caller = null,
             [System.Runtime.CompilerServices.CallerMemberName] string method = "")
         {
-            if (DebugLevel >= 2) _TRACE(2, msg, caller ?? $"{ClassName}.{method}");
+            if (DebugLevel >= 2) _TRACE(3, msg, caller ?? $"{ClassName}.{method}");
         }
 
         public void Trace(Func<string> func, string caller = null,
             [System.Runtime.CompilerServices.CallerMemberName] string method = "")
         {
-            if (DebugLevel >= 2) _TRACE(2, func, caller ?? $"{ClassName}.{method}");
+            if (DebugLevel >= 2) _TRACE(3, func, caller ?? $"{ClassName}.{method}");
         }
 
         public void Trace2(string msg, string caller = null,
             [System.Runtime.CompilerServices.CallerMemberName] string method = "")
         {
-            if (DebugLevel >= 3) _TRACE(3, msg, caller ?? $"{ClassName}.{method}");
+            if (DebugLevel == 3 || DebugLevel >= 5) _TRACE(3, msg, caller ?? $"{ClassName}.{method}");
         }
 
         public void Trace2(Func<string> func, string caller = null,
             [System.Runtime.CompilerServices.CallerMemberName] string method = "")
         {
-            if (DebugLevel >= 3) _TRACE(3, func, caller ?? $"{ClassName}.{method}");
+            if (DebugLevel == 3 || DebugLevel >= 5) _TRACE(3, func, caller ?? $"{ClassName}.{method}");
         }
 
         public void Trace3(string msg, string caller = null,
@@ -141,10 +151,23 @@ namespace ChartBlazorApp.Models
         {
             if (DebugLevel >= 5) _TRACE(5, func, caller ?? $"{ClassName}.{method}");
         }
+
+        public void TraceA(string msg, string caller = null,
+            [System.Runtime.CompilerServices.CallerMemberName] string method = "")
+        {
+            if (DebugLevel >= 3 ) _TRACE(10, msg, caller ?? $"{ClassName}.{method}");
+        }
+
+        public void TraceA(Func<string> func, string caller = null,
+            [System.Runtime.CompilerServices.CallerMemberName] string method = "")
+        {
+            if (DebugLevel >= 3) _TRACE(10, func, caller ?? $"{ClassName}.{method}");
+        }
 #else
         public static int DEBUG_LEVEL { get; set; } = 0;
         public static void DEBUG(string msg, string caller = null) {}
         public static void DEBUG(Func<string> func, string caller = null) {}
+        public void DebugNL(int nl = 1) {}
         public void Debug(string msg, string caller = null) {}
         public void Debug(Func<string> func, string caller = null) {}
         public static void TRACE(string msg, string caller = null) {}

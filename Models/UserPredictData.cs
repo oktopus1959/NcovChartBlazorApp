@@ -55,7 +55,8 @@ namespace ChartBlazorApp.Models
         {
             var firstRealDate = infData.Dates.First();
             DateTime realEndDate = predStartDt?.AddDays(-1) ?? DateTime.MaxValue;
-            if (realEndDate > infData.Dates.Last()) realEndDate = infData.Dates.Last();
+            DateTime infEndDate = infData.Dates.Last();
+            if (realEndDate > infEndDate) realEndDate = infEndDate;
             int realDays = (realEndDate - firstRealDate).Days + 1;
 
             if (rtDecayParam.StartDate > realEndDate) rtDecayParam.StartDate = realEndDate;

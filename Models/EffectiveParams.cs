@@ -60,7 +60,9 @@ namespace ChartBlazorApp.Models
                         //int duration = CurrentSettings.localMaxRtDuration ?? -1;
                         int duration = CurrentSettings.extremeRtDetectDuration ?? -1;
                         var dt = CurrentSettings.myParamStartDate(dataIdx)._parseDateTime();
-                        _subParamsCache[dataIdx] = subParam = data.CalcDecaySubParams(duration, dt._isValid() ? (DateTime?)dt : null, idx == -1 ? DebugLevel : 0);
+                        int days = CurrentSettings.myParamDaysToOne(dataIdx);
+                        if (days > 0 && dt._notValid()) dt = getInitailParamStartDate(idx);
+                        _subParamsCache[dataIdx] = subParam = data.CalcDecaySubParamsEx(duration, dt._isValid() ? (DateTime?)dt : null, days, idx == -1 ? DebugLevel : 0);
                     }
                 }
                 if (subParam.HasValue) return subParam.Value;
@@ -132,6 +134,10 @@ namespace ChartBlazorApp.Models
 
         public int ExtremeRtDetectDuration { get { return CurrentSettings.myExtremeRtDetectDuration(); } }
 
+        public bool UseDateForChangePoint { get { return CurrentSettings.useDateForChangePoint; } }
+
+        public bool UsePostDecayRt1 { get { return CurrentSettings.usePostDecayRt1; } }
+
         public string ParamStartDate { get { return getParamStartDate(); } }
         public string getParamStartDate(int idx = -1, bool bSystem = false) {
             if (!bSystem && DetailSettings) {
@@ -142,14 +148,18 @@ namespace ChartBlazorApp.Models
                 if (dt._parseDateTime()._isValid()) return dt;
                 if (dt._notEmpty()) logger.Warn($"getOrNewDecaySubParams({idx}).StartDate={dt} is invalid.");
             }
-            var startDt = NthInfectData(idx).InitialDecayParam.StartDate;
-            if (startDt._isValid()) return startDt._toDateString();
+            return getInitailParamStartDate(idx)._toDateString();
+        }
+        private DateTime getInitailParamStartDate(int idx)
+        {
+            var dt = NthInfectData(idx).InitialDecayParam.StartDate;
+            if (dt._isValid()) return dt;
 
-            var dts = NthInfectData(idx).InitialSubParams.StartDate;
-            if (dts._parseDateTime()._isValid()) return dts;
-            dts = RtDecayParam.DefaultParam.StartDate._toDateString();
-            logger.Info($"RtDecayParam.DefaultParam.StartDat={dts} is returned.");
-            return dts;
+            dt = NthInfectData(idx).InitialSubParams.StartDate._parseDateTime();
+            if (dt._isValid()) return dt;
+
+            logger.Info($"RtDecayParam.DefaultParam.StartDat={dt._toDateString()} is returned.");
+            return RtDecayParam.DefaultParam.StartDate;
         }
 
         public string ParamStartDateFourstepStr { get { return getParamStartDateFourstepStr(); } }
@@ -174,6 +184,11 @@ namespace ChartBlazorApp.Models
             return NthInfectData(idx).InitialDecayParam.DaysToOne.
                 _gtZeroOr(() => NthInfectData(idx).InitialSubParams.DaysToOne).
                 _gtZeroOr(() => RtDecayParam.DefaultParam.DaysToOne);
+        }
+
+        public string getParamDateOnOne(int idx = -1, bool bSystem = false)
+        {
+            return getParamStartDate(idx, bSystem)._parseDateTime().AddDays(getParamDaysToOne(idx, bSystem))._toDateString();
         }
 
         public double ParamDecayFactor { get { return getParamDecayFactor(); } }
@@ -256,8 +271,8 @@ namespace ChartBlazorApp.Models
         public int ParamDaysToRt2 { get { return getParamDaysToRt2(); } }
         public int getParamDaysToRt2(int idx = -1) {
             return CurrentSettings.myParamDaysToRt2(idx).
-                _gtZeroOr(() => NthInfectData(idx).InitialDecayParam.DaysToRt2).
-                _gtZeroOr(() => RtDecayParam.DefaultParam.DaysToRt2);
+                _neZeroOr(() => NthInfectData(idx).InitialDecayParam.DaysToRt2).
+                _neZeroOr(() => RtDecayParam.DefaultParam.DaysToRt2);
         }
 
         public double ParamRt2 { get { return getParamRt2(); } }
@@ -270,8 +285,8 @@ namespace ChartBlazorApp.Models
         public int ParamDaysToRt3 { get { return getParamDaysToRt3(); } }
         public int getParamDaysToRt3(int idx = -1) {
             return CurrentSettings.myParamDaysToRt3(idx).
-                _gtZeroOr(() => NthInfectData(idx).InitialDecayParam.DaysToRt3).
-                _gtZeroOr(() => RtDecayParam.DefaultParam.DaysToRt3);
+                _neZeroOr(() => NthInfectData(idx).InitialDecayParam.DaysToRt3).
+                _neZeroOr(() => RtDecayParam.DefaultParam.DaysToRt3);
         }
 
         public double ParamRt3 { get { return getParamRt3(); } }
@@ -284,8 +299,8 @@ namespace ChartBlazorApp.Models
         public int ParamDaysToRt4 { get { return getParamDaysToRt4(); } }
         public int getParamDaysToRt4(int idx = -1) {
             return CurrentSettings.myParamDaysToRt4(idx).
-                _gtZeroOr(() => NthInfectData(idx).InitialDecayParam.DaysToRt4).
-                _gtZeroOr(() => RtDecayParam.DefaultParam.DaysToRt4);
+                _neZeroOr(() => NthInfectData(idx).InitialDecayParam.DaysToRt4).
+                _neZeroOr(() => RtDecayParam.DefaultParam.DaysToRt4);
         }
 
         public double ParamRt4 { get { return getParamRt4();}}

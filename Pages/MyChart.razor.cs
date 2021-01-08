@@ -105,6 +105,8 @@ namespace ChartBlazorApp.Pages
 
         private bool _cancellable = false;
 
+        private string _dateOnOne { get { return _effectiveParams.getParamDateOnOne(); } }
+
         private static string _predictBackDt { get; set; }
 
 #if DEBUG
@@ -115,6 +117,7 @@ namespace ChartBlazorApp.Pages
 #else
         private int _debugLevel = 0;
 #endif
+        private int _traceLevel { get { return (_debugLevel - 1)._lowLimit(0); } }
 
         private InfectData _infectData { get { return _effectiveParams.MyInfectData; } }
 
@@ -149,6 +152,10 @@ namespace ChartBlazorApp.Pages
         private int _localMaxRtDuration { get { return _effectiveParams.LocalMaxRtDuration; } }
 
         private int _extremeRtDetectDuration { get { return _effectiveParams.ExtremeRtDetectDuration; } }
+
+        private bool _useDateForChangePoint { get { return _effectiveParams.UseDateForChangePoint; } }
+
+        private bool _usePostDecayRt1 { get { return _effectiveParams.UsePostDecayRt1; } }
 
         //private string _paramDate { get { return _effectiveParams.MyParamStartDate()._orElse(() => _infectData.FindRecentMaxRtDateStr(_localMaxRtDuration))._orElse(() => _infectData.InitialDecayParam.StartDate._toDateString()); } }
         private string _paramDate { get { return _effectiveParams.ParamStartDate; } }
@@ -259,7 +266,7 @@ namespace ChartBlazorApp.Pages
 
         public async Task ChangeDebugLevel(ChangeEventArgs args)
         {
-            _debugLevel = args.Value.ToString()._parseInt();
+            _debugLevel = args.Value.ToString()._parseInt() + 1;
             ConsoleLog.DEBUG_LEVEL = _debugLevel;
             await RenderChartMethod();
         }
@@ -321,10 +328,19 @@ namespace ChartBlazorApp.Pages
         /// <summary> 基準日<summary>
         public async Task ChangeExpectationParamDate(ChangeEventArgs args)
         {
-            string dt = args.Value.ToString().Trim();
-            if (dt._reMatch(@"^\d+/\d+$")) dt = $"{DateTime.Now._yyyy()}/{dt}";
-            dt = getValidStartDt(dt);
-            await changeRtParamCustom(dt, "2020/1/1",
+            string dts = args.Value.ToString().Trim();
+            if (dts._reMatch(@"^\d+/\d+$")) dts = $"{DateTime.Now._yyyy()}/{dts}";
+            dts = getValidStartDt(dts);
+            if (_useDateForChangePoint && _effectiveParams.CurrentSettings.myParamDaysToOne() > 0) {
+                var dt = dts._parseDateTime();
+                if (dt._notValid()) dt = _effectiveParams.getParamStartDate(-1, true)._parseDateTime();
+                if (dt._isValid()) {
+                    dts = dt._toDateString();
+                    int days = (_dateOnOne._parseDateTime() - dt).Days._lowLimit(0)._highLimit(100);
+                    _effectiveParams.CurrentSettings.setParamDaysToOne(days);
+                }
+            }
+            await changeRtParamCustom(dts, "2020/1/1",
                 _effectiveParams.CurrentSettings.setParamStartDate,
                 () => _effectiveParams.RenewDecaySubParams(),
                 () => _effectiveParams.CurrentSettings.myParamStartDate(),
@@ -350,7 +366,9 @@ namespace ChartBlazorApp.Pages
             DateTime dt = dts._parseDateTime();
             var firstDt = _infectData.Dates._first();
             var lastDt = _infectData.Dates._last();
-            if (dt._isValid() && dt >= firstDt && dt <= lastDt) return dts;
+            if (dt._isValid() && dt >= firstDt) {
+                return (dt <= lastDt) ? dts : lastDt._toDateString();
+            }
             logger.Warn($"rtDate({dts}) is invalid. Use empty value instead.");
             return "";
         }
@@ -429,15 +447,56 @@ namespace ChartBlazorApp.Pages
                 _effectiveParams.CurrentSettings.setExtremeRtDetectDuration);
         }
 
+        /// <summary> Rt=1への自動減衰を有効化 </summary>
+        public async Task ChangePostDecayRt1(ChangeEventArgs args)
+        {
+            _effectiveParams.CurrentSettings.setUsePostDecayRt1((bool)args.Value);
+            await RenderChartMethod();
+        }
+
         /// <summary> 目標Rtになるまでの日数</summary>
         /// <param name="args"></param>
         /// <returns></returns>
         public async Task ChangeRtParamDaysToOne(ChangeEventArgs args)
         {
-            await changeRtParam(args, 9999,
-                _effectiveParams.SetParamDaysToOne,
+            int days = args.Value.ToString()._parseInt(0);
+            if (days == DailyData.ReloadMagicNumber && _cancellable) reloadData(true);     // 「RESET」→「変化日までの日数:MagicNumber」でリロード
+            if (days < 0 || days > 999) { days = 0; }
+            await changeRtParamCustom(days, 9999,
+                _effectiveParams.CurrentSettings.setParamDaysToOne,
+                () => _effectiveParams.RenewDecaySubParams(),
                 () => _effectiveParams.CurrentSettings.myParamDaysToOne(),
                 _effectiveParams.CurrentSettings.setParamDaysToOne);
+        }
+
+        /// <summary> 目標Rtになる日付</summary>
+        /// <param name="args"></param>
+        /// <returns></returns>
+        public async Task ChangeDateOnOne(ChangeEventArgs args)
+        {
+            string dt = args.Value.ToString().Trim();
+            if (dt == DailyData.ReloadMagicNumber.ToString() && _cancellable) {
+                reloadData(true);     // 「RESET」→「変化日までの日数:MagicNumber」でリロード
+                dt = "";
+            }
+            if (dt._reMatch(@"^\d+/\d+$")) dt = $"{DateTime.Now._yyyy()}/{dt}";
+            int days = (dt._parseDateTime() - _effectiveParams.getParamStartDate()._parseDateTime()).Days._lowLimit(0)._highLimit(100);
+            await changeRtParamCustom(days, 9999,
+                _effectiveParams.CurrentSettings.setParamDaysToOne,
+                () => _effectiveParams.RenewDecaySubParams(),
+                () => _effectiveParams.CurrentSettings.myParamDaysToOne(),
+                _effectiveParams.CurrentSettings.setParamDaysToOne);
+        }
+
+        /// <summary> 目標Rtになる日付または日数の選択</summary>
+        /// <param name="args"></param>
+        /// <returns></returns>
+        public async Task UseDateOrDaysForChangePoint()
+        {
+            logger.Info($"CALLED");
+            _effectiveParams.CurrentSettings.setUseDateForChangePoint(!_useDateForChangePoint);
+            _cancellable = false;
+            await RenderChartMethod();
         }
 
         public async Task ChangeRtParamDecayFactor(ChangeEventArgs args)
@@ -568,12 +627,12 @@ namespace ChartBlazorApp.Pages
             mySetter(val);
             await RenderChartMethod();
             var newval = getter();
-            if (val._isEmpty()) {
+            //if (val._isEmpty()) {
                 setter(outVal);
                 StateHasChanged();
                 setter(newval);
                 StateHasChanged();
-            }
+            //}
         }
 
         private async Task changeRtParamCustom<T>(T value, T outVal, Action<T> mySetter, Action custom, Func<T> getter, Action<T> setter) where T: IComparable
@@ -583,12 +642,12 @@ namespace ChartBlazorApp.Pages
             custom?.Invoke();
             await RenderChartMethod();
             var newval = getter();
-            if (newval.CompareTo(oldval) == 0) {
+            //if (newval.CompareTo(oldval) == 0) {
                 setter(outVal);
                 StateHasChanged();
                 setter(newval);
                 StateHasChanged();
-            }
+            //}
         }
 
         private async Task changeRtParamCustom2(ChangeEventArgs args, int outVal, Action<string> mySetter, Action custom, Func<int> getter, Action<int> setter)
@@ -598,12 +657,12 @@ namespace ChartBlazorApp.Pages
             custom?.Invoke();
             await RenderChartMethod();
             var newval = getter();
-            if (newval.CompareTo(oldval) == 0) {
+            //if (newval.CompareTo(oldval) == 0) {
                 setter(outVal);
                 StateHasChanged();
                 setter(newval);
                 StateHasChanged();
-            }
+            //}
         }
 
         public async Task RenderEstimatedBarMethod(ChangeEventArgs args)
@@ -653,7 +712,8 @@ namespace ChartBlazorApp.Pages
             if (bForce || (dtNow > _prevReloadDt.AddSeconds(5) && dtNow < _prevReloadDt.AddSeconds(10))) {
                 logger.Info($"CALL dailyData.Initialize(true)");
                 dailyData.Initialize(true);
-                forecastData.Initialize();
+                logger.Info($"CALL forecastData.Initialize(true)");
+                forecastData.Initialize(true);
             }
             _prevReloadDt = dtNow;
         }
@@ -664,11 +724,6 @@ namespace ChartBlazorApp.Pages
             if (_cancellable) {
                 await getSettings();
             } else {
-#if DEBUG
-                reloadData(true);
-#else
-                reloadData();
-#endif
                 _effectiveParams.CurrentSettings.setParamStartDate("");
                 _effectiveParams.CurrentSettings.setParamDaysToOne(0);
                 _effectiveParams.CurrentSettings.setParamDecayFactor(0);
@@ -718,6 +773,7 @@ namespace ChartBlazorApp.Pages
         public async Task RenderChartMethod(bool bFirst = false, bool bResetScrollBar = false, bool bCancellable = false)
         {
             RtDecayParam rtParam = _effectiveParams.MakeRtDecayParam();
+            rtParam.UsePostDecayRt1 = !_detailSettings || _usePostDecayRt1;
             int extDays = _drawExpectation || _drawExpectationChecked ? _extensionDays : Math.Min(_extensionDays, 5);  // 予想曲線を表示したことがないときは、余分な表示日は5日とする
             int barWidth = _drawExpectation && _estimatedBar ? Math.Max(_barWidth, _estimatedBarMinWidth) : _barWidth;
             bool bTailPadding = !_estimatedBar || barWidth > -4;
@@ -799,7 +855,7 @@ namespace ChartBlazorApp.Pages
                     if (!bAnimation) options.AnimationDuration = 0;
                     if (bTailPadding) options.legend.SetAlignEnd();
                     options.legend.reverse = true;  // 凡例の表示を登録順とは逆順にする
-                     options.SetOnlyClickEvent(_onlyOnClick);
+                    options.SetOnlyClickEvent(_onlyOnClick);
                     chartData.options = options;
 
                     var dataSets = new List<Dataset>();
