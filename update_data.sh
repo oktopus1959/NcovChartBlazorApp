@@ -109,6 +109,7 @@ SEVERE_DAILY_FILE=severe_daily.csv
 SEVERE_DAILY_WORK=$WORKDIR/$SEVERE_DAILY_FILE
 DEATH_SERIOUS_PARAM=Data/death_and_serious.txt
 DEATH_SERIOUS_TARGET=$CSVDIR/death_and_serious.csv
+CHART_SCALES_PARAM=Data/other_chart_scales.txt
 
 INFECT_AGES_FILE=infect_by_ages.txt
 
@@ -158,7 +159,7 @@ RUN_CMD -f "tailFromDate $SEVERE_DAILY_WORK | cut -d, -f2 > ${SEVERE_DAILY_WORK}
 cp $DEATH_SERIOUS_PARAM $DEATH_SERIOUS_TARGET
 RUN_CMD -f -m "paste -d, ${DEATH_TOTAL_WORK}.tmp2 ${SEVERE_DAILY_WORK}.tmp2 >> $DEATH_SERIOUS_TARGET"
 
-for x in Data/*_rate.txt; do
+for x in Data/*_rate.txt $CHART_SCALES_PARAM; do
     RUN_CMD -m "cp -p $x $CSVDIR/$(basename ${x/.txt/.csv})"
 done
 
