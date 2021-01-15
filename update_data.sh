@@ -110,6 +110,7 @@ SEVERE_DAILY_WORK=$WORKDIR/$SEVERE_DAILY_FILE
 DEATH_SERIOUS_PARAM=Data/death_and_serious.txt
 DEATH_SERIOUS_TARGET=$CSVDIR/death_and_serious.csv
 CHART_SCALES_PARAM=Data/other_chart_scales.txt
+FOURSTEP_HOPE_PARAM=Data/4step_hope_params.txt
 
 INFECT_AGES_FILE=infect_by_ages.txt
 
@@ -143,6 +144,11 @@ RUN_CMD -f -m "sed -nr '/^${FIRST_DATE},/,$ p' $PREF_SRCFILE | \
             sed -r 's/^([0-9]+),([0-9]+),([0-9]+),/\1\/\2\/\3,/' | \
             cut -d, -f1-4 >> ${PREF_WORK_FILE}"
 
+# 都道府県追加ファイル
+if [ $(ls -1 Data/pref/*.txt 2>/dev/null | wc -l) -gt 0 ]; then
+    RUN_CMD -f -m "cat Data/pref/*.txt >> ${PREF_WORK_FILE}"
+fi
+
 # 追加陽性者数
 RUN_CMD -f -m "addExtraTotal $PREF_PARAM_FILE $PREF_WORK_FILE"
 RUN_CMD -f -m "sed 's/[都府県],/,/' $PREF_WORK_FILE > $PREF_TARGET_FILE"
@@ -159,7 +165,7 @@ RUN_CMD -f "tailFromDate $SEVERE_DAILY_WORK | cut -d, -f2 > ${SEVERE_DAILY_WORK}
 cp $DEATH_SERIOUS_PARAM $DEATH_SERIOUS_TARGET
 RUN_CMD -f -m "paste -d, ${DEATH_TOTAL_WORK}.tmp2 ${SEVERE_DAILY_WORK}.tmp2 >> $DEATH_SERIOUS_TARGET"
 
-for x in Data/*_rate.txt $CHART_SCALES_PARAM; do
+for x in Data/*_rate.txt $CHART_SCALES_PARAM $FOURSTEP_HOPE_PARAM; do
     RUN_CMD -m "cp -p $x $CSVDIR/$(basename ${x/.txt/.csv})"
 done
 
