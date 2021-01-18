@@ -105,7 +105,7 @@ pref_num = {}
 dt = ARGV.shift
 
 while line = gets
-  items = line.strip.gsub(/※[^\s]+/, "").gsub(/⾧/,"長").split(/\s+/);
+  items = line.strip.gsub(/※[^\s]+/, "").gsub(/⻘/,"青").gsub(/[⻑⾧]/,"長").split(/\s+/);
   #STDERR.puts items.join("|")
   i = 0
   while i < items.size
@@ -121,7 +121,7 @@ end
 
 prefs.each {|name|
   num = pref_num[name]
-  if num && num > 0
+  if num && (num > 0 || name == '岩手')
     puts "#{dt},#{name},#{pref_codes[name]},#{num}"
   else
     STDERR.puts "\e[38;5;9mNO DATA\e[0m: #{name}"

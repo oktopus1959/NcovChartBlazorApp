@@ -66,9 +66,16 @@ addExtraTotal() {
         VAR_PRINT tailDate
         VAR_PRINT tailVal
         grep -v '^#' $paramFile | grep "${pref}" | while read line; do
-            if [[ $(normalizeDate "$line") > $tailDate ]]; then
-                tailVal=$((tailVal + $(echo $line | cut -d, -f4) ))
+            normDate=$(normalizeDate "$line")
+            newVal=$(echo $line | cut -d, -f4)
+            if [[ $normDate > $tailDate ]]; then
+                tailVal=$((tailVal + $newVal))
                 addLine="$(echo $line | cut -d, -f1-3),$tailVal"
+                VAR_PRINT -f -1 addLine
+                echo "$addLine" >> $outFile
+            elif [[ "$line" =~ ,USE ]]; then
+                [ $normDate -ge $tailDate ] && tailVal=$newVal
+                addLine="$(echo $line | cut -d, -f1-4)"
                 VAR_PRINT -f -1 addLine
                 echo "$addLine" >> $outFile
             fi
@@ -110,7 +117,7 @@ SEVERE_DAILY_WORK=$WORKDIR/$SEVERE_DAILY_FILE
 DEATH_SERIOUS_PARAM=Data/death_and_serious.txt
 DEATH_SERIOUS_TARGET=$CSVDIR/death_and_serious.csv
 CHART_SCALES_PARAM=Data/other_chart_scales.txt
-FOURSTEP_HOPE_PARAM=Data/4step_hope_params.txt
+FOURSTEP_EXPECT_PARAM=Data/4step_expect_params.txt
 
 INFECT_AGES_FILE=infect_by_ages.txt
 
@@ -139,10 +146,10 @@ EOS
 RUN_CMD -f "sed -nr '/^${FIRST_DATE},/,$ p' $PCR_DAILY_WORK| ruby -e '$(ruby_script)' >> ${PREF_WORK_FILE}"
 
 # 都道府県
-[ "$LOADFLAG" ] && RUN_CMD -m "(cd Data/covid19; git pull)"
-RUN_CMD -f -m "sed -nr '/^${FIRST_DATE},/,$ p' $PREF_SRCFILE | \
-            sed -r 's/^([0-9]+),([0-9]+),([0-9]+),/\1\/\2\/\3,/' | \
-            cut -d, -f1-4 >> ${PREF_WORK_FILE}"
+#[ "$LOADFLAG" ] && RUN_CMD -m "(cd Data/covid19; git pull)"
+#RUN_CMD -f -m "sed -nr '/^${FIRST_DATE},/,$ p' $PREF_SRCFILE | \
+#            sed -r 's/^([0-9]+),([0-9]+),([0-9]+),/\1\/\2\/\3,/' | \
+#            cut -d, -f1-4 >> ${PREF_WORK_FILE}"
 
 # 都道府県追加ファイル
 if [ $(ls -1 Data/pref/*.txt 2>/dev/null | wc -l) -gt 0 ]; then
@@ -151,7 +158,7 @@ fi
 
 # 追加陽性者数
 RUN_CMD -f -m "addExtraTotal $PREF_PARAM_FILE $PREF_WORK_FILE"
-RUN_CMD -f -m "sed 's/[都府県],/,/' $PREF_WORK_FILE > $PREF_TARGET_FILE"
+RUN_CMD -f -m "sed 's/[府県],/,/' $PREF_WORK_FILE | sed 's/東京都,/東京,/' > $PREF_TARGET_FILE"
 
 # 重症者&死亡者&改善率
 RUN_CMD -f "downloadCsv https://www.mhlw.go.jp/content/$DEATH_TOTAL_FILE ${DEATH_TOTAL_WORK}"
@@ -165,7 +172,7 @@ RUN_CMD -f "tailFromDate $SEVERE_DAILY_WORK | cut -d, -f2 > ${SEVERE_DAILY_WORK}
 cp $DEATH_SERIOUS_PARAM $DEATH_SERIOUS_TARGET
 RUN_CMD -f -m "paste -d, ${DEATH_TOTAL_WORK}.tmp2 ${SEVERE_DAILY_WORK}.tmp2 >> $DEATH_SERIOUS_TARGET"
 
-for x in Data/*_rate.txt $CHART_SCALES_PARAM $FOURSTEP_HOPE_PARAM; do
+for x in Data/*_rate.txt $CHART_SCALES_PARAM $FOURSTEP_EXPECT_PARAM; do
     RUN_CMD -m "cp -p $x $CSVDIR/$(basename ${x/.txt/.csv})"
 done
 
