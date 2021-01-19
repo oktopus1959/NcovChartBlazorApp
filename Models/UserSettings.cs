@@ -24,7 +24,10 @@ namespace ChartBlazorApp.Models
         public int[] favorPrefIdxes { get; set; }
 
         public int barWidth { get; set; }
+        public int yAxisMin { get; set; }
+
         public int[] yAxisMax { get; set; }
+        public double[] yAxis2Max { get; set; }
 
         public bool drawExpectation { get; set; }
         public bool estimatedBar { get; set; }
@@ -39,6 +42,7 @@ namespace ChartBlazorApp.Models
         public int? extremeRtDetectDuration { get; set; }
         public bool useDateForChangePoint { get; set; }
         public bool usePostDecayRt1 { get; set; }
+        public double postDecayFactorRt2 { get; set; }
 
         public string[] paramRtStartDate { get; set; }
         public string[] paramRtStartDateFourstep { get; set; }
@@ -104,7 +108,9 @@ namespace ChartBlazorApp.Models
             prefIdx = MainPrefNum;
             favorPrefIdxes = new int[Constants.FAVORITE_PREF_MAX];
             barWidth = 0;
+            yAxisMin = 0;
             yAxisMax = new int[numData];
+            yAxis2Max = new double[numData];
             drawExpectation = false;
             estimatedBar = false;
             estimatedBarMinWidth = 0;
@@ -118,6 +124,7 @@ namespace ChartBlazorApp.Models
             extremeRtDetectDuration = null;
             useDateForChangePoint = false;
             usePostDecayRt1 = false;
+            postDecayFactorRt2 = 0;
             paramRtStartDate = new string[numData];
             paramRtStartDateFourstep = new string[numData];
             paramRtDaysToOne = new int[numData];
@@ -193,6 +200,7 @@ namespace ChartBlazorApp.Models
         public UserSettings fillEmptyValues(int numData)
         {
             yAxisMax = _extendArray(yAxisMax, numData);
+            yAxis2Max = _extendArray(yAxis2Max, numData);
             favorPrefIdxes = _extendArray(favorPrefIdxes, Constants.FAVORITE_PREF_MAX);
             paramRtStartDate = _extendArray(paramRtStartDate, numData);
             paramRtStartDateFourstep = _extendArray(paramRtStartDateFourstep, numData);
@@ -225,12 +233,13 @@ namespace ChartBlazorApp.Models
         }
 
         public int myExtensionDays() { return extensionDays._gtZeroOr(Constants.EXTENSION_DAYS); }
-        public int myLocalMaxRtDuration() { return localMaxRtDuration._geZeroOr(Constants.LOCAL_MAX_RT_BACK_DURATION); }
+        //public int myLocalMaxRtDuration() { return localMaxRtDuration._geZeroOr(Constants.LOCAL_MAX_RT_BACK_DURATION); }
         public int myExtremeRtDetectDuration() { return extremeRtDetectDuration._geZeroOr(Constants.EXTREMUM_DETECTION_DURATION); }
 
         public int dataIdx { get { return prefIdxByRadio(radioIdx); } }
 
         public int myYAxisMax(int idx = -1) { return yAxisMax._getNth(idx >= 0 ? idx : dataIdx); }
+        public double myYAxis2Max(int idx = -1) { return yAxis2Max._getNth(idx >= 0 ? idx : dataIdx); }
         public string myParamStartDate(int idx = -1) { return paramRtStartDate._getNth(idx >= 0 ? idx : dataIdx); }
         public string myParamStartDateFourstep(int idx = -1) { return paramRtStartDateFourstep._getNth(idx >= 0 ? idx : dataIdx); }
         public int myParamDaysToOne(int idx = -1) { return paramRtDaysToOne._getNth(idx >= 0 ? idx : dataIdx); }
@@ -257,6 +266,16 @@ namespace ChartBlazorApp.Models
         public void changeYAxisMax(int value)
         {
             if (yAxisMax.Length > dataIdx) yAxisMax[dataIdx] = value;
+        }
+
+        public void changeYAxisMin(int value)
+        {
+            yAxisMin = value;
+        }
+
+        public void changeYAxis2Max(double value)
+        {
+            if (yAxis2Max.Length > dataIdx) yAxis2Max[dataIdx] = value;
         }
 
         /// <summary>
@@ -404,6 +423,10 @@ namespace ChartBlazorApp.Models
         public void setUsePostDecayRt1(bool value)
         {
             usePostDecayRt1 = value;
+        }
+        public void setPostDecayFactorRt2(double value)
+        {
+            postDecayFactorRt2 = value;
         }
         public void setParamStartDate(string value)
         {

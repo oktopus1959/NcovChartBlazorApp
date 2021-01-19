@@ -13,13 +13,19 @@ namespace ChartBlazorApp.Models
         {
             return new ConsoleLog() {
                 ClassName = new StackFrame(1).GetMethod().DeclaringType.FullName._split('.')[^1],
-                DebugLevel = DEBUG_LEVEL
+                _localDebugLevel = -1,
             };
         }
 
         public string ClassName { get; set; }
 
-        public int DebugLevel { get; set; } = 0;
+        public void SetLocalDebugLevel(int debugLevel) { _localDebugLevel = debugLevel; }
+
+        public void ResetLocalDebugLevel() { _localDebugLevel = -1; }
+
+        private int _localDebugLevel = -1;
+
+        private int _debugLevel { get { return _localDebugLevel >= 0 ? _localDebugLevel : DEBUG_LEVEL; } }
 
         public static void INFO(string msg, string caller = null,
             [System.Runtime.CompilerServices.CallerMemberName] string method = "")
@@ -51,7 +57,12 @@ namespace ChartBlazorApp.Models
         }
 
 #if DEBUG
+        public static bool DEBUG_FLAG { get; set; } = true;
         public static int DEBUG_LEVEL { get; set; } = 1;
+#else
+        public static bool DEBUG_FLAG { get; set; } = false;
+        public static int DEBUG_LEVEL { get; set; } = 0;
+#endif
 
         public static void DEBUG(string msg, string caller = null,
             [System.Runtime.CompilerServices.CallerMemberName] string method = "")
@@ -67,24 +78,24 @@ namespace ChartBlazorApp.Models
 
         public void DebugNL(int nl = 1)
         {
-            if (DebugLevel >= 1) Console.WriteLine(new string[(nl - 1)._lowLimit(0)]._fill("\n")._join(""));
+            if (_debugLevel >= 1) Console.WriteLine(new string[(nl - 1)._lowLimit(0)]._fill("\n")._join(""));
         }
 
         public void Debug(string msg, string caller = null,
             [System.Runtime.CompilerServices.CallerMemberName] string method = "")
         {
-            if (DebugLevel >= 1) DEBUG(msg, caller ?? $"{ClassName}.{method}");
+            if (_debugLevel >= 1) DEBUG(msg, caller ?? $"{ClassName}.{method}");
         }
 
         public void Debug(Func<string> func, string caller = null,
             [System.Runtime.CompilerServices.CallerMemberName] string method = "")
         {
-            if (DebugLevel >= 1) DEBUG(func, caller ?? $"{ClassName}.{method}");
+            if (_debugLevel >= 1) DEBUG(func, caller ?? $"{ClassName}.{method}");
         }
 
         public static void _TRACE(int level, string msg, string caller)
         {
-            consoleWrite($"TRACE{(level > 2 ? (level - 1).ToString() : "")}", caller, msg);
+            consoleWrite($"TRACE{(level > 1 ? level.ToString() : "")}", caller, msg);
         }
 
         public static void _TRACE(int level, Func<string> func, string caller)
@@ -107,73 +118,76 @@ namespace ChartBlazorApp.Models
         public void Trace(string msg, string caller = null,
             [System.Runtime.CompilerServices.CallerMemberName] string method = "")
         {
-            if (DebugLevel >= 2) _TRACE(3, msg, caller ?? $"{ClassName}.{method}");
+            if (_debugLevel >= 2) _TRACE(1, msg, caller ?? $"{ClassName}.{method}");
         }
 
         public void Trace(Func<string> func, string caller = null,
             [System.Runtime.CompilerServices.CallerMemberName] string method = "")
         {
-            if (DebugLevel >= 2) _TRACE(3, func, caller ?? $"{ClassName}.{method}");
+            if (_debugLevel >= 2) _TRACE(1, func, caller ?? $"{ClassName}.{method}");
         }
 
+#if DEBUG
         public void Trace2(string msg, string caller = null,
             [System.Runtime.CompilerServices.CallerMemberName] string method = "")
         {
-            if (DebugLevel == 3 || DebugLevel >= 5) _TRACE(3, msg, caller ?? $"{ClassName}.{method}");
+            if (_debugLevel == 3 || _debugLevel == 4) _TRACE(2, msg, caller ?? $"{ClassName}.{method}");
         }
 
         public void Trace2(Func<string> func, string caller = null,
             [System.Runtime.CompilerServices.CallerMemberName] string method = "")
         {
-            if (DebugLevel == 3 || DebugLevel >= 5) _TRACE(3, func, caller ?? $"{ClassName}.{method}");
+            if (_debugLevel == 3 || _debugLevel == 4) _TRACE(2, func, caller ?? $"{ClassName}.{method}");
         }
 
         public void Trace3(string msg, string caller = null,
             [System.Runtime.CompilerServices.CallerMemberName] string method = "")
         {
-            if (DebugLevel >= 4) _TRACE(4, msg, caller ?? $"{ClassName}.{method}");
+            if (_debugLevel == 4) _TRACE(3, msg, caller ?? $"{ClassName}.{method}");
         }
 
         public void Trace3(Func<string> func, string caller = null,
             [System.Runtime.CompilerServices.CallerMemberName] string method = "")
         {
-            if (DebugLevel >= 4) _TRACE(4, func, caller ?? $"{ClassName}.{method}");
+            if (_debugLevel == 4) _TRACE(3, func, caller ?? $"{ClassName}.{method}");
         }
 
         public void Trace4(string msg, string caller = null,
             [System.Runtime.CompilerServices.CallerMemberName] string method = "")
         {
-            if (DebugLevel >= 5) _TRACE(5, msg, caller ?? $"{ClassName}.{method}");
+            if (_debugLevel >= 5) _TRACE(4, msg, caller ?? $"{ClassName}.{method}");
         }
 
         public void Trace4(Func<string> func, string caller = null,
             [System.Runtime.CompilerServices.CallerMemberName] string method = "")
         {
-            if (DebugLevel >= 5) _TRACE(5, func, caller ?? $"{ClassName}.{method}");
+            if (_debugLevel >= 5) _TRACE(4, func, caller ?? $"{ClassName}.{method}");
+        }
+
+        public void Trace5(string msg, string caller = null,
+            [System.Runtime.CompilerServices.CallerMemberName] string method = "")
+        {
+            if (_debugLevel >= 6) _TRACE(5, msg, caller ?? $"{ClassName}.{method}");
+        }
+
+        public void Trace5(Func<string> func, string caller = null,
+            [System.Runtime.CompilerServices.CallerMemberName] string method = "")
+        {
+            if (_debugLevel >= 6) _TRACE(5, func, caller ?? $"{ClassName}.{method}");
         }
 
         public void TraceA(string msg, string caller = null,
             [System.Runtime.CompilerServices.CallerMemberName] string method = "")
         {
-            if (DebugLevel >= 3 ) _TRACE(10, msg, caller ?? $"{ClassName}.{method}");
+            if (_debugLevel >= 3 ) _TRACE(9, msg, caller ?? $"{ClassName}.{method}");
         }
 
         public void TraceA(Func<string> func, string caller = null,
             [System.Runtime.CompilerServices.CallerMemberName] string method = "")
         {
-            if (DebugLevel >= 3) _TRACE(10, func, caller ?? $"{ClassName}.{method}");
+            if (_debugLevel >= 3) _TRACE(9, func, caller ?? $"{ClassName}.{method}");
         }
 #else
-        public static int DEBUG_LEVEL { get; set; } = 0;
-        public static void DEBUG(string msg, string caller = null) {}
-        public static void DEBUG(Func<string> func, string caller = null) {}
-        public void DebugNL(int nl = 1) {}
-        public void Debug(string msg, string caller = null) {}
-        public void Debug(Func<string> func, string caller = null) {}
-        public static void TRACE(string msg, string caller = null) {}
-        public static void TRACE(Func<string> func, string caller = null) {}
-        public void Trace(string msg, string caller = null) {}
-        public void Trace(Func<string> func, string caller = null) {}
         public void Trace2(string msg, string caller = null) {}
         public void Trace2(Func<string> func, string caller = null) {}
         public void Trace3(string msg, string caller = null) {}
@@ -234,7 +248,11 @@ namespace ChartBlazorApp.Models
 
         private static void consoleWrite(string level, string caller, string msg)
         {
-            Console.WriteLine($"{DateTime.Now._toString()} {level} [{caller}] {msg}");
+            int nlCnt = 0;
+            int len = msg._safeLength();
+            while (nlCnt < len && msg[nlCnt] == '\n') ++nlCnt;
+            if (nlCnt > 0) Console.Write(msg._substring(0, nlCnt));
+            Console.WriteLine($"{DateTime.Now._toString()} {level} [{caller}] {msg._substring(nlCnt)}");
         }
 
         private static string callerLoc(string method, string path, int linenum)

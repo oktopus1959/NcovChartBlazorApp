@@ -48,10 +48,14 @@ namespace ChartBlazorApp.Pages
         public int _infectDataCount { get { return _effectiveParams.InfectDataCount; } }
 
         // タイトル（地域名）
-        private string _getTitle(int n) { return _effectiveParams.GetTitle(n); }
+        private string _getTitle(int n = -1) { return _effectiveParams.GetTitle(n); }
 
         // 変化度1
-        public static int[] _decayFactors = new int[] {
+        public static int[] _decayFactors { get; set; } = new int[] {
+            //-4,     // -4
+            //-3,     // -3
+            //-2,     // -2
+            //-1,     // -1
             1000,   // 0
             250,    // 1
             100,    // 2
@@ -64,8 +68,11 @@ namespace ChartBlazorApp.Pages
             2,      // 9
         };
 
+        //public static int _decayFactors1Start = -4;
+        public static int _decayFactors1Start = 0;
+
         // 変化度2
-        public static int[] _decayFactors2 = new int[] {
+        public static int[] _decayFactors2 { get; set; } = new int[] {
             -4,     // -4
             -3,     // -3
             -2,     // -2
@@ -109,27 +116,37 @@ namespace ChartBlazorApp.Pages
 
         private static string _predictBackDt { get; set; }
 
-#if DEBUG
-        private int _debugLevel {
-            get { return _effectiveParams?.DebugLevel ?? Constants.DEBUG_LEVEL; }
-            set { if (_effectiveParams != null) _effectiveParams.DebugLevel = value; }
-        }
-#else
-        private int _debugLevel = 0;
-#endif
-        private int _traceLevel { get { return (_debugLevel - 1)._lowLimit(0); } }
+        private bool _testInfectEnabled => _effectiveParams.TestInfectDataEnabled;
+        private int _testInfectIdx => _effectiveParams.TestInfectDataIdx;
+
+        //private int _debugLevel {
+        //    get { return _effectiveParams?.DebugLevel ?? ConsoleLog.DEBUG_LEVEL; }
+        //    set { if (_effectiveParams != null) _effectiveParams.DebugLevel = value; }
+        //}
+        private int _debugLevel => ConsoleLog.DEBUG_LEVEL;
+        private bool _debugFlag => ConsoleLog.DEBUG_FLAG;
+
+
+        private int _traceLevel { get { return _debugLevel - 1; } }
 
         private InfectData _infectData { get { return _effectiveParams.MyInfectData; } }
 
-        private int _radioIdx { get { return _effectiveParams.RadioIdx; } }
+        private int _radioIdx { get { return _testInfectEnabled ? _selectorPos : _effectiveParams.RadioIdx; } }
 
-        private int _prefIdx { get { return Math.Max(_effectiveParams.PrefIdx, _mainPrefNum); } }
+        private int _prefIdx { get { return _testInfectEnabled ? _testInfectIdx : Math.Max(_effectiveParams.PrefIdx, _mainPrefNum); } }
 
         private int _dataIdx { get { return _effectiveParams.MyDataIdx; } }
 
         private int _barWidth { get { return _effectiveParams.BarWidth; } }
 
         private double _yAxisMax { get { return _effectiveParams.YAxisMax; } }
+        private int _yAxisMaxUser { get { return _effectiveParams.CurrentSettings.myYAxisMax(); } }
+
+        //private double _yAxisMin { get { return _effectiveParams.YAxisMin; } }
+        private double _yAxisMin { get; set; } = 0;
+
+        private double _yAxis2Max { get { return _effectiveParams.YAxis2Max; } }
+        private string _yAxis2MaxUser { get { var y2max = _effectiveParams.CurrentSettings.myYAxis2Max(); return y2max > 0 ? $"{y2max:f1}" : ""; } }
 
         private bool _drawExpectation { get { bool flag = _effectiveParams.DrawExpectation; if (flag) _drawExpectationChecked = true; return flag; } }
 
@@ -141,6 +158,8 @@ namespace ChartBlazorApp.Pages
 
         private bool _fourstepSettings { get { return _effectiveParams.FourstepSettings; } }
 
+        private bool _fourstepDataDefault { get { return _effectiveParams.FourstepDataDefault; } }
+
         private bool _onlyOnClick { get { return _effectiveParams.OnlyOnClick; } }
 
         private bool _expectOverReal { get { return _effectiveParams.ExpectOverReal; } }
@@ -149,13 +168,15 @@ namespace ChartBlazorApp.Pages
 
         //private bool _useOnForecast { get { return _effectiveParams.UseOnForecast; } }
 
-        private int _localMaxRtDuration { get { return _effectiveParams.LocalMaxRtDuration; } }
+        //private int _localMaxRtDuration { get { return _effectiveParams.LocalMaxRtDuration; } }
 
         private int _extremeRtDetectDuration { get { return _effectiveParams.ExtremeRtDetectDuration; } }
 
         private bool _useDateForChangePoint { get { return _effectiveParams.UseDateForChangePoint; } }
 
-        private bool _usePostDecayRt1 { get { return _effectiveParams.UsePostDecayRt1; } }
+        //private bool _usePostDecayRt1 { get { return _effectiveParams.UsePostDecayRt1; } }
+
+        private double _postDecayFactorRt2 { get { return _effectiveParams.PostDecayFactorRt2; } }
 
         //private string _paramDate { get { return _effectiveParams.MyParamStartDate()._orElse(() => _infectData.FindRecentMaxRtDateStr(_localMaxRtDuration))._orElse(() => _infectData.InitialDecayParam.StartDate._toDateString()); } }
         private string _paramDate { get { return _effectiveParams.ParamStartDate; } }
@@ -266,8 +287,9 @@ namespace ChartBlazorApp.Pages
 
         public async Task ChangeDebugLevel(ChangeEventArgs args)
         {
-            _debugLevel = args.Value.ToString()._parseInt() + 1;
-            ConsoleLog.DEBUG_LEVEL = _debugLevel;
+            int level = args.Value.ToString()._parseInt() + 1;
+            ConsoleLog.DEBUG_LEVEL = level;
+            if (_effectiveParams != null) _effectiveParams.DebugLevel = level;
             await RenderChartMethod();
         }
 
@@ -315,7 +337,22 @@ namespace ChartBlazorApp.Pages
 
         public async Task ChangeYAxisMax(ChangeEventArgs args)
         {
-            _effectiveParams.CurrentSettings.changeYAxisMax(args.Value.ToString()._parseInt(0));
+            var val = args.Value.ToString();
+            if (val._startsWith("#")) {
+                //_effectiveParams.CurrentSettings.changeYAxisMin(val.Trim('#')._parseInt(0));
+                _yAxisMin = val.Trim('#')._parseInt(0);
+            } else {
+                if (val._equalsTo("自動")) val = "";
+                _effectiveParams.CurrentSettings.changeYAxisMax(val._parseInt(0)._geZeroOr(0));
+            }
+            await RenderChartMethod();
+        }
+
+        public async Task ChangeYAxis2Max(ChangeEventArgs args)
+        {
+            var val = args.Value.ToString();
+            if (val._equalsTo("自動")) val = "";
+            _effectiveParams.CurrentSettings.changeYAxis2Max(val._parseDouble(0)._geZeroOr(0));
             await RenderChartMethod();
         }
 
@@ -394,10 +431,10 @@ namespace ChartBlazorApp.Pages
                 _effectiveParams.CurrentSettings.setExtensionDays);
         }
 
-#if DEBUG
         public async Task ChangePredBackDays(ChangeEventArgs args)
         {
             string dts = args.Value.ToString().Trim();
+            logger.Debug($"CALLED: dt={dts}");
             if (dts._reMatch(@"^\d+/\d+$"))
                 dts = $"{DateTime.Now._yyyy()}/{dts}";
             else if (dts._reMatch(@"^\d+$"))
@@ -407,20 +444,24 @@ namespace ChartBlazorApp.Pages
             if (dt._notValid()) {
                 int backDays = dts._parseInt(0)._lowLimit(-7)._highLimit(0);
                 dt = (_infectData?.Dates)._last();
-                dts = dt._isValid() ? dt.AddDays(backDays)._toDateString() : "";
+                if (dt._isValid()) {
+                    dt = dt.AddDays(backDays);
+                    dts = dt._toDateString();
+                } else {
+                    dts = "";
+                }
             }
             _predictBackDt = dts;
+            logger.Debug($"_predictBackDt={_predictBackDt}");
             if (dt._isValid()) {
                 dailyData.Initialize(true, dt);
                 forecastData.Initialize();
-                await RenderChartMethod();
+                await getSettings();
+                _cancellable = false;
+                await InitializeParams();
+                //await RenderChartMethod();
             }
         }
-#else
-        public void ChangePredBackDays(ChangeEventArgs args)
-        {
-        }
-#endif
 
         //public async Task ChangeUseOnForecast(ChangeEventArgs args)
         //{
@@ -429,14 +470,14 @@ namespace ChartBlazorApp.Pages
         //    await _effectiveParams.CurrentSettings.SaveSettings();
         //}
 
-        /// <summary> 基準日検出遡及日数 </summary>
-        public async Task ChangeLocalMaxRtDuration(ChangeEventArgs args)
-        {
-            await changeRtParam(args, 9999,
-                _effectiveParams.SetLocalMaxRtDuration,
-                () => _effectiveParams.CurrentSettings.myLocalMaxRtDuration(),
-                _effectiveParams.CurrentSettings.setLocalMaxRtDuration);
-        }
+        ///// <summary> 基準日検出遡及日数 </summary>
+        //public async Task ChangeLocalMaxRtDuration(ChangeEventArgs args)
+        //{
+        //    await changeRtParam(args, 9999,
+        //        _effectiveParams.SetLocalMaxRtDuration,
+        //        () => _effectiveParams.CurrentSettings.myLocalMaxRtDuration(),
+        //        _effectiveParams.CurrentSettings.setLocalMaxRtDuration);
+        //}
 
         /// <summary> 極値Rt検出前後日数 </summary>
         public async Task ChangeExtremeRtDetectDuration(ChangeEventArgs args)
@@ -452,6 +493,15 @@ namespace ChartBlazorApp.Pages
         {
             _effectiveParams.CurrentSettings.setUsePostDecayRt1((bool)args.Value);
             await RenderChartMethod();
+        }
+
+        /// <summary> Rtの自動減衰率を設定 </summary>
+        public async Task ChangePostDecayFactorRt2(ChangeEventArgs args)
+        {
+            await changeRtParam(args, 9999,
+                _effectiveParams.SetPostDecayFactorRt2,
+                () => _effectiveParams.CurrentSettings.postDecayFactorRt2,
+                _effectiveParams.CurrentSettings.setPostDecayFactorRt2);
         }
 
         /// <summary> 目標Rtになるまでの日数</summary>
@@ -623,8 +673,12 @@ namespace ChartBlazorApp.Pages
 
         private async Task changeRtParam<T>(ChangeEventArgs args, T outVal, Action<string> mySetter, Func<T> getter, Action<T> setter)
         {
-            var val = args.Value.ToString();
-            mySetter(val);
+            await changeRtParam(args.Value.ToString(), outVal, mySetter, getter, setter);
+        }
+
+        private async Task changeRtParam<T>(string val, T outVal, Action<string> mySetter, Func<T> getter, Action<T> setter)
+        {
+            mySetter?.Invoke(val);
             await RenderChartMethod();
             var newval = getter();
             //if (val._isEmpty()) {
@@ -686,8 +740,14 @@ namespace ChartBlazorApp.Pages
 
         public async Task ChangeEasyOrFourstepSettings(ChangeEventArgs args)
         {
-            _effectiveParams.SetFourstepSettings(args.Value.ToString());
-            await RenderChartMethod();
+            var val = args.Value.ToString();
+            var fourstep = val._equalsTo("fourstep");
+            _effectiveParams.SetFourstepSettings(val);
+            if (!fourstep || _effectiveParams.FourstepEnabled) {
+                await RenderChartMethod();
+            } else {
+                await _effectiveParams.CurrentSettings.SaveSettings();
+            }
         }
 
         public async Task RenderThickChartBarMethod()
@@ -720,10 +780,11 @@ namespace ChartBlazorApp.Pages
 
         public async Task InitializeParams()
         {
-            logger.Info($"CALLED");
             if (_cancellable) {
+                logger.Info($"CANCELED");
                 await getSettings();
             } else {
+                logger.Info($"CALLED");
                 _effectiveParams.CurrentSettings.setParamStartDate("");
                 _effectiveParams.CurrentSettings.setParamDaysToOne(0);
                 _effectiveParams.CurrentSettings.setParamDecayFactor(0);
@@ -740,27 +801,79 @@ namespace ChartBlazorApp.Pages
 
         public async Task InitializeFourstepParams()
         {
-            logger.Info($"CALLED");
             if (_cancellable) {
+                logger.Info($"CANCELED");
                 await getSettings();
             } else {
+                logger.Info($"CALLED");
                 _effectiveParams.CurrentSettings.setParamStartDateFourstep("");
                 _effectiveParams.CurrentSettings.setParamDaysToRt1(0);
                 _effectiveParams.CurrentSettings.setParamRt1(0);
                 _effectiveParams.CurrentSettings.setParamDaysToRt2(0);
-                _effectiveParams.CurrentSettings.setParamRt2(0);
+                _effectiveParams.CurrentSettings.setParamRt2(1);
                 _effectiveParams.CurrentSettings.setParamDaysToRt3(0);
-                _effectiveParams.CurrentSettings.setParamRt3(0);
+                _effectiveParams.CurrentSettings.setParamRt3(1);
                 _effectiveParams.CurrentSettings.setParamDaysToRt4(0);
-                _effectiveParams.CurrentSettings.setParamRt4(0);
+                _effectiveParams.CurrentSettings.setParamRt4(1);
             }
             await RenderChartMethod(false, false, !_cancellable);
+        }
+
+        public async Task HopeParams()
+        {
+            logger.Info($"CALLED");
+            var param = DailyData.ExpectedFourstepParams._nth(_dataIdx);
+            if (param != null && param.StartDate._notEmpty()) {
+                _effectiveParams.CurrentSettings.setParamStartDateFourstep(param.StartDate);
+                _effectiveParams.CurrentSettings.setParamDaysToRt1(param.DaysToRt1);
+                _effectiveParams.CurrentSettings.setParamRt1(param.Rt1);
+                _effectiveParams.CurrentSettings.setParamDaysToRt2(param.DaysToRt2);
+                _effectiveParams.CurrentSettings.setParamRt2(param.Rt2);
+                _effectiveParams.CurrentSettings.setParamDaysToRt3(param.DaysToRt3);
+                _effectiveParams.CurrentSettings.setParamRt3(param.Rt3);
+                _effectiveParams.CurrentSettings.setParamDaysToRt4(param.DaysToRt4);
+                _effectiveParams.CurrentSettings.setParamRt4(param.Rt4);
+                await RenderChartMethod(false, false, !_cancellable);
+            }
+        }
+
+        public async Task CommitParams()
+        {
+            logger.Info($"CALLED");
+            await RenderChartMethod();
+        }
+
+        private string _extraNewlyData = "";
+
+        public async Task TestMode()
+        {
+            await updateTestData(_extraNewlyData);
+        }
+
+        public async Task NormalMode()
+        {
+            _effectiveParams.ClearTestInfectData();
+            await RenderChartMethod();
+        }
+
+        public async Task UpdateTestData(ChangeEventArgs args)
+        {
+            await updateTestData(args.Value.ToString());
+        }
+
+        private async Task updateTestData(string testData)
+        {
+            _extraNewlyData = _effectiveParams.UseTestInfectData(testData);
+            await changeRtParam(testData, "-",
+                null,
+                () => _extraNewlyData,
+                (val) => _extraNewlyData = val);
         }
 
         public async Task RenderReloadMethod()
         {
             reloadData();
-            await RenderChartMethod(true, true);
+            await RenderChartMethod();
         }
 
         /// <summary>
@@ -772,8 +885,8 @@ namespace ChartBlazorApp.Pages
         /// <returns></returns>
         public async Task RenderChartMethod(bool bFirst = false, bool bResetScrollBar = false, bool bCancellable = false)
         {
-            RtDecayParam rtParam = _effectiveParams.MakeRtDecayParam();
-            rtParam.UsePostDecayRt1 = !_detailSettings || _usePostDecayRt1;
+            logger.Trace("ENTER");
+            RtDecayParam rtParam = _effectiveParams.MakeRtDecayParam(!_detailSettings);
             int extDays = _drawExpectation || _drawExpectationChecked ? _extensionDays : Math.Min(_extensionDays, 5);  // 予想曲線を表示したことがないときは、余分な表示日は5日とする
             int barWidth = _drawExpectation && _estimatedBar ? Math.Max(_barWidth, _estimatedBarMinWidth) : _barWidth;
             bool bTailPadding = !_estimatedBar || barWidth > -4;
@@ -784,6 +897,7 @@ namespace ChartBlazorApp.Pages
             await JSRuntime._renderChart2("chart-wrapper-home", barWidth, scrlbarRatio, jsonStr);
 
             if (!bFirst && !_cancellable) await _effectiveParams.CurrentSettings.SaveSettings();
+            logger.Trace("LEAVE");
         }
 
         private double newlyDaysRatio(int dispDays)
@@ -817,7 +931,7 @@ namespace ChartBlazorApp.Pages
                     $"exp={_drawExpectation}, " +
                     $"det={_detailSettings}, " +
                     $"est={_estimatedBar}, " +
-                    $"rtDur={_localMaxRtDuration}, " +
+                    //$"rtDur={_localMaxRtDuration}, " +
                     $"expDt={rtp?.EffectiveStartDate.ToShortDateString()}, " +
                     $"days={(rtp?.Fourstep == false ? rtp.DaysToOne.ToString() : "")}, " +
                     $"rt1={rtp?.EasyRt1}, ft1={rtp?.DecayFactor}, " +
@@ -841,16 +955,15 @@ namespace ChartBlazorApp.Pages
                     if (_drawExpectation) {
                         predData = UserPredictData.PredictValuesEx(infData, rtDecayParam, fullDates._length(), extensionDays);
                         predDays = predData.PredDays;
+                        logger.Debug(() => $"AveErr: {predData.CalcAverageMSE(infData.Average, realDays - Constants.AVERAGE_ERR_TAIL_DURATION, realDays):f3}");
                     }
                     //dispDays = Math.Max(realDays + 21, predDays) + 1;
                     dispDays = Math.Max(realDays + extensionDays, predDays) + 1;
                     if (predData != null) predData.DispDays = dispDays;
 
-                    (double y1_max, double y1_step, double y2_max, double y2_step) = (infData.Y1_Max, infData.Y1_Step, infData.Y2_Max, infData.Y2_Step);
-                    double yMax = _yAxisMax;
-                    if (yMax > 0) {
-                        (y1_max, y1_step) = (yMax, yMax / 10);
-                    }
+                    (double, double) calcYAxisScale(double yMax0, double yStep0, double yMax) => yMax > 0 ? (yMax, yMax / (yMax == 2.5 ? 5 : 10)) : (yMax0, yStep0);
+                    (double y1_max, double y1_step) = calcYAxisScale(infData.Y1_Max, infData.Y1_Step, _yAxisMax._lowLimit(_yAxisMin));
+                    (double y2_max, double y2_step) = calcYAxisScale(infData.Y2_Max, infData.Y2_Step, _yAxis2Max);
                     Options options = Options.CreateTwoAxes(new Ticks(y1_max, y1_step), new Ticks(y2_max, y2_step));
                     if (!bAnimation) options.AnimationDuration = 0;
                     if (bTailPadding) options.legend.SetAlignEnd();

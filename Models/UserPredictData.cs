@@ -53,6 +53,7 @@ namespace ChartBlazorApp.Models
         /// <returns></returns>
         public UserPredictData predictValuesEx(InfectData infData, RtDecayParam rtDecayParam, int numFullDays, int extensionDays, DateTime? predStartDt)
         {
+            //logger.Trace("ENTER");
             var firstRealDate = infData.Dates.First();
             DateTime realEndDate = predStartDt?.AddDays(-1) ?? DateTime.MaxValue;
             DateTime infEndDate = infData.Dates.Last();
@@ -96,8 +97,18 @@ namespace ChartBlazorApp.Models
                     revAveAverage[idx] = RevAverage[beg..end].Sum() / 7;
                 }
             }
+
+            // 推計移動平均
             PredAverage = revAveAverage._extend(numFullDays);
-            PredNewly = predictInfect(infData.Newly, infData.Average, PredAverage, realDays, PredStartIdx);
+
+            // 推計陽性者数(3週平均)
+            double[] predNewlyMean = calcPredictInfectMean(infData.Newly, infData.Average, PredAverage, realDays, PredStartIdx);
+            PredNewly = predNewlyMean;
+
+            // 推計陽性者数(前週差分)
+            //PredNewly = predictInfect(infData.Newly, predNewlyMean, PredAverage, realDays, PredStartIdx);
+
+            // 逆算Rt
             double total = 0;
             double[] totals = PredNewly.Select((n, i) => total += (n > 0 ? n : infData.Newly._nth(i))).ToArray();
             RevRt = new double[numFullDays];
@@ -106,23 +117,40 @@ namespace ChartBlazorApp.Models
             }
 
             PredDays = PredStartIdx + predRtLen;
+            //logger.Trace("LEAVE");
             return this;
         }
 
-        private static double[] predictInfect(double[] newly, double[] average, double[] pred, int realDays, int predStartIdx)
+        private static double[] predictInfect(double[] newly, double[] predNewlyMean, double[] predAverage, int realDays, int predStartIdx)
+        {
+            // 推計陽性者数
+            double[] predNewly = new double[predAverage.Length];
+
+            for (int n = predStartIdx + 1; n < predAverage.Length; ++n) {
+                var ave = predAverage[n];
+                var sum = n._range(n - 6).Select(i => i < realDays ? newly[i] : predNewly[i]).Sum();
+                var val = ave * 7 - sum;
+                var mean = predNewlyMean[n];
+                //predNewly[n] = val < ave ? val._lowLimit(mean) : val._highLimit(mean);
+                predNewly[n] = (mean * 3 + val) / 4;
+            }
+            return predNewly;
+        }
+
+        private static double[] calcPredictInfectMean(double[] newly, double[] average, double[] predAverage, int realDays, int predStartIdx)
         {
             double newly_offset = 3.0;
             double pred_offset = 10.0;
 
             // dayRatio: 当日増減率
-            double[] dayRatio = new double[pred.Length];
+            double[] dayRatio = new double[predAverage.Length];
             double calcRatio(double n, double? p) => (p > 0) ? Math.Pow((n + newly_offset) / (p.Value + pred_offset), 1.0) : 1.0;
             for (int i = 0; i < realDays && i < dayRatio.Length; ++i) {
-                dayRatio[i] = calcRatio(newly._nth(i), (i < predStartIdx) ? average._nth(i) : pred._nth(i));
+                dayRatio[i] = calcRatio(newly._nth(i), (i < predStartIdx) ? average._nth(i) : predAverage._nth(i));
             }
 
             // dowRatio: 当日、-7日と-14日の平均増減率
-            double[] dowRatio = new double[pred.Length];
+            double[] dowRatio = new double[predAverage.Length];
             double calcRatio3(int idx) => Enumerable.Range(0, 3).Select(w => dayRatio._nth(idx - w*7, 1.0)).Sum() / 3;
             for (int i = 0; i < dowRatio.Length; ++i) {
                 dowRatio[i] = (i < realDays) ? Math.Max(Math.Min(calcRatio3(i), 2.0), 0.3) : dowRatio._nth(i - 7, 1.0);
@@ -130,8 +158,16 @@ namespace ChartBlazorApp.Models
 
             //return pred.Select((p, i) => i < realDays && i <= approxDayPos ? null : p * dowRatio._nth(i - 7)).ToArray();
             // 一週間前の曜日増減率を参照する
-            return pred.Select((p, i) => (i <= predStartIdx) ? 0 : p * dowRatio._nth(i - 7)).ToArray();
+            return predAverage.Select((p, i) => (i <= predStartIdx) ? 0 : p * dowRatio._nth(i - 7)).ToArray();
         }
 
+        /// <summary>
+        /// 二乗平均誤差の計算
+        /// </summary>
+        /// <returns></returns>
+        public double CalcAverageMSE(double[] average, int start, int end)
+        {
+            return end._range(start).Select(i => Math.Pow(PredAverage[i] - average[i], 2)).Sum();
+        }
     }
 }

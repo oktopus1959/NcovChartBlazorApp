@@ -674,6 +674,17 @@ namespace StandardCommon
             return array;
         }
 
+        /// <summary>
+        /// Shallow copy を作成して返す
+        /// </summary>
+        /// <typeparam name="T"></typeparam>
+        /// <param name="array"></param>
+        /// <returns></returns>
+        public static T[] _clone<T>(this T[] array)
+        {
+            return (T[])array.Clone();
+        }
+
     } // ArrayExtensions
 
     /// <summary>
@@ -2015,6 +2026,14 @@ namespace StandardCommon
         public static string _join(this IEnumerable<string> list, string delim)
         {
             return list._notEmpty() ? string.Join(delim, list) : "";
+        }
+
+        /// <summary>
+        /// IEnumerable の各要素を join する。
+        /// </summary>
+        public static string _join<T>(this IEnumerable<T> list, string delim)
+        {
+            return list._notEmpty() ? string.Join(delim, list.Select(x=>x.ToString())) : "";
         }
 
         /// <summary>

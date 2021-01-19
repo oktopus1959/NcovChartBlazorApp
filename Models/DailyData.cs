@@ -27,6 +27,8 @@ namespace ChartBlazorApp.Models
 
         private List<InfectData> _infectDataList = null;
 
+        public DateTime LastUpdateDt { get; private set; }
+
         public static int ReloadMagicNumber { get; private set; } = 9999;
 
         public DailyData()
@@ -51,36 +53,32 @@ namespace ChartBlazorApp.Models
 
         public void Initialize(bool bForce = false, DateTime? lastRealDt = null)
         {
-            //logger.Debug($"CALLED");
+            logger.Trace($"CALLED");
             if (m_syncBool.BusyCheck()) return;
             using (m_syncBool) {
                 // OnInitialized は2回呼び出される可能性があるので、30秒以内の再呼び出しの場合は、 DailyData の初期化をスキップする
                 var prevDt = _lastInitializedDt;
                 _lastInitializedDt = DateTime.Now;
-                if (!bForce && _lastInitializedDt < prevDt.AddSeconds(30)) return;
+                if (!bForce && _lastInitializedDt < prevDt.AddSeconds(30)) {
+                    logger.Info($"SKIPPED");
+                    return;
+                }
 
-                string filePath = Constants.PREF_FILE_PATH;
-                var fileInfo = Helper.GetFileInfo(filePath);
-                if (bForce || fileInfo.ModifyDt > _lastFileDt) {
-                    // ファイルが更新されていたら再ロードする
-                    _lastFileDt = fileInfo.ModifyDt;
-                    _infectDataList = loadPrefectureData(readFile(filePath), lastRealDt);
-                    logger.Info($"lastInitialized at {prevDt}, Reload:{filePath}");
+                try {
+                    string filePath = Constants.PREF_FILE_PATH;
+                    var fileInfo = Helper.GetFileInfo(filePath);
+                    if (bForce || fileInfo.ModifyDt > _lastFileDt) {
+                        // ファイルが更新されていたら再ロードする
+                        _lastFileDt = fileInfo.ModifyDt;
+                        _infectDataList = loadPrefectureData(readFile(filePath), lastRealDt);
+                        loadFourstepHopeParams();
+                        LastUpdateDt = _lastInitializedDt;
+                        logger.Info($"prev Initialized at {prevDt}, Reload:{filePath}");
+                    }
+                } catch (Exception e) {
+                    logger.Error(e.ToString());
                 }
             }
-        }
-
-        private static DateTime _firstDate = "2020/6/1"._parseDateTime();
-
-        public class PrefInfectData
-        {
-            public string Title { get; set; }
-            public double Y1_Max { get; set; }
-            public double Y2_Max { get; set; }
-            public RtDecayParam DecayParam { get; set; }
-            public List<DateTime> Dates { get; set; }
-            public List<double> Total { get; set; }
-            public int PreDataNum { get; set; }
         }
 
         public static double CalcRt(double[] total, int idx)
@@ -101,12 +99,7 @@ namespace ChartBlazorApp.Models
                 var keyName = items[2];
                 if (keyName._notEmpty()) {
                     data = prefDataDict._safeGetOrNewInsert(keyName);
-                    if (data.Title._isEmpty()) {
-                        data.Title = dispName;
-                        data.DecayParam = new RtDecayParam();   // 全て 0 の初期データ
-                        data.Dates = new List<DateTime>();
-                        data.Total = new List<double>();
-                    }
+                    data.InitializeIfNecessary(dispName);
                     if (bAddOrder && !prefOrder.Contains(keyName)) prefOrder.Add(keyName);
                 }
                 return data;
@@ -124,144 +117,73 @@ namespace ChartBlazorApp.Models
                 } else if (items[0]._startsWith("#params")) {
                     var data = getOrNewData(items, false);
                     if (data != null) {
-                        data.Y1_Max = items._nth(3)._parseDouble(0.0);
-                        data.Y2_Max = items._nth(4)._parseDouble(0.0);
-                        data.DecayParam.StartDate = items._nth(5)._parseDateTime();
-                        data.DecayParam.DaysToOne = items._nth(6)._parseInt(0);
-                        data.DecayParam.DecayFactor = Pages.MyChart.GetDecayFactor(items._nth(7)._parseDouble(-9999));
-                        data.DecayParam.EasyRt1 = items._nth(8)._parseDouble(0);
-                        data.DecayParam.EasyRt2 = items._nth(9)._parseDouble(0);
-                        data.DecayParam.DecayFactorNext = Pages.MyChart.GetDecayFactor2(items._nth(10)._parseDouble(-9999));
+                        data.AddYAxesMax(items._nth(3)._parseDouble(0.0), items._nth(4)._parseDouble(0.0));
+                        data.AddDecayParam(
+                            items._nth(5)._parseDateTime(),
+                            items._nth(6)._parseInt(0),
+                            Pages.MyChart.GetDecayFactor(items._nth(7)._parseDouble(-9999)),
+                            items._nth(8)._parseDouble(0),
+                            items._nth(9)._parseDouble(0),
+                            Pages.MyChart.GetDecayFactor2(items._nth(10)._parseDouble(-9999)));
                     }
                 } else if (items[0]._startsWith("20")) {
                     var data = getOrNewData(items, true);
                     if (data != null) {
                         var dt = items._nth(0)._parseDateTime();
-                        if (lastRealDt == null || dt <= lastRealDt) {
+                        if (dt._isValid()) {
                             var val = items._nth(3)._parseDouble(0);
-                            if (data.Dates._isEmpty() || data.Dates.Last() < dt) {
-                                data.Total.Add(val);
-                                data.Dates.Add(dt);
-                                if (dt < _firstDate) ++data.PreDataNum;
-                            } else {
-                                for (int i = data.Dates.Count() - 1; i >= 0; --i) {
-                                    if (data.Dates[i] == dt) {
-                                        data.Total[i] = val;
-                                    } else if (data.Dates[i] > dt) {
-                                        break;
-                                    }
-                                }
-                            }
+                            var flag = items._nth(4);
+                            data.AddData(dt, val, flag);
                         }
                     }
                 }
-            }
-
-            double[] adjustTotal(double[] total)
-            {
-                double[] adjTotal = new double[total.Length];
-                Array.Copy(total, adjTotal, total.Length);
-                int emptyIdx = -1;
-                for (int i = 0; i < adjTotal.Length; ++i) {
-                    var newVal = total._nth(i) - total._nth(i - 1);
-                    if (newVal > 0) {
-                        if (emptyIdx >= 0) {
-                            double prevVal = adjTotal._nth(emptyIdx - 1) - adjTotal._nth(emptyIdx - 2);
-                            int num = i - emptyIdx + 1;
-                            if (((newVal >= 40 || prevVal >= 40) && num <= 5) || newVal >= num * 10 || prevVal >= num * 10) {
-                                double delta;
-                                int k, m;
-                                if (prevVal > newVal) {
-                                    delta = prevVal / num;
-                                    k = i - 1;
-                                    m = emptyIdx - 1;
-                                    adjTotal[k] = adjTotal._nth(m);
-                                } else {
-                                    delta = newVal / num;
-                                    k = i;
-                                    m = emptyIdx;
-                                }
-                                for (int j = k - 1; j >= m; --j) adjTotal[j] = adjTotal[j + 1] - delta;
-                            }
-                        }
-                        emptyIdx = -1;
-                    } else {
-                        if (emptyIdx < 0) emptyIdx = i;
-                    }
-                }
-                return adjTotal;
-            }
-
-            double calcY1Max(double[] newlies)
-            {
-                int newlyMax = (int)newlies[(newlies.Length - Constants.Y_MAX_CALC_DURATION)._lowLimit(0)..].Max();
-                if (newlyMax < 100) {
-                    return ((newlyMax + 10) / 10) * 10.0;
-                } else if (newlyMax < 1000) {
-                    return ((newlyMax + 100) / 100) * 100.0;
-                } else if (newlyMax < 10000) {
-                    return ((newlyMax + 1000) / 1000) * 1000.0;
-                } else if (newlyMax < 100000) {
-                    return ((newlyMax + 10000) / 10000) * 10000.0;
-                } else {
-                    return ((newlyMax + 100000) / 100000) * 100000.0;
-                }
-            }
-
-            double calcY2Max(double[] rts)
-            {
-                int nearPt = (rts.Length - 30)._lowLimit(0);
-                int longPt = (rts.Length - Constants.Y_MAX_CALC_DURATION)._lowLimit(0);
-                if (nearPt > 0 && rts[longPt..nearPt].Count((x) => x > 2.5) > 3)
-                    return 5.0;
-                if (rts.Length > 0 && rts[nearPt..].Max() > 2.5)
-                    return 5.0;
-                return 2.5;
-            }
-
-            InfectData makeData(PrefInfectData data)
-            {
-                int predatanum = data.PreDataNum;
-                double total(int i) => data.Total._nth(i + predatanum);
-                double newly(int i) => total(i) - total(i - 1);
-                var dates = data.Dates.Skip(predatanum).ToArray();
-                var newlies = (data.Total.Count - predatanum)._range().Select(i => newly(i)).ToArray();
-                double[] adjustedTotal = adjustTotal(data.Total.ToArray());
-                double adjTotal(int i) => adjustedTotal._nth(i + predatanum);
-                //double weekly(int i) => total(i) - total(i - 7);
-                double weekly(int i) => adjTotal(i) - adjTotal(i - 7);
-                double average(int i) => weekly(i) / 7;
-                var averages = (data.Total.Count - predatanum)._range().Select(i => average(i)).ToArray();
-                double rt(int i) { double w7 = weekly(i - 7); return w7 > 0 ? Math.Pow(weekly(i) / w7, 5.0 / 7.0) : 0.0; };
-                var rts = (data.Total.Count - predatanum)._range().Select(i => rt(i)).ToArray();
-                var y1_max = data.Y1_Max > 0 ? data.Y1_Max : calcY1Max(newlies);
-                var y1_step = y1_max / 10;
-                var y2_max = data.Y2_Max > 0 ? data.Y2_Max : calcY2Max(rts);
-                var y2_step = y2_max / 5;
-                //以下を有効にしてしまうと、システム既定基準日とシステム既定検出遡及日による基準日との区別ができなくなってしまう。
-                //if (data.DecayParam.StartDate._notValid()) data.DecayParam.StartDate = dates[0].AddDays(InfectData.FindRecentMaxIndex(rts));
-                var infectData = new InfectData {
-                    Title = data.Title,
-                    Y1_Max = y1_max,
-                    Y1_Step = y1_step,
-                    Y2_Max = y2_max,
-                    Y2_Step = y2_step,
-                    Dates = dates,
-                    Newly = newlies,
-                    Average = averages,
-                    Rt = rts,
-                    InitialDecayParam = data.DecayParam,
-                };
-                infectData.InitialSubParams = infectData.CalcDecaySubParams();
-                return infectData;
             }
 
             var infectList = new List<InfectData>();
             foreach (var pref in prefOrder) {
                 var data = prefDataDict._safeGet(pref);
-                if (data != null) infectList.Add(makeData(data));
+                if (data != null) infectList.Add(data.MakeData());
             }
             return infectList;
+        }
+
+        public class ExpectdFourstepParam
+        {
+            public string ButtonText;
+            public string StartDate;
+            public int DaysToRt1;
+            public double Rt1;
+            public int DaysToRt2;
+            public double Rt2;
+            public int DaysToRt3;
+            public double Rt3;
+            public int DaysToRt4;
+            public double Rt4;
+        }
+
+        public static ExpectdFourstepParam[] ExpectedFourstepParams { get; private set; } = null;
+
+        /// <summary>
+        /// 4段階設定の希望設定をロードする
+        /// </summary>
+        private void loadFourstepHopeParams()
+        {
+            ExpectedFourstepParams = readFile(Constants.EXPECT_FILE_PATH).
+                Select(line => line.Trim()._reReplace(" *", "")._reReplace(",#.*", "").Split(',')).
+                Where(items => items._length() >= 3 && !items[0]._startsWith("#")).
+                Select(items => new ExpectdFourstepParam() {
+                    ButtonText = items[0],
+                    StartDate = items[1],
+                    DaysToRt1 = items._nth(2)._parseInt(0),
+                    Rt1 = items._nth(3)._parseDouble(1),
+                    DaysToRt2 = items._nth(4)._parseInt(0),
+                    Rt2 = items._nth(5)._parseDouble(1),
+                    DaysToRt3 = items._nth(6)._parseInt(0),
+                    Rt3 = items._nth(7)._parseDouble(1),
+                    DaysToRt4 = items._nth(8)._parseInt(0),
+                    Rt4 = items._nth(9)._parseDouble(1),
+                }).
+                ToArray();
         }
 
         // [JSInvokable] 属性を付加すると JavaScript から呼び出せるようになる。(今回は使用していないが参考のため残してある)

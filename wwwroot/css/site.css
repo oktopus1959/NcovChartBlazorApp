@@ -284,12 +284,22 @@ label, input[type='checkbox'], input[type='radio'] {
     color: grey;
 }
 
+.darkred {
+    color: darkred;
+}
+
 .no-color {
     color: rgba(0,0,0,0);
 }
 
 .text-date {
     width: 6em;
+    height: 24px;
+    padding: 0px 4px;
+}
+
+.text-long {
+    width: 19em;
     height: 24px;
     padding: 0px 4px;
 }

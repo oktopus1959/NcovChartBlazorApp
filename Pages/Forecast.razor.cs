@@ -80,7 +80,7 @@ namespace ChartBlazorApp.Pages
             //forecastData.Initialize();
         }
 
-        private bool _showOtherCharts = Constants.DEBUG_LEVEL > 0;
+        private bool _showOtherCharts = ConsoleLog.DEBUG_LEVEL > 0;
 
         public async Task ShowOtherCharts(ChangeEventArgs args)
         {
@@ -89,7 +89,7 @@ namespace ChartBlazorApp.Pages
             StateHasChanged();
         }
 
-        private bool _extendDispDays = false;
+        private bool _extendDispDays = ConsoleLog.DEBUG_LEVEL > 0;
 
         public async Task ExtendDispDays(ChangeEventArgs args)
         {
@@ -106,9 +106,9 @@ namespace ChartBlazorApp.Pages
         public async Task RenderDeathAndSeriousChart(bool bAnimation = true)
         {
             // システム設定によるパラメータ
-            RtDecayParam rtParam = _effectiveParams.MakeRtDecayParam(0, true);  // 0: 全国
+            RtDecayParam rtParam = _effectiveParams.MakeRtDecayParam(true, 0);  // 0: 全国
             // ユーザ設定によるパラメータ
-            RtDecayParam rtParamByUser = _effectiveParams.DetailSettings && !_effectiveParams.FourstepSettings ? _effectiveParams.MakeRtDecayParam(0, false) : null;
+            RtDecayParam rtParamByUser = _effectiveParams.DetailSettings && !_effectiveParams.FourstepEnabled ? _effectiveParams.MakeRtDecayParam(false, 0) : null;
 
             // 予測に必要なデータの準備
             _userData = new UserForecastData(_extendDispDays).MakeData(forecastData, _infectData0, rtParam);
@@ -124,7 +124,7 @@ namespace ChartBlazorApp.Pages
 
             if (_showOtherCharts) {
                 jsonStr = forecastData.MakeDailyDeathJonData(_userData, userDataByUser, onlyOnClick);
-                await JSRuntime._renderChart2("chart-wrapper-dailydeath", -2, 100, jsonStr);
+                await JSRuntime._renderChart2("chart-wrapper-dailydeath", -2, newlyDaysRatio(), jsonStr);
 
                 jsonStr = forecastData.MakeSeriousDiffJsonData(_userData, onlyOnClick);
                 await JSRuntime._renderChart2("chart-wrapper-seriousdiff", -2, 100, jsonStr);
