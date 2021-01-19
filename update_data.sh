@@ -127,9 +127,9 @@ mkdir -p $CSVDIR $WORKDIR
 FIRST_DATE='2020.0?5.18'
 
 # ヘッダー部
-grep '^#' $PREF_PARAM_FILE > $PREF_WORK_FILE
+sed -n '1,/#end_of_header/ p' $PREF_PARAM_FILE > $PREF_WORK_FILE
 
-# 全国
+# 全国データのダウンロード
 RUN_CMD -f "downloadCsv https://www.mhlw.go.jp/content/$PCR_DAILY_FILE ${PCR_DAILY_WORK}"
 
 ruby_script() {
@@ -143,21 +143,26 @@ end
 EOS
 }
 
+# 全国陽性者数
 RUN_CMD -f "sed -nr '/^${FIRST_DATE},/,$ p' $PCR_DAILY_WORK| ruby -e '$(ruby_script)' >> ${PREF_WORK_FILE}"
 
-# 都道府県
-#[ "$LOADFLAG" ] && RUN_CMD -m "(cd Data/covid19; git pull)"
-#RUN_CMD -f -m "sed -nr '/^${FIRST_DATE},/,$ p' $PREF_SRCFILE | \
-#            sed -r 's/^([0-9]+),([0-9]+),([0-9]+),/\1\/\2\/\3,/' | \
-#            cut -d, -f1-4 >> ${PREF_WORK_FILE}"
-
-# 都道府県追加ファイル
-if [ $(ls -1 Data/pref/*.txt 2>/dev/null | wc -l) -gt 0 ]; then
-    RUN_CMD -f -m "cat Data/pref/*.txt >> ${PREF_WORK_FILE}"
-fi
+# 都道府県陽性者数
+PREF_WORKDIR=$WORKDIR/pref
+mkdir -p $PREF_WORKDIR
+for x in $(ls -1 Data/mhlw_pref/*.txt); do
+    pref_work_file=$PREF_WORKDIR/$(basename $x)
+    if [[ ! -f $pref_work_file || $x -nt $pref_work_file ]]; then
+        RUN_CMD -f -m "$BINDIR/make_pref_data.sh $x > $pref_work_file"
+    fi
+done
+RUN_CMD "cat ${PREF_WORKDIR}/*.txt >> ${PREF_WORK_FILE}"
 
 # 追加陽性者数
-RUN_CMD -f -m "addExtraTotal $PREF_PARAM_FILE $PREF_WORK_FILE"
+#RUN_CMD -f -m "addExtraTotal $PREF_PARAM_FILE $PREF_WORK_FILE"
+RUN_CMD -f -m "sed -n '/#overwrite/,/#append/ p' $PREF_PARAM_FILE | grep -v '^#' | \
+               sed 's/$/,OVERWRITE/' >> $PREF_WORK_FILE"
+RUN_CMD -f -m "sed -n '/#append/,$ p' $PREF_PARAM_FILE | grep -v '^#' | \
+               sed 's/$/,APPEND/' >> $PREF_WORK_FILE"
 RUN_CMD -f -m "sed 's/[府県],/,/' $PREF_WORK_FILE | sed 's/東京都,/東京,/' > $PREF_TARGET_FILE"
 
 # 重症者&死亡者&改善率
