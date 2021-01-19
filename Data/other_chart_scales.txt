@@ -1,4 +1,4 @@
 #chart-name,max,min
 serious-diff,60,-40
-cum-death-diff,60,-40
-serious+defath-diff,70,-50
+cum-death-diff,40,-60
+serious+defath-diff,100,-50
