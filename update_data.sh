@@ -156,6 +156,7 @@ for x in $(ls -1 Data/mhlw_pref/*.txt); do
     fi
 done
 RUN_CMD "cat ${PREF_WORKDIR}/*.txt >> ${PREF_WORK_FILE}"
+echo "#end_of_mhlw_pref" >> ${PREF_WORK_FILE}
 
 # 追加陽性者数
 #RUN_CMD -f -m "addExtraTotal $PREF_PARAM_FILE $PREF_WORK_FILE"
