@@ -105,17 +105,12 @@ pref_num = {}
 dt = ARGV.shift
 
 while line = gets
-  items = line.strip.gsub(/※[^\s]+/, "").gsub(/⻘/,"青").gsub(/[⻑⾧]/,"長").split(/\s+/);
+  #STDERR.puts line
+  items = line.gsub(/※[^\s\|]+/, "").gsub(/⻘/,"青").gsub(/[⻑⾧]/,"長").strip.split('|');
   #STDERR.puts items.join("|")
-  i = 0
-  while i < items.size
-    if items[i] =~ /^[一-龠々]+$/
-      name = items[i]
-      num = items[i+1].gsub(/,/, "").to_i
-      i += 1
-      pref_num[name] = num
-    end
-    i += 1
+  name = items[0].strip.split(/ +/)[0]
+  if prefs.include?(name)
+    pref_num[name] = items[1].strip.gsub(/,/, "").to_i
   end
 end
 
