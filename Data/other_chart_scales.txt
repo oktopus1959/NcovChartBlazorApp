@@ -1,4 +1,4 @@
 #chart-name,max,min
-serious-diff,60,-40
 cum-death-diff,50,-100
-serious+deth-diff,100,-100
+serious-diff,60,-60
+serious+death-diff,120,-120

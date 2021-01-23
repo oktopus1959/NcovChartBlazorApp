@@ -9,7 +9,8 @@ if [[ "$1" == -* ]]; then
     [[ "$1" == -*l* ]] && LOADFLAG=$1
     shift
 fi
-[ "$1" ] && BLAZOR_REMOTE_HOST="$1"
+[ "$1" ] && BLAZOR_REMOTE_HOST2="$1"
+[ "$2" ] && BLAZOR_REMOTE_HOST="$2"
 
 WORKDIR=Data/work
 CSVDIR=Data/csv
@@ -17,7 +18,9 @@ CSVDIR=Data/csv
 copy_files() {
     if [ "$BLAZOR_REMOTE_HOST" ]; then
         RUN_CMD -m "scp $CSVDIR/*.csv ${BLAZOR_REMOTE_HOST}:dotnet/ChartBlazorApp/$CSVDIR"
-        #RUN_CMD -m "ssh ${BLAZOR_REMOTE_HOST} touch dotnet/ChartBlazorApp/$CSVDIR/*"
+    fi
+    if [ "$BLAZOR_REMOTE_HOST2" ]; then
+        RUN_CMD -m "scp $CSVDIR/*.csv ${BLAZOR_REMOTE_HOST2}:dotnet/ChartBlazorApp/$CSVDIR"
     fi
 }
 
