@@ -3,6 +3,11 @@
 BINDIR=$(dirname $0)
 
 txtfile=$1
+if [ -z "$txtfile" ]; then
+    echo "Text filename required." >&2
+    exit
+fi
+
 dt=$(basename ${txtfile%.*})
 if [[ "$dt" =~ ^202[0-9][01][0-9][0-3][0-9]$ ]]; then
     dtstr=$(date --date=$dt '+%Y/%m/%d')
