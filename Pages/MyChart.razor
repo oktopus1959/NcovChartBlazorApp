@@ -53,7 +53,7 @@
             @*<select class="mt-0 mb-1" style="padding: 1px" name="other-pref" value="@_prefIdx" @onchange="ChangePref" disabled="@(_radioIdx != _selectorPos)">*@
             <select style="margin-left: 4px; padding: 2px;" name="other-pref" value="@_prefIdx" @onchange="ChangePref">
                 @for (int i = _mainPrefNum; i < _infectDataCount; ++i) { <option value="@i" selected="@(i == _prefIdx)">@_getTitle(i)</option> }
-                @if (_testInfectEnabled) { <option value="@_testInfectIdx" selected>（@_getTitle()）</option> }
+                @if (_timeMachineInfectEnabled) { <option value="@_timeMachineInfectIdx" selected>（@_getTitle()）</option> }
             </select>
             <button class="btn btn-primary btn-sm py-1 ml-2" style="padding: 0px 10px 0px 10px;" @onclick="MovePrefLeft"
                     disabled="@(_radioIdx < _mainPrefNum || (_radioIdx == _mainPrefNum && _radioIdx < _selectorPos))"><div class="left-triangle"></div></button>
@@ -115,6 +115,7 @@
         }
         return 0;
     }
+    private bool _eventsInfectInput = false;
 }
         <!-- 2段階設定 -->
         <div class="inline-wrapper with-border">
@@ -170,16 +171,32 @@
                     <span class="@_fontColor(_easyEnabled())">Rtが目標値になってから：</span>
                     <input type="text" class="text-number-short" value="@_paramDaysToNext" @onchange="ChangeRtParamDaysToNext" disabled="@(!_easyEnabled())"/>
                     <span class="@_fontColor(_easyEnabled())">日後の</span></div><br/>*@
-                <div class="inline-wrapper">
-                    <span class="@_fontColor(_easyEnabled())">次の目標Rt：</span>
-                    <input type="text" class="text-number" value="@_paramEasyRt2" @onchange="ChangeRtParamEasyRt2" disabled="@(!_easyEnabled())"/></div>
-                <div class="inline-wrapper">
-                    <span class="@_fontColor(_easyEnabled())">次の屈曲度：</span>
-                    <select style="padding: 1px" name="decay-factory" value="@_paramDecayFactorNext" @onchange="ChangeRtParamDecayFactorNext" disabled="@(!_easyEnabled())">
-                        @foreach ((var i, var v) in _decayFactors2._enumerate()) {
-                            <option value="@v" selected="@(v == _paramDecayFactorNext)">@(i + _decayFactors2Start)</option>
-                        }
-                    </select></div>
+                <div class="vertical-center" style="margin-top: 8px">
+                    <div class="inline-wrapper">
+                        <span class="@_fontColor(_easyEnabled())">次の目標Rt：</span>
+                        <input type="text" class="text-number" value="@_paramEasyRt2" @onchange="ChangeRtParamEasyRt2" disabled="@(!_easyEnabled())"/></div>
+                    <div class="inline-wrapper">
+                        <span class="@_fontColor(_easyEnabled())">次の屈曲度：</span>
+                        <select style="padding: 1px" name="decay-factory" value="@_paramDecayFactorNext" @onchange="ChangeRtParamDecayFactorNext" disabled="@(!_easyEnabled())">
+                            @foreach ((var i, var v) in _decayFactors2._enumerate()) {
+                                <option value="@v" selected="@(v == _paramDecayFactorNext)">@(i + _decayFactors2Start)</option>
+                            }
+                        </select></div>
+                    @if (!_eventsInfectInput) {
+                        <div class="inline-wrapper position-right">
+                            <button class="btn btn-primary btn-sm py-0 px-1 ml-2" @onclick="EventsInputOn" disabled="@(!_easyEnabled())">イベント</button></div>
+                    } else {
+                        <div class="inline-wrapper position-right">
+                            <button class="btn btn-primary btn-sm py-0 px-1 ml-2" @onclick="EventsInputOff" disabled="@(!_easyEnabled())">戻る</button></div><br/>
+                    }
+                    </div>
+                    @if (_eventsInfectInput) {
+                        <div class="inline-wrapper">
+                            <span>イベント：</span>
+                            <input type="text" class="text-long-2" value="@_events" @onchange="UpdateEvents"/></div>
+                        <p class="darkred small mb-0" style="line-height: 20px">
+                            ※「日付:文言」のカンマ区切り。例：「1/8:緊急事態宣言,2/7:同終了」<br/>※日付、コロン、カンマは半角で入力すること</p>
+                    }
                 <hr class="narrow" style="background-color: silver"/>
                 @*<div class="inline-wrapper">
                     <span class="@_fontColor(_easyEnabled())">基準日検出遡及日数：</span>
@@ -190,7 +207,7 @@
                         <span class="@_fontColor(_easyEnabled())">Rt=1への自動減衰</span>
                     </label></div>*@
                 <div class="inline-wrapper">
-                    <span class="@_fontColorDarkred(_easyEnabled())">Rt自動減衰率：</span>
+                    <span class="@_fontColor(_easyEnabled())">Rt自動減衰率：</span>
                     <input type="text" class="text-number" value="@($"{_postDecayFactorRt2._round(3)}")" @onchange="ChangePostDecayFactorRt2" disabled="@(!_easyEnabled())"/>
                     <span class="@_fontColor(_easyEnabled())"></span></div>
                 <div class="inline-wrapper">
@@ -201,19 +218,21 @@
                     <div class="inline-wrapper">
                         <span>予想曲線表示日数：</span>
                         <input type="text" class="text-number-short" value="@_extensionDays" @onchange="ChangeExtensionDays"/></div>
-                    @if (!_testInfectEnabled) {
+                    @if (!_timeMachineInfectEnabled) {
                         <div class="inline-wrapper position-right">
-                            <button class="btn btn-primary btn-sm py-0 px-1 ml-2" @onclick="TestMode" disabled="@(!_easyEnabled())">実験</button></div>
+                            <button class="btn btn-primary btn-sm py-0 px-1 ml-2" @onclick="TimeMachineMode" disabled="@(!_easyEnabled())">タイムマシン</button></div>
                     } else {
                         <div class="inline-wrapper position-right">
+                            <button class="btn btn-primary btn-sm py-0 px-1 ml-4" @onclick="AdoptTimeMachineData" disabled="@(!_easyEnabled())">採用</button>
                             <button class="btn btn-primary btn-sm py-0 px-1 ml-2" @onclick="NormalMode" disabled="@(!_easyEnabled())">戻る</button></div><br/>
                     }
                 </div>
-                @if (_testInfectEnabled) {
+                @if (_timeMachineInfectEnabled) {
                     <div class="inline-wrapper">
-                        <span>実験データ：</span>
-                        <input type="text" class="text-long" value="@_extraNewlyData" @onchange="UpdateTestData"/></div>
-                    <p class="darkred small mb-0">※0または-N: N日前に戻る ／ N1,N2,…: 未来データとしてN1,N2,…を追加</p>
+                        <span>入力データ：</span>
+                        <input type="text" class="text-long" value="@_timeMachineData" @onchange="UpdateTimeMachineData"/></div>
+                    <p class="darkred small mb-0" style="line-height: 20px">
+                    ※0または-N: N日前に戻る ／ N1,N2,…: 未来データとしてN1,N2,…を追加<br/>※数字、マイナス、カンマは半角で入力すること</p>
                 }
                 @*<div class="inline-wrapper">
                     <label for="use-on-forecast">
@@ -265,9 +284,13 @@
             <p class="small">※日数が正数のステップのみ有効</p>
         </div>
     </div>
-    @if (_drawExpectation && !_detailSettings) {
+    @if (_drawExpectation) {
         <div class="indent">
-            <p class="small">※上記は過去のRtの推移を基に自動的に計算したものです。将来において必ずしもこの通りに推移するわけではないことにご留意ください。</p>
+        @if (_detailSettings) {
+            <p class="small mb-0 darkred" style="line-height: 20px">※日付の入力の際、「年」は省略可。詳細は下記【説明】を参照</p>
+        } else if (_drawExpectation) {
+            <p class="small mb-0" style="line-height: 20px">※上記は過去のRtの推移を基に自動的に計算したものです。将来において必ずしもこの通りに推移するわけではないことにご留意ください。</p>
+        }
         </div>
     }
 </div>
@@ -282,8 +305,8 @@
     <div class="inline-wrapper">
         @if (_yAxisMin > 0) { <span>左Ｙ軸最大値（≧@_yAxisMin）：</span>} else { <span>左Ｙ軸最大値：</span> }
         @code{
-            private static int[] y1maxes = new int[] { 100000, 50000, 20000, 10000, 5000, 4000, 3000, 2000, 1000, 500, 400, 300, 200, 100, 50, 20 };
-            private static int[] y1mins = new int[] { 0, 100, 200, 500, 1000, 2000 };
+            private static int[] y1maxes = new int[] { 100000, 50000, 20000, 15000, 10000, 5000, 4000, 3000, 2000, 1500, 1000, 500, 400, 300, 200, 150, 100, 50, 20 };
+            private static int[] y1mins = new int[] { 0, 100, 200, 500, 1000, 2000, 5000 };
         }
         @{
             var y1Max = _yAxisMaxUser;
@@ -301,7 +324,7 @@
             if (!y2Max._containedIn("10.0", "5.0", "2.5", "2.0")) y2Max = "自動";
         }
         <select style="padding: 1px" name="yAxis2Max" value="@y2Max" @onchange="ChangeYAxis2Max">
-            @foreach (var rt in Helper.Array("10.0", "5.0", "2.5", "2.0", "自動")) { <option value="@rt" selected="@(rt == y2Max)">@rt</option> }
+            @foreach (var rt in Helper.Array("10.0", "5.0", "2.5", "2.0", "1.5", "自動")) { <option value="@rt" selected="@(rt == y2Max)">@rt</option> }
         </select></div>
     @* クリック時のみ反応する *@
     <div class="inline-wrapper">

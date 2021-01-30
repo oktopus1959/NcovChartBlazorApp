@@ -1191,11 +1191,15 @@ namespace StandardCommon
         /// <param name="str"></param>
         /// <param name="delim"></param>
         /// <returns></returns>
-        public static string[] _split(this string str, char delim)
+        public static string[] _split(this string str, char delim, bool bStrip = false)
         {
             if (str._isEmpty()) return new string[] { "" };
 
-            return str.Split(new char[] { delim });
+            var items = str.Split(new char[] { delim });
+            if (bStrip) {
+                items = items.Select(x => x._strip()).ToArray();
+            }
+            return items;
         }
 
         /// <summary>
@@ -1204,14 +1208,20 @@ namespace StandardCommon
         /// <param name="str"></param>
         /// <param name="delim"></param>
         /// <returns></returns>
-        public static string[] _split2(this string str, char delim)
+        public static string[] _split2(this string str, char delim, bool bStrip = false)
         {
             if (str._isEmpty()) return new string[] { "" };
 
             int idx = str.IndexOf(delim);
             if (idx < 0) return str._toArray1();
 
-            return new string[] { str._safeSubstring(0, idx), str._safeSubstring(idx + 1) };
+            var item1 = str._safeSubstring(0, idx);
+            var item2 = str._safeSubstring(idx + 1);
+            if (bStrip) {
+                item1 = item1._strip(); 
+                item2 = item2._strip(); 
+            }
+            return new string[] { item1, item2 };
         }
 
         /// <summary>
@@ -1278,17 +1288,17 @@ namespace StandardCommon
         }
 
         /// <summary>
-        /// 日時文字列をパースして DateTime を返す。エラーなら MinValue を返す。例外は出さない。
+        /// 日時文字列をパースして DateTime を返す。エラーなら MinValue または MaxValue を返す。例外は出さない。
         /// </summary>
         /// <param name="dt"></param>
         /// <returns></returns>
-        public static DateTime _parseDateTime(this string dt)
+        public static DateTime _parseDateTime(this string dt, bool bMaxValue = false)
         {
             DateTime result;
             if (DateTime.TryParse(dt, out result))
                 return result;
             else
-                return DateTime.MinValue;
+                return bMaxValue ? DateTime.MaxValue : DateTime.MinValue;
         }
 
         /// <summary>

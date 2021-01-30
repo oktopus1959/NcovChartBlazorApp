@@ -7,12 +7,11 @@
 <div style="width: 100%">
 <div class="chart-block" style="@(false && _userData.UseFourStep ? "max-width: 100%" : null)">
 <h4><span>新型コロナ</span> <span>重症者数グラフ</span> <span>@(_userData.UseFourStep ? "（4段階設定使用）" : "")</span></h4>
-<span>@(_userData.LastRealDateStr)現在：@(_userData.RealSerious._last()._formatComma())名</span>／
+<span>@(_userData.LastRealDateStr)現在：@(_userData.RealSerious._last()._formatComma())名</span> <span>／</span>
     @if (_userData.MaxPredictSerious > _userData.LastPredictSerious){
-    <span>@(_userData.MaxPredictSeriousDateStr)最大予測：@(_userData.MaxPredictSerious._formatComma())名</span>
-    } else {
-    <span>@(_userData.LastPredictDateStr)予測：@(_userData.LastPredictSerious._formatComma())名</span>
+        <span>@(_userData.MaxPredictSeriousDateStr)最大予測：@(_userData.MaxPredictSerious._formatComma())名</span> <span>／</span>
     }
+    <span>@(_userData.LastPredictDateStr)予測：@(_userData.LastPredictSerious._formatComma())名</span>
 @*<span>（予測日：@(forecastData.PredictStartDateStr)）</span>*@
 @* Chart の Canvas *@
 <div class="scrollableChartWrapper" style="" id="chart-wrapper-serious">
@@ -28,7 +27,7 @@
 
 <div class="chart-block right-block" style="@(false && _userData.UseFourStep ? "max-width: 100%" : null)">
 <h4><span>新型コロナ</span> <span>累計死亡者数グラフ</span> <span>@(_userData.UseFourStep ? "（4段階設定使用）" : "")</span></h4>
-<span>@(_userData.LastRealDateStr)現在：@(_userData.RealDeath._last()._formatComma())名</span>／
+<span>@(_userData.LastRealDateStr)現在：@(_userData.RealDeath._last()._formatComma())名</span> ／
     <span>@(_userData.LastPredictDateStr)予測：@(_userData.LastPredictDeath._formatComma())名</span> @*<span>（予測日：@(forecastData.PredictStartDateStr)）</span>*@
 @* Chart の Canvas *@
 <div class="scrollableChartWrapper" style="" id="chart-wrapper-death">
@@ -47,7 +46,7 @@
     <p>【日本集中治療医学会「<a href="https://www.jsicm.org/news/statement200401.html" target="_blank">新型コロナウイルス感染症（COVID-19）に関する理事長声明</a>」(2020/4/1)より】</p>
     <div class="less-indent">
     <p>「現在、本邦には約6,500床ほどのICUベッドがあると推定致しますが、約4倍のマンパワーが必要であること、他の重症患者の受け入れも必要であることを考えると、
-    このままでは、実際に新型コロナウイルス感染症の重症患者を収容できるベッド数は<span class="darkred">1,000床にも満たない</span>可能性があります。」</p>
+    このままでは、実際に新型コロナウイルス感染症の重症患者を収容できるベッド数は<font class="darkred">1,000床にも満たない</font>可能性があります。」</p>
     </div>
     <div class="indent"><p style="margin-left: 1rem; font-size: small">
         ※現時点ではコロナ対応のICUベッド数は増加しているかと思いますが、それでも逼迫しつつあることは確かだろうと考えます。</p></div> 
@@ -63,6 +62,11 @@
         <input type="checkbox" name="extend-disp-days" id="extend-disp-days" @onchange="ExtendDispDays" checked="@_extendDispDays" />
         <span>表示期間延長</span>
     </label></div>
+@if (ConsoleLog.DEBUG_FLAG) {
+    <div class="inline-wrapper my-0 position-right">
+    <button class="btn btn-primary btn-sm py-0 px-1" @onclick="Reload">RELOAD</button>
+    </div>
+}
 
 <div style="margin-top: 10px; display: @(_showOtherCharts ? "blcok" : "none"); width: 100%">
 <div class="chart-block">
@@ -77,7 +81,7 @@
 </div>
 </div>
 
-<div class="chart-block">
+<div class="chart-block right-block">
 <span style="font-size: 1.25em;">累計死亡者［実数／予測値 乖離］</span> @if (_debug) { <span>(@($"MSE={_userData.DeathDiffMSE:f1}"))</span> }
 @* Chart の Canvas *@
 <div class="scrollableChartWrapper" id="chart-wrapper-deathdiff">
@@ -91,7 +95,7 @@
 </div>
 
 <div style="margin-top: 10px; display: @(_showOtherCharts ? "blcok" : "none"); width: 100%">
-<div class="chart-block right-block">
+<div class="chart-block">
 <span style="font-size: 1.25em;">重症者［実数／予測値 乖離］</span> @if (_debug) { <span>(@($"MSE={_userData.SeriousDiffMSE:f1}"))</span> }
 @* Chart の Canvas *@
 <div class="scrollableChartWrapper" id="chart-wrapper-seriousdiff">

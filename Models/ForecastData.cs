@@ -57,6 +57,8 @@ namespace ChartBlazorApp.Models
     {
         public DateTime UpdateDate { get; set; }
 
+        public double[] BaseDataSeries { get; set; }
+
         public List<DatedDataSeries> DataSeriesList { get; set; }
 
         public DatedDataSeriesList NewAdd(DatedDataSeries series)
@@ -161,17 +163,31 @@ namespace ChartBlazorApp.Models
         {
             var list = new DatedDataSeriesList() { DataSeriesList = new List<DatedDataSeries>() };
             foreach (var items in readFile(csvfile).Select(line => line.Trim().Split(','))) {
-                if (items[0]._startsWith("#")) {
-                    if (items[0]._startsWith("#modify")) {
-                        list.UpdateDate = items[1]._parseDateTime();
+                if (items._length() >= 2) {
+                    if (items[0]._startsWith("#")) {
+                        if (items[0]._startsWith("#modify")) {
+                            list.UpdateDate = items[1]._parseDateTime();
+                        } else if (items[0]._startsWith("#base")) {
+                            list.BaseDataSeries = items[1..].Select(item => item._parseDouble()).ToArray();
+                        }
+                    } else {
+                        var date = items[0]._parseDateTime();
+                        double[] dataSeries;
+                        int end = Math.Min(items.Length, num);
+                        if (items[1]._startsWith("factor=")) {
+                            end = 2;
+                            double factor = items[1]._safeSubstring("factor=".Length)._strip()._parseDouble();
+                            dataSeries = list.BaseDataSeries.Select(r => r * factor).ToArray();
+                        } else {
+                            dataSeries = items[1..end].Select(item => item._parseDouble()).ToArray();
+                        }
+                        var offsetDays = items[end]._parseInt(0);
+                        list.DataSeriesList.Add(new DatedDataSeries() {
+                            Date = date,
+                            DataSeries = dataSeries,
+                            OffsetDays = offsetDays,
+                        });
                     }
-                } else {
-                    int end = Math.Min(items.Length, num);
-                    list.DataSeriesList.Add(new DatedDataSeries() {
-                        Date = items[0]._parseDateTime(),
-                        DataSeries = items[1..end].Select(item => item._parseDouble()).ToArray(),
-                        OffsetDays = items[end]._parseInt(0),
-                    });
                 }
             }
             return list;
@@ -186,8 +202,9 @@ namespace ChartBlazorApp.Models
         private void runReloadTask()
         {
             Task.Run(() => {
+                int period = (ConsoleLog.DEBUG_FLAG ? 3 : 60) * 1000;
                 while (true) {
-                    Task.Delay(60 * 1000).Wait();
+                    Task.Delay(period).Wait();
                     Initialize();
                 }
             });
@@ -205,23 +222,35 @@ namespace ChartBlazorApp.Models
                 // OnInitialized は2回呼び出される可能性があるので、30秒以内の再呼び出しの場合は、 DailyData の初期化をスキップする
                 var prevDt = _lastInitializedDt;
                 _lastInitializedDt = DateTime.Now;
-                if (!bForce && _lastInitializedDt < prevDt.AddSeconds(30)) {
+                int skipSec = ConsoleLog.DEBUG_FLAG ? 0 : 30;
+                if (!bForce && _lastInitializedDt < prevDt.AddSeconds(skipSec)) {
                     logger.Info($"SKIPPED");
                     return;
                 }
                 try {
                     var fileInfo = Helper.GetFileInfo(Constants.INFECTION_RATE_FILE_PATH);
-                    if (bForce || fileInfo.ModifyDt > _lastFileDt) {
-                        // ファイルが更新されていたら再ロードする
-                        _lastFileDt = fileInfo.ModifyDt;
-                        InfectRatesByAges = loadInfectByAgesData();                                 // 年代別陽性者数CSVのロード
-                        loadDeathAndSerious();                                                      // 死亡者数と重症化者数CSVのロード
-                        DeathRatesByAges = loadRatesFile(Constants.DEATH_RATE_FILE_PATH, 10);       // 死亡率CSVのロード
-                        SeriousRatesByAges = loadRatesFile(Constants.SERIOUS_RATE_FILE_PATH, 10);   // 重症化率CSVのロード
-                        RecoverRates = loadRatesFile(Constants.RECOVER_RATE_FILE_PATH, 2);          // 改善率CSVのロード
-                        loadOtherChartScales();
-                        logger.Info($"prev Initialized at {prevDt}, Files reloaded");
+                    while (!bForce) {
+                        if (fileInfo.ModifyDt > _lastFileDt) break;
+                        if (!ConsoleLog.DEBUG_FLAG) return;
+                        fileInfo = Helper.GetFileInfo(Constants.DEATH_RATE_FILE_PATH);
+                        if (fileInfo.ModifyDt > _lastFileDt) break;
+                        fileInfo = Helper.GetFileInfo(Constants.SERIOUS_RATE_FILE_PATH);
+                        if (fileInfo.ModifyDt > _lastFileDt) break;
+                        fileInfo = Helper.GetFileInfo(Constants.RECOVER_RATE_FILE_PATH);
+                        if (fileInfo.ModifyDt > _lastFileDt) break;
+                        fileInfo = Helper.GetFileInfo(Constants.OTHER_CHART_SCALES_FILE_PATH);
+                        if (fileInfo.ModifyDt > _lastFileDt) break;
+                        return;
                     }
+                    // ファイルが更新されていたら再ロードする
+                    _lastFileDt = fileInfo.ModifyDt;
+                    InfectRatesByAges = loadInfectByAgesData();                                 // 年代別陽性者数CSVのロード
+                    loadDeathAndSerious();                                                      // 死亡者数と重症化者数CSVのロード
+                    DeathRatesByAges = loadRatesFile(Constants.DEATH_RATE_FILE_PATH, 10);       // 死亡率CSVのロード
+                    SeriousRatesByAges = loadRatesFile(Constants.SERIOUS_RATE_FILE_PATH, 10);   // 重症化率CSVのロード
+                    RecoverRates = loadRatesFile(Constants.RECOVER_RATE_FILE_PATH, 2);          // 改善率CSVのロード
+                    loadOtherChartScales();
+                    logger.Info($"prev Initialized at {prevDt}, Files reloaded");
                 } catch (Exception e) {
                     logger.Error(e.ToString());
                 }
@@ -324,7 +353,7 @@ namespace ChartBlazorApp.Models
         }
 
         // その他グラフのスケール [max, min] の配列
-        private double[][] otherChartScales = null;
+        private Dictionary<string, double[]> otherChartScalesDict = new Dictionary<string, double[]>();
         
         /// <summary>
         /// その他グラフのスケールCSVのロード
@@ -334,11 +363,12 @@ namespace ChartBlazorApp.Models
         /// </summary>
         private void loadOtherChartScales()
         {
-            otherChartScales = readFile(Constants.OTHER_CHART_SCALES_FILE_PATH).
-                Select(line => line.Trim().Split(',')).
-                Where(items => items._length() >= 3 && !items[0]._startsWith("#")).
-                Select(items => Helper.Array(items[1]._parseDouble(100), items[2]._parseDouble(0))).
-                ToArray();
+            foreach (var line in readFile(Constants.OTHER_CHART_SCALES_FILE_PATH)) {
+                var items = line.Trim().Split(',');
+                if (items._length() >= 3 && !items[0]._startsWith("#")) {
+                    otherChartScalesDict[items[0]._reReplace(@"[_\-]diff.*", "")] = Helper.Array(items[1]._parseDouble(100), items[2]._parseDouble(0));
+                }
+            }
         }
 
         /// <summary>
@@ -347,7 +377,8 @@ namespace ChartBlazorApp.Models
         /// <returns></returns>
         public string MakeDeathJsonData(UserForecastData userData, UserForecastData userDataByUser, bool onlyOnClick, bool bAnimation)
         {
-            double maxPredDeath = userData.LastPredictDeath._lowLimit(userDataByUser?.LastPredictDeath ?? 0);
+            //double maxPredDeath = userData.LastPredictDeath._lowLimit(userDataByUser?.LastPredictDeath ?? 0);
+            double maxPredDeath = Helper.Array(userData.RealDeathMax, userData.LastPredictDeath, userDataByUser?.LastPredictDeath ?? 0).Max();
             double y1_max = roundYAxis(maxPredDeath, YAxisMaxDeath);
             double y1_min = maxPredDeath > YAxisMaxDeath ? 0 : YAxisMinDeath;
             double y1_step = (y1_max - y1_min) / 10;
@@ -396,7 +427,7 @@ namespace ChartBlazorApp.Models
         /// <returns></returns>
         public string MakeSeriousJsonData(UserForecastData userData, UserForecastData userDataByUser, bool onlyOnClick, bool bAnimation)
         {
-            double maxPredSerious = userData.MaxPredictSerious._lowLimit(userDataByUser?.MaxPredictSerious ?? 0);
+            double maxPredSerious = Helper.Array(userData.RealSeriousMax, userData.MaxPredictSerious, userDataByUser?.MaxPredictSerious ?? 0).Max();
             double y1_max = roundYAxis(maxPredSerious, YAxisMaxSerious);
             double y1_min = maxPredSerious > YAxisMaxSerious ? 0 : YAxisMinSerious;
             //double y1_max = 3000;
@@ -444,7 +475,7 @@ namespace ChartBlazorApp.Models
         private double roundYAxis(double maxValue, double yAxis)
         {
             if (maxValue <= yAxis) return yAxis;
-            double calcAxis(double val) => Math.Round((double)(val + 499) / 1000.0, 0) * 1000;
+            double calcAxis(double val) => Math.Round((double)(val * 1.11 + 499) / 1000.0, 0) * 1000;
             if (maxValue <= 3000) return calcAxis(maxValue * 2) / 2;
             return calcAxis(maxValue);
         }
@@ -505,8 +536,9 @@ namespace ChartBlazorApp.Models
         /// <returns></returns>
         public string MakeSeriousDiffJsonData(UserForecastData userData, bool onlyOnClick)
         {
-            double y1_max = otherChartScales._nth(0)._first()._gtZeroOr(60);
-            double y1_min = otherChartScales._nth(0)._second()._neZeroOr(-40);
+            double[] scales = otherChartScalesDict._safeGet("serious"); 
+            double y1_max = scales._first()._gtZeroOr(60);
+            double y1_min = scales._second()._neZeroOr(-40);
             double y1_step = 10;
             Options options = Options.CreateTwoAxes(new Ticks(y1_max, y1_step, y1_min), new Ticks(y1_max, y1_step, y1_min));
             options.AnimationDuration = 0;
@@ -543,8 +575,9 @@ namespace ChartBlazorApp.Models
         public string MakeDeathDiffJsonData(UserForecastData userData, bool onlyOnClick)
         {
             //double maxPredBothDiff = userData.DeathRealPredictDiff?.Last() ?? 100;
-            double y1_max = otherChartScales._nth(1)._first()._gtZeroOr(60);
-            double y1_min = otherChartScales._nth(1)._second()._neZeroOr(-40);
+            double[] scales = otherChartScalesDict._safeGet("cum-death"); 
+            double y1_max = scales._first()._gtZeroOr(60);
+            double y1_min = scales._second()._neZeroOr(-40);
             double y1_step = 10;
             Options options = Options.CreateTwoAxes(new Ticks(y1_max, y1_step, y1_min), new Ticks(y1_max, y1_step, y1_min));
             options.AnimationDuration = 0;
@@ -581,8 +614,9 @@ namespace ChartBlazorApp.Models
         public string MakeBothDiffJsonData(UserForecastData userData, bool onlyOnClick)
         {
             //double maxPredBothDiff = userData.BothSumRealPredictDiff?.Last() ?? 100;
-            double y1_max = otherChartScales._nth(2)._first()._gtZeroOr(80);
-            double y1_min = otherChartScales._nth(2)._second()._neZeroOr(-40);
+            double[] scales = otherChartScalesDict._safeGet("serious+death"); 
+            double y1_max = scales._first()._gtZeroOr(80);
+            double y1_min = scales._second()._neZeroOr(-40);
             double y1_step = 10;
             Options options = Options.CreateTwoAxes(new Ticks(y1_max, y1_step, y1_min), new Ticks(y1_max, y1_step, y1_min));
             options.AnimationDuration = 0;
@@ -715,9 +749,11 @@ namespace ChartBlazorApp.Models
 
         public double[] RealDeath { get; set; } = null;
         public double[] FullPredictDeath { get; set; } = null;
+        public double RealDeathMax { get; set; }
 
         public double[] RealSerious { get; set; } = null;
-        public double[] FullPredictSerious = null;
+        public double[] FullPredictSerious { get; set; } = null;
+        public double RealSeriousMax { get; set; }
 
         public double[] DailyRealDeath { get; set; } = null;
         public double[] DailyPredictDeath { get; set; } = null;
@@ -778,10 +814,12 @@ namespace ChartBlazorApp.Models
             double[] fullPredictDeath = forecastData.CalcFullPredictDeath(infectsByAges, firstDate, chartFullPredDays);
             FullPredictDeath = fullPredictDeath.Select((x, i) => Math.Round(x)).ToArray();
             LastPredictDeath = (int)FullPredictDeath.Last();
+            RealDeathMax = RealDeath.Max();
 
             // serious予想
             RealSerious = forecastData.RealSeriousSeries.GetSubSeriesFrom(forecastData.ChartStartDate);
             FullPredictSerious = forecastData.CalcFullPredictSerious(infectsByAges, firstDate, chartFullPredDays, fullPredictDeath);
+            RealSeriousMax = RealSerious.Max();
 
             (var idx, var val) = FullPredictSerious.Skip(calcRealDays)._top1();
             MaxPredictSerious = (int)Math.Round(val);

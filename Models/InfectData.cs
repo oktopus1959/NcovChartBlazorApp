@@ -36,6 +36,9 @@ namespace ChartBlazorApp.Models
 
         public double[] Rt { get; set; }
 
+        /// <summary> イベント("日付:アノテーション,..."形式) </summary>
+        public string Events { get; set; }
+
         /// <summary> 県別データファイルから取得した設定値(Layer-3) </summary>
         public RtDecayParam InitialDecayParam { get; set; }
 
@@ -703,13 +706,19 @@ namespace ChartBlazorApp.Models
             //return realDays._range(realDays - duration).Select(i => Math.Pow(predData.PredAverage[i] - Average[i], 2)).Sum();
         }
 
-    }
+    } // class InfectData
 
     public class PrefInfectData
     {
+        private static ConsoleLog logger = ConsoleLog.GetLogger();
+
         private static DateTime _firstDate = "2020/6/1"._parseDateTime();
 
         private string Title { get; set; }
+
+        private string Events { get; set; }
+
+        private (DateTime, DateTime)[] ShiftRanges { get; set; }
 
         private double Y1_Max { get; set; }
         private double Y2_Max { get; set; }
@@ -727,6 +736,35 @@ namespace ChartBlazorApp.Models
                 //DecayParam = new RtDecayParam();   // 全て 0 の初期データ
                 //Dates = new List<DateTime>();
                 //Total = new List<double>();
+            }
+        }
+
+        public void AddEvents(string[] events)
+        {
+            Events = events._join(",");
+            if (Events._notEmpty()) logger.Debug($"{Title}: Events: {Events}");
+        }
+
+        public void AddShiftRanges(string[] ranges)
+        {
+            (DateTime, DateTime) toDtPair(string[] dates) { return (dates._first()._parseDateTime(), dates._second()._parseDateTime(true)); }
+            ShiftRanges = ranges.Select(r => toDtPair(r._split(':', true))).ToArray();
+        }
+
+        public void ShiftPrefData()
+        {
+            if (ShiftRanges._notEmpty()) {
+                var minDt = cumulatives.Keys.Min();
+                var maxDt = cumulatives.Keys.Max();
+                foreach (var pair in ShiftRanges) {
+                    var end = pair.Item2._highLimit(maxDt);
+                    var dt = pair.Item1._lowLimit(minDt);
+                    while (dt <= end) {
+                        cumulatives[dt.AddDays(-1)] = cumulatives[dt];
+                        dt = dt.AddDays(1);
+                    }
+                    if (end == maxDt) cumulatives.Remove(end);
+                }
             }
         }
 
@@ -752,7 +790,7 @@ namespace ChartBlazorApp.Models
             if (flag._isEmpty()) {
                 cumulatives[dt] = val;
             } else {
-                if (flag._startsWith("O") || !cumulatives.ContainsKey(dt)) {
+                if (flag._startsWith("O") || !cumulatives.ContainsKey(dt)) {    // O: OverWrite
                     cumulatives[dt] = cumulatives._safeGet(dt.AddDays(-1)) + val;
                 }
             }
@@ -795,15 +833,23 @@ namespace ChartBlazorApp.Models
 
         private double calcY1Max(double[] newlies)
         {
-            int newlyMax = (int)newlies[(newlies.Length - Constants.Y_MAX_CALC_DURATION)._lowLimit(0)..].Max();
+            int newlyMax = (int)(newlies[(newlies.Length - Constants.Y_MAX_CALC_DURATION)._lowLimit(0)..].Max() / 0.9);
             if (newlyMax < 100) {
                 return ((newlyMax + 10) / 10) * 10.0;
+            } else if (newlyMax < 150) {
+                return 150;
             } else if (newlyMax < 1000) {
                 return ((newlyMax + 100) / 100) * 100.0;
+            } else if (newlyMax < 1500) {
+                return 1500;
             } else if (newlyMax < 10000) {
                 return ((newlyMax + 1000) / 1000) * 1000.0;
+            } else if (newlyMax < 15000) {
+                return 15000;
             } else if (newlyMax < 100000) {
                 return ((newlyMax + 10000) / 10000) * 10000.0;
+            } else if (newlyMax < 150000) {
+                return 150000;
             } else {
                 return ((newlyMax + 100000) / 100000) * 100000.0;
             }
@@ -876,6 +922,7 @@ namespace ChartBlazorApp.Models
             //if (DecayParam.StartDate._notValid()) DecayParam.StartDate = dates[0].AddDays(InfectData.FindRecentMaxIndex(rts));
             var infectData = new InfectData {
                 Title = Title,
+                Events = Events,
                 Y1_Max = y1_max,
                 Y1_Step = y1_step,
                 Y2_Max = y2_max,
@@ -891,6 +938,6 @@ namespace ChartBlazorApp.Models
             infectData.InitialSubParams = subParams;
             return infectData;
         }
-    }
+    } // class PrefInfectData
 
 }

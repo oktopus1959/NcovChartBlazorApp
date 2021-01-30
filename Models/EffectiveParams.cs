@@ -70,47 +70,47 @@ namespace ChartBlazorApp.Models
             return this;
         }
 
-        // テスト用の InfectData
-        private InfectData _testInfectData = null;
+        // TimeMachine用の InfectData
+        private InfectData _timeMachineInfectData = null;
 
         /// <summary>
         /// ソースデータからテスト用InfectDataを作成して、整形されたデータを返す
         /// </summary>
         /// <param name="srcIdx"></param>
         /// <returns></returns>
-        public string UseTestInfectData(string testData)
+        public string UseTimeMachineInfectData(string tmData)
         {
-            logger.Info($"{GetTitle()}: {testData}");
-            _testInfectData = null;
-            var trimData = testData._strip()._orElse("0");
+            logger.Info($"{GetTitle()}: {tmData}");
+            _timeMachineInfectData = null;
+            var trimData = tmData._strip()._orElse("0");
             int[] extraData = trimData._isEmpty() ? null : trimData._split(',').Select(x => x._strip()._parseInt(0)).ToArray();
             if (extraData._notEmpty() && extraData[0] < 0) extraData[0] = extraData[0]._lowLimit(-90);
-            _testInfectData = NthInfectData(-1).CreateData(extraData);
+            _timeMachineInfectData = NthInfectData(-1).CreateData(extraData);
             RenewDecaySubParams();
             return extraData._join(",");
         }
 
-        public void ClearTestInfectData()
+        public void ClearTimeMachineInfectData()
         {
-            _testInfectData = null;
+            _timeMachineInfectData = null;
             RenewDecaySubParams();
         }
 
-        public bool TestInfectDataEnabled => _testInfectData != null;
+        public bool TimeMachineInfectDataEnabled => _timeMachineInfectData != null;
 
-        public int TestInfectDataIdx => TestInfectDataEnabled ? InfectDataCount : -1;
+        public int TimeMachineInfectDataIdx => TimeMachineInfectDataEnabled ? InfectDataCount : -1;
 
         // データの数
         public int InfectDataCount => _dailyData?.InfectDataCount ?? 0;
 
-        public int MyDataIdx => TestInfectDataEnabled ? InfectDataCount : CurrentSettings.dataIdx;
+        public int MyDataIdx => TimeMachineInfectDataEnabled ? InfectDataCount : CurrentSettings.dataIdx;
 
         private int myDataIdx(int idx = -1) { return idx < 0 ? MyDataIdx : idx; }
 
         public InfectData NthInfectData(int n) {
             if (_dailyData == null) return InfectData.DummyData;
 
-            if ((n < 0 || n >= InfectDataCount) && _testInfectData != null) return _testInfectData;
+            if ((n < 0 || n >= InfectDataCount) && _timeMachineInfectData != null) return _timeMachineInfectData;
 
             int myIdx = myDataIdx(n);
             var data = _dailyData.InfectDataList._nth(myIdx);
@@ -133,7 +133,7 @@ namespace ChartBlazorApp.Models
             get { return CurrentSettings.radioIdx; }
             set {
                 CurrentSettings.radioIdx = value;
-                _testInfectData = null;
+                _timeMachineInfectData = null;
             }
         }
 
@@ -141,7 +141,7 @@ namespace ChartBlazorApp.Models
             get { return Math.Max(CurrentSettings.prefIdx, Constants.MAIN_PREF_NUM); }
             set {
                 CurrentSettings.prefIdx = value;
-                _testInfectData = null;
+                _timeMachineInfectData = null;
             }
         }
 
@@ -206,6 +206,13 @@ namespace ChartBlazorApp.Models
             CurrentSettings.setPostDecayFactorRt2(value._isEmpty() ? Constants.PostDecayFactorRt2 : value._parseDouble(0)._gtZeroOr(0.0000001));
         }
 
+        public string Events => getEvents();
+        public string getEvents(int idx = -1)
+        {
+            var evt = CurrentSettings.myEvents(idx);
+            if (evt._notEmpty()) return evt;
+            return NthInfectData(idx).Events;
+        }
 
         public string ParamStartDate { get { return getParamStartDate(); } }
         public string getParamStartDate(int idx = -1, bool bSystem = false) {
