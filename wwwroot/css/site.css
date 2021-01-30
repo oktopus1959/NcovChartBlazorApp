@@ -288,6 +288,10 @@ label, input[type='checkbox'], input[type='radio'] {
     color: darkred;
 }
 
+.darkgreen {
+    color: darkgreen;
+}
+
 .no-color {
     color: rgba(0,0,0,0);
 }
@@ -300,6 +304,12 @@ label, input[type='checkbox'], input[type='radio'] {
 
 .text-long {
     width: 19em;
+    height: 24px;
+    padding: 0px 4px;
+}
+
+.text-long-2 {
+    width: 21em;
     height: 24px;
     padding: 0px 4px;
 }

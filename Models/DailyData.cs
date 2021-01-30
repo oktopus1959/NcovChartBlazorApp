@@ -40,8 +40,9 @@ namespace ChartBlazorApp.Models
         private void runReloadTask()
         {
             Task.Run(() => {
+                int period = (ConsoleLog.DEBUG_FLAG ? 10 : 60) * 1000;
                 while (true) {
-                    Task.Delay(60 * 1000).Wait();
+                    Task.Delay(period).Wait();
                     Initialize();
                 }
             });
@@ -59,7 +60,8 @@ namespace ChartBlazorApp.Models
                 // OnInitialized は2回呼び出される可能性があるので、30秒以内の再呼び出しの場合は、 DailyData の初期化をスキップする
                 var prevDt = _lastInitializedDt;
                 _lastInitializedDt = DateTime.Now;
-                if (!bForce && _lastInitializedDt < prevDt.AddSeconds(30)) {
+                int skipSec = ConsoleLog.DEBUG_FLAG ? 5 : 30;
+                if (!bForce && _lastInitializedDt < prevDt.AddSeconds(skipSec)) {
                     logger.Info($"SKIPPED");
                     return;
                 }
@@ -125,6 +127,20 @@ namespace ChartBlazorApp.Models
                             items._nth(8)._parseDouble(0),
                             items._nth(9)._parseDouble(0),
                             Pages.MyChart.GetDecayFactor2(items._nth(10)._parseDouble(-9999)));
+                    }
+                } else if (items[0]._startsWith("#events")) {
+                    if (items.Length >= 4) {
+                        var data = getOrNewData(items, false);
+                        data.AddEvents(items[3..]);
+                    }
+                } else if (items[0]._startsWith("#shifts")) {
+                    if (items.Length >= 4) {
+                        var data = getOrNewData(items, false);
+                        data.AddShiftRanges(items[3..]);
+                    }
+                } else if (items[0]._startsWith("#end_of_mhlw")) {
+                    foreach (var data in prefDataDict.Values) {
+                        data.ShiftPrefData();
                     }
                 } else if (items[0]._startsWith("20")) {
                     var data = getOrNewData(items, true);

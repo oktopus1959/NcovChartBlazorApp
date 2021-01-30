@@ -64,6 +64,9 @@ namespace ChartBlazorApp.Models
         public int[] paramRtDaysToRt4 { get; set; }
         public double[] paramRtRt4 { get; set; }
 
+        /// <summary> アノテーション </summary>
+        public string[] events { get; set; }
+
         // ---- 上のところまでが LocalStorage に保存される
 
         public int favorPrefNum {
@@ -143,6 +146,7 @@ namespace ChartBlazorApp.Models
             paramRtRt3 = new double[numData];
             paramRtDaysToRt4 = new int[numData];
             paramRtRt4 = new double[numData];
+            events = new string[numData];
             return this;
         }
 
@@ -219,6 +223,7 @@ namespace ChartBlazorApp.Models
             paramRtRt3 = _extendArray(paramRtRt3, numData);
             paramRtDaysToRt4 = _extendArray(paramRtDaysToRt4, numData);
             paramRtRt4 = _extendArray(paramRtRt4, numData);
+            events = _extendArray(events, numData);
 
             if (_oldValuesCopied) {
                 logger.Debug($"Old value already copied");
@@ -258,6 +263,7 @@ namespace ChartBlazorApp.Models
         public double myParamRt3(int idx = -1) { return paramRtRt3._getNth(idx >= 0 ? idx : dataIdx); }
         public int myParamDaysToRt4(int idx = -1) { return paramRtDaysToRt4._getNth(idx >= 0 ? idx : dataIdx); }
         public double myParamRt4(int idx = -1) { return paramRtRt4._getNth(idx >= 0 ? idx : dataIdx); }
+        public string myEvents(int idx = -1) { return events._getNth(idx >= 0 ? idx : dataIdx); }
 
         public void changeBarWidth(int value)
         {
@@ -370,6 +376,17 @@ namespace ChartBlazorApp.Models
                 doCompaction();
             }
             return this;
+        }
+
+        public void SetEasyParams(int idx, string startDt, int daysToOne, double rt1, double factor1, double rt2, double factor2)
+        {
+            if (idx < 0) idx = dataIdx;
+            paramRtStartDate[idx] = startDt;
+            paramRtDaysToOne[idx] = daysToOne;
+            paramRtEasyRt1[idx] = rt1;
+            paramRtDecayFactor[idx] = factor1;
+            paramRtEasyRt2[idx] = rt2;
+            paramRtDecayFactorNext[idx] = factor2;
         }
 
         public void setDrawExpectation(bool value)
@@ -499,6 +516,10 @@ namespace ChartBlazorApp.Models
         public void setParamRt4(double value)
         {
             if (paramRtRt4.Length > dataIdx) paramRtRt4[dataIdx] = value;
+        }
+        public void setEvent(string value)
+        {
+            if (events.Length > dataIdx) events[dataIdx] = value;
         }
 
     }

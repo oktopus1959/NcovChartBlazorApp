@@ -302,14 +302,14 @@ namespace ChartBlazorApp.Models
                 annotations = annotations._extend(annotations.Length + 1);
             }
             annotation.annotations = annotations;
-            var a = annotations[^1] = new Annotation.Annotation_();
-            if (mode._notEmpty()) a.mode = mode;
+            var anno = annotations[^1] = new Annotation.Annotation_();
+            if (mode._notEmpty()) anno.mode = mode;
             if (axisId._isEmpty()) axisId = scales.xAxes[0].id;
-            if (axisId._notEmpty()) a.scaleID = axisId;
-            if (color._notEmpty()) a.borderColor = color;
-            a.value = value;
+            if (axisId._notEmpty()) anno.scaleID = axisId;
+            if (color._notEmpty()) anno.borderColor = color;
+            anno.value = value;
             if (label._notEmpty()) {
-                a.label = new Annotation.Annotation_.Label() { content = label };
+                anno.label = new Annotation.Annotation_.Label() { content = label };
             }
         }
     }

@@ -116,8 +116,10 @@ namespace ChartBlazorApp.Pages
 
         private static string _predictBackDt { get; set; }
 
-        private bool _testInfectEnabled => _effectiveParams.TestInfectDataEnabled;
-        private int _testInfectIdx => _effectiveParams.TestInfectDataIdx;
+        private int _eventsInfectIdx => _effectiveParams.TimeMachineInfectDataIdx;
+
+        private bool _timeMachineInfectEnabled => _effectiveParams.TimeMachineInfectDataEnabled;
+        private int _timeMachineInfectIdx => _effectiveParams.TimeMachineInfectDataIdx;
 
         //private int _debugLevel {
         //    get { return _effectiveParams?.DebugLevel ?? ConsoleLog.DEBUG_LEVEL; }
@@ -131,9 +133,9 @@ namespace ChartBlazorApp.Pages
 
         private InfectData _infectData { get { return _effectiveParams.MyInfectData; } }
 
-        private int _radioIdx { get { return _testInfectEnabled ? _selectorPos : _effectiveParams.RadioIdx; } }
+        private int _radioIdx { get { return _timeMachineInfectEnabled ? _selectorPos : _effectiveParams.RadioIdx; } }
 
-        private int _prefIdx { get { return _testInfectEnabled ? _testInfectIdx : Math.Max(_effectiveParams.PrefIdx, _mainPrefNum); } }
+        private int _prefIdx { get { return _timeMachineInfectEnabled ? _timeMachineInfectIdx : Math.Max(_effectiveParams.PrefIdx, _mainPrefNum); } }
 
         private int _dataIdx { get { return _effectiveParams.MyDataIdx; } }
 
@@ -177,6 +179,8 @@ namespace ChartBlazorApp.Pages
         //private bool _usePostDecayRt1 { get { return _effectiveParams.UsePostDecayRt1; } }
 
         private double _postDecayFactorRt2 { get { return _effectiveParams.PostDecayFactorRt2; } }
+
+        private string _events => _effectiveParams.Events;
 
         //private string _paramDate { get { return _effectiveParams.MyParamStartDate()._orElse(() => _infectData.FindRecentMaxRtDateStr(_localMaxRtDuration))._orElse(() => _infectData.InitialDecayParam.StartDate._toDateString()); } }
         private string _paramDate { get { return _effectiveParams.ParamStartDate; } }
@@ -365,8 +369,8 @@ namespace ChartBlazorApp.Pages
         /// <summary> 基準日<summary>
         public async Task ChangeExpectationParamDate(ChangeEventArgs args)
         {
-            string dts = args.Value.ToString().Trim();
-            if (dts._reMatch(@"^\d+/\d+$")) dts = $"{DateTime.Now._yyyy()}/{dts}";
+            string dts = args.Value.ToString().Trim()._toFullDateStr();
+            //if (dts._reMatch(@"^\d+/\d+$")) dts = $"{DateTime.Now._yyyy()}/{dts}";
             dts = getValidStartDt(dts);
             if (_useDateForChangePoint && _effectiveParams.CurrentSettings.myParamDaysToOne() > 0) {
                 var dt = dts._parseDateTime();
@@ -387,8 +391,8 @@ namespace ChartBlazorApp.Pages
         /// <summary>4段階の基準日<summary>
         public async Task ChangeExpectationParamDateForestep(ChangeEventArgs args)
         {
-            string dt = args.Value.ToString().Trim();
-            if (dt._reMatch(@"^\d+/\d+$")) dt = $"{DateTime.Now._yyyy()}/{dt}";
+            string dt = args.Value.ToString().Trim()._toFullDateStr();
+            //if (dt._reMatch(@"^\d+/\d+$")) dt = $"{DateTime.Now._yyyy()}/{dt}";
             dt = getValidStartDt(dt);
             await changeRtParamCustom(dt, "2020/1/1",
                 _effectiveParams.CurrentSettings.setParamStartDateFourstep,
@@ -433,12 +437,12 @@ namespace ChartBlazorApp.Pages
 
         public async Task ChangePredBackDays(ChangeEventArgs args)
         {
-            string dts = args.Value.ToString().Trim();
+            string dts = args.Value.ToString().Trim()._toFullDateStr(true);
             logger.Debug($"CALLED: dt={dts}");
-            if (dts._reMatch(@"^\d+/\d+$"))
-                dts = $"{DateTime.Now._yyyy()}/{dts}";
-            else if (dts._reMatch(@"^\d+$"))
-                dts = $"{DateTime.Now.ToString("yyyy/MM")}/{dts}";
+            //if (dts._reMatch(@"^\d+/\d+$"))
+            //    dts = $"{DateTime.Now._yyyy()}/{dts}";
+            //else if (dts._reMatch(@"^\d+$"))
+            //    dts = $"{DateTime.Now.ToString("yyyy/MM")}/{dts}";
             //dts = getValidStartDt(dts);
             var dt = dts._parseDateTime();
             if (dt._notValid()) {
@@ -528,8 +532,10 @@ namespace ChartBlazorApp.Pages
             if (dt == DailyData.ReloadMagicNumber.ToString() && _cancellable) {
                 reloadData(true);     // 「RESET」→「変化日までの日数:MagicNumber」でリロード
                 dt = "";
+            } else {
+                dt = dt._toFullDateStr();
             }
-            if (dt._reMatch(@"^\d+/\d+$")) dt = $"{DateTime.Now._yyyy()}/{dt}";
+            //if (dt._reMatch(@"^\d+/\d+$")) dt = $"{DateTime.Now._yyyy()}/{dt}";
             int days = (dt._parseDateTime() - _effectiveParams.getParamStartDate()._parseDateTime()).Days._lowLimit(0)._highLimit(100);
             await changeRtParamCustom(days, 9999,
                 _effectiveParams.CurrentSettings.setParamDaysToOne,
@@ -843,31 +849,58 @@ namespace ChartBlazorApp.Pages
             await RenderChartMethod();
         }
 
-        private string _extraNewlyData = "";
+        private string _timeMachineData = "";
 
-        public async Task TestMode()
+        public async Task TimeMachineMode()
         {
-            await updateTestData(_extraNewlyData);
+            await updateTimeMachineData(_timeMachineData);
         }
 
         public async Task NormalMode()
         {
-            _effectiveParams.ClearTestInfectData();
+            _effectiveParams.ClearTimeMachineInfectData();
             await RenderChartMethod();
         }
 
-        public async Task UpdateTestData(ChangeEventArgs args)
+        public async Task UpdateTimeMachineData(ChangeEventArgs args)
         {
-            await updateTestData(args.Value.ToString());
+            await updateTimeMachineData(args.Value.ToString());
         }
 
-        private async Task updateTestData(string testData)
+        private async Task updateTimeMachineData(string tmData)
         {
-            _extraNewlyData = _effectiveParams.UseTestInfectData(testData);
-            await changeRtParam(testData, "-",
+            _timeMachineData = _effectiveParams.UseTimeMachineInfectData(tmData);
+            await changeRtParam(tmData, "-",
                 null,
-                () => _extraNewlyData,
-                (val) => _extraNewlyData = val);
+                () => _timeMachineData,
+                (val) => _timeMachineData = val);
+        }
+
+        public async Task AdoptTimeMachineData()
+        {
+            RtDecayParam rtParam = _effectiveParams.MakeRtDecayParam(false);
+            _effectiveParams.CurrentSettings.SetEasyParams(-1, rtParam.StartDate._dateString(), rtParam.DaysToOne, rtParam.EasyRt1, rtParam.DecayFactor, rtParam.EasyRt2, rtParam.DecayFactorNext);
+            await NormalMode();
+        }
+
+        public async Task EventsInputOn()
+        {
+            _eventsInfectInput = true;
+            await RenderChartMethod();
+        }
+
+        public async Task EventsInputOff()
+        {
+            _eventsInfectInput = false;
+            await RenderChartMethod();
+        }
+
+        public async Task UpdateEvents(ChangeEventArgs args)
+        {
+            await changeRtParam(args.Value.ToString(), ":",
+                (val) => _effectiveParams.CurrentSettings.setEvent(val),
+                () => _effectiveParams.Events,
+                (val) => _effectiveParams.CurrentSettings.setEvent(val));
         }
 
         public async Task RenderReloadMethod()
@@ -964,11 +997,20 @@ namespace ChartBlazorApp.Pages
                     (double, double) calcYAxisScale(double yMax0, double yStep0, double yMax) => yMax > 0 ? (yMax, yMax / (yMax == 2.5 ? 5 : 10)) : (yMax0, yStep0);
                     (double y1_max, double y1_step) = calcYAxisScale(infData.Y1_Max, infData.Y1_Step, _yAxisMax._lowLimit(_yAxisMin));
                     (double y2_max, double y2_step) = calcYAxisScale(infData.Y2_Max, infData.Y2_Step, _yAxis2Max);
+
                     Options options = Options.CreateTwoAxes(new Ticks(y1_max, y1_step), new Ticks(y2_max, y2_step));
                     if (!bAnimation) options.AnimationDuration = 0;
                     if (bTailPadding) options.legend.SetAlignEnd();
                     options.legend.reverse = true;  // 凡例の表示を登録順とは逆順にする
                     options.SetOnlyClickEvent(_onlyOnClick);
+                    // イベントアノテーションの追加
+                    foreach (var evt in _events._split(',')) {
+                        var items = evt._split2(':');
+                        var val = items._nth(0)._strip();
+                        var label = items._nth(1);
+                        if (val._notEmpty() && label._notEmpty())
+                            options.AddAnnotation(val._toCanonicalMMDD(), label);
+                    }
                     chartData.options = options;
 
                     var dataSets = new List<Dataset>();

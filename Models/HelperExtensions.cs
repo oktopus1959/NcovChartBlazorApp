@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.JSInterop;
+using StandardCommon;
 
 namespace ChartBlazorApp.Models
 {
@@ -11,6 +12,32 @@ namespace ChartBlazorApp.Models
         public static double?[] _toNullableArray(this IEnumerable<double> array, int roundDigit, double? defval = null)
         {
             return array.Select(x => x > 0 ? Math.Round(x, roundDigit) : defval).ToArray();
+        }
+
+        public static string _toFullDateStr(this string dtStr, bool bAllowDayOnly = false)
+        {
+            var dtNow = DateTime.Now;
+            if (bAllowDayOnly && dtStr._reMatch(@"^\d+$")) {
+                dtStr = $"{dtNow:MM}/{dtStr}";
+            }
+            if (dtStr._reMatch(@"^\d+/\d+$")) {
+                var result = $"{dtNow:yyyy}/{dtStr}";
+                var resDt = result._parseDateTime();
+                if (resDt > dtNow.AddMonths(9))
+                    result = $"{dtNow.AddYears(-1):yyyy}/{dtStr}";
+                else if (resDt < dtNow.AddMonths(-9))
+                    result = $"{dtNow.AddYears(1):yyyy}/{dtStr}";
+                return result;
+            }
+            return dtStr;
+        }
+
+        /// <summary> MM/DD 形式の日付文字列に変換して返す </summary>
+        /// <param name="dtStr"></param>
+        /// <returns></returns>
+        public static string _toCanonicalMMDD(this string dtStr)
+        {
+            return dtStr._toFullDateStr()._parseDateTime().ToString("MM/dd");
         }
 
         public static async Task _renderChart2(this IJSRuntime jsRuntime, string chartId, int barWidth, double scrollRatio, string jsonStr,

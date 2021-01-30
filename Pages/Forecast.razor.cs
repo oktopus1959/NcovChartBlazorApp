@@ -89,11 +89,17 @@ namespace ChartBlazorApp.Pages
             StateHasChanged();
         }
 
-        private bool _extendDispDays = ConsoleLog.DEBUG_LEVEL > 0;
+        private bool _extendDispDays = false; // ConsoleLog.DEBUG_LEVEL > 0;
 
         public async Task ExtendDispDays(ChangeEventArgs args)
         {
             _extendDispDays = (bool)(args.Value);
+            await RenderDeathAndSeriousChart(false);
+            StateHasChanged();
+        }
+
+        public async Task Reload()
+        {
             await RenderDeathAndSeriousChart(false);
             StateHasChanged();
         }
@@ -116,11 +122,13 @@ namespace ChartBlazorApp.Pages
 
             bool onlyOnClick = _effectiveParams.OnlyOnClick;
 
-            var jsonStr = forecastData.MakeDeathJsonData(_userData, userDataByUser, onlyOnClick, bAnimation);
-            await JSRuntime._renderChart2("chart-wrapper-death", -2, newlyDaysRatio(), jsonStr);
+            string jsonStr;
 
             jsonStr = forecastData.MakeSeriousJsonData(_userData, userDataByUser, onlyOnClick, bAnimation);
             await JSRuntime._renderChart2("chart-wrapper-serious", -2, newlyDaysRatio(), jsonStr);
+
+            jsonStr = forecastData.MakeDeathJsonData(_userData, userDataByUser, onlyOnClick, bAnimation);
+            await JSRuntime._renderChart2("chart-wrapper-death", -2, newlyDaysRatio(), jsonStr);
 
             if (_showOtherCharts) {
                 jsonStr = forecastData.MakeDailyDeathJonData(_userData, userDataByUser, onlyOnClick);
