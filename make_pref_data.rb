@@ -100,7 +100,8 @@ pref_codes = {
   "沖縄" => "Okinawa",
 }
 
-pref_num = {}
+posi_num = {}
+test_num = {}
 
 dt = ARGV.shift
 
@@ -110,14 +111,19 @@ while line = gets
   #STDERR.puts items.join("|")
   name = items[0].strip.split(/ +/)[0]
   if prefs.include?(name)
-    pref_num[name] = items[1].strip.gsub(/,/, "").to_i
+    posi_num[name] = pnum = items[1].strip.gsub(/,/, "").to_i
+    test_num[name] = tnum = items[2].strip.gsub(/,/, "").to_i
+    if pnum > tnum
+      STDERR.puts "\e[38;5;9mPOSITIVE(#{pnum}) > TEST(#{tnum})\e[0m: #{name}"
+    end
   end
 end
 
 prefs.each {|name|
-  num = pref_num[name]
-  if num && (num > 0 || name == '岩手')
-    puts "#{dt},#{name},#{pref_codes[name]},#{num}"
+  pnum = posi_num[name]
+  tnum = test_num[name]
+  if pnum && (pnum > 0 || name == '岩手')
+    puts "#{dt},#{name},#{pref_codes[name]},#{pnum},#{tnum}"
   else
     STDERR.puts "\e[38;5;9mNO DATA\e[0m: #{name}"
   end

@@ -109,8 +109,11 @@ downloadCsv() {
 PREF_PARAM_FILE=Data/pref_params.txt
 PREF_WORK_FILE=$WORKDIR/prefectures_ex.csv
 PREF_TARGET_FILE=$CSVDIR/prefectures_ex.csv
-PCR_DAILY_FILE=pcr_positive_daily.csv
-PCR_DAILY_WORK=$WORKDIR/$PCR_DAILY_FILE
+POSI_DAILY_FILE=pcr_positive_daily.csv
+POSI_DAILY_WORK=$WORKDIR/$POSI_DAILY_FILE
+TEST_DAILY_FILE=pcr_tested_daily.csv
+TEST_DAILY_WORK=$WORKDIR/$TEST_DAILY_FILE
+ALL_PCR_DAILY_WORK=$WORKDIR/all_pcr_daily.csv
 PREF_SRCFILE=Data/covid19/data/prefectures.csv
 
 DEATH_TOTAL_FILE=death_total.csv
@@ -133,21 +136,27 @@ FIRST_DATE='2020.0?5.18'
 sed -n '1,/#end_of_header/ p' $PREF_PARAM_FILE > $PREF_WORK_FILE
 
 # 全国データのダウンロード
-RUN_CMD -f "downloadCsv https://www.mhlw.go.jp/content/$PCR_DAILY_FILE ${PCR_DAILY_WORK}"
+RUN_CMD -f "downloadCsv https://www.mhlw.go.jp/content/$POSI_DAILY_FILE ${POSI_DAILY_WORK}"
+RUN_CMD -f "downloadCsv https://www.mhlw.go.jp/content/$TEST_DAILY_FILE ${TEST_DAILY_WORK}"
 
 ruby_script() {
 cat <<EOS
-total = 0;
+posi_total = 0;
+test_total = 0;
 while line = gets;
     items = line.strip.split(/,/);
-    total += items[1].to_i;
-    puts "#{items[0]},全国,All,#{total}";
+    posi_total += items[1].to_i;
+    test_total += items[2].to_i;
+    puts "#{items[0]},全国,All,#{posi_total},#{test_total}";
 end
 EOS
 }
 
 # 全国陽性者数
-RUN_CMD -f "sed -nr '/^${FIRST_DATE},/,$ p' $PCR_DAILY_WORK| ruby -e '$(ruby_script)' >> ${PREF_WORK_FILE}"
+RUN_CMD -fm "sed -nr '/^${FIRST_DATE},/,$ s/\r//p' $POSI_DAILY_WORK > ${POSI_DAILY_WORK}.tmp"
+RUN_CMD -fm "sed -nr '/^${FIRST_DATE},/,$ s/\r//p' $TEST_DAILY_WORK | cut -d, -f2 > ${TEST_DAILY_WORK}.tmp"
+RUN_CMD -fm "paste -d, ${POSI_DAILY_WORK}.tmp ${TEST_DAILY_WORK}.tmp > $ALL_PCR_DAILY_WORK"
+RUN_CMD -fm "ruby -e '$(ruby_script)' $ALL_PCR_DAILY_WORK >> ${PREF_WORK_FILE}"
 
 # 都道府県陽性者数
 PREF_WORKDIR=$WORKDIR/pref
