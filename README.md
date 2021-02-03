@@ -50,6 +50,12 @@ $ ./update_data.sh --load
 作成されたデータは、都道府県別のPCR検査数、陽性率を抽出するために利用することも可能です。
 抽出方法については `make_pref_data.rb` を参考にしてください。
 
+#### 2021/02/03 追記
+上記PDFからテキストを抽出するためのDockerイメージを構築する Dockerfile を別プロジェクトして作成しました。
+
+[camelot-mhlw](https://github.com/oktopus1959/camelot-mhlw)
+
+
 ### 年齢階級別陽性者数データ
 重症者数・死亡者数の予測には、 Data/infect_by_ages.txt が必要です。
 これは、毎週木曜日あたりに厚労省から発表される「年齢階級別陽性者数」を見て手作業で更新しています。
