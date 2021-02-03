@@ -5,11 +5,11 @@ Chart.js を使って実装したものです。もともと、Web アプリの�
 公開することにしました。
 
 ## Web サイト
-このアプリは、下記サイトにて実際に稼動しています。
+このアプリは、下記「[新型コロナ 陽性者数グラフ](https://ncov.oktopus59.net/)」サイトにて実際に稼動しています。
 
 https://ncov.oktopus59.net/
 
-陽性者数の他、 日本における COVID-19 重症者や死亡者数の予測も下記ページで行っています。
+陽性者数の他、 日本における COVID-19 [重症者や死亡者数の予測](https://ncov.oktopus59.net/forecast/)も下記ページで行っています。
 
 https://ncov.oktopus59.net/forecast/
 
