@@ -1,4 +1,14 @@
-﻿function insertStaticDescription(html) {
+﻿function insertDescription(divId, html) {
+    initializeDescription();
+    document.getElementById(divId).innerHTML = html;
+}
+
+function initializeDescription() {
+    document.getElementById("components-reconnect-modal").style.display = "block";
+    document.getElementById("dummy-description").innerHTML = "";
+}
+
+function insertStaticDescription(html) {
     document.getElementById("static-description").innerHTML = html;
 }
 

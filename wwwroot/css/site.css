@@ -151,6 +151,10 @@ hr.narrow {
     height: 2.5em !important;
 }
 
+.mr-X {
+    margin-right: 1.3em !important;
+}
+
 .inline-wrapper {
     display: inline-block;
     margin-top: 4px;
@@ -183,6 +187,14 @@ hr.narrow {
         margin-left: auto;
         margin-right: 6px;
     }
+
+    .inline-narrow { display: inline; font-size: small; }
+    .inline-small-font { display: none; }
+}
+
+@media (min-width: 355px) {
+    .inline-narrow { display: none; }
+    .inline-small-font { display: inline; font-size: small; }
 }
 
 @media (min-width: 400px) {
@@ -231,15 +243,15 @@ table {
 @media (min-width: 600px) {
     div.inline-or-block { display: inline-block; margin-top: 0px; }
 }
-
+/*
 @media (min-width: 660px) {
     div.tbl-scroll { overflow-x: initial; }
     div.table { max-width: 640px; }
 }
-
+*/
 @media (min-width: 800px) {
     div.tbl-scroll { overflow-x: initial; }
-    div.table { max-width: 640px; }
+    div.table { max-width: 780px; }
     div.table-block { margin-right: 20px; }
 }
 
@@ -292,8 +304,20 @@ label, input[type='checkbox'], input[type='radio'] {
     color: darkgreen;
 }
 
+.unselected-color {
+    color: rgb(30,30,30);
+}
+
 .no-color {
     color: rgba(0,0,0,0);
+}
+
+.bold-font {
+    font-weight: bold;
+}
+
+.normal-font {
+    font-weight: normal;
 }
 
 .text-date {

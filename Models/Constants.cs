@@ -8,6 +8,9 @@ namespace ChartBlazorApp.Models
 {
     public static class Constants
     {
+        /// <summary> データの最初の日付 </summary>
+        public const string FIRST_EFFECTIVE_DATE = "2020/6/1";
+
         /***  MyChart.razor.cs ***/
         public const double PostDecayFactorRt2 = 0.025;
 
@@ -183,7 +186,7 @@ namespace ChartBlazorApp.Models
         public const int FORECAST_PREDICTION_DAYS = 28;
 
         /// <summary> 4段階設定用の予測日数 </summary>
-        public const int FORECAST_PREDICTION_DAYS_FOR_DETAIL = 90;
+        public const int FORECAST_PREDICTION_DAYS_FOR_DETAIL = 100;
 
         /// <summary> 7日移動平均の中央までシフトする日数 </summary>
         public const int FORECAST_AVERAGE_SHIFT_DAYS = 3;

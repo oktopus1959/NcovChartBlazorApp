@@ -115,8 +115,8 @@ namespace ChartBlazorApp.Models
     {
         private static ConsoleLog logger = ConsoleLog.GetLogger();
 
-        /// <summary> グラフ表示開始日 </summary>
-        public DateTime ChartStartDate { get; set; }
+        /// <summary> 元データにおける起算日(計算の起点として実データを使用する初日) </summary>
+        public DateTime CalcStartDate { get; set; }
 
         /// <summary> 実データ部分も含めた予測表示開始日 </summary>
         public DateTime PredDispStartDate { get; set; }
@@ -124,7 +124,8 @@ namespace ChartBlazorApp.Models
         /// <summary> 予測に利用する実データの終了日(の翌日) </summary>
         public DateTime PredictStartDate { get; set; }
 
-        public int ChartRealDays { get { return (PredictStartDate - ChartStartDate).Days; } }
+        /// <summary> 元データにおける実データ日数 </summary>
+        public int ChartRealDays { get { return (PredictStartDate - CalcStartDate).Days; } }
 
         public double StartSeriousTotal { get; set; }
 
@@ -162,16 +163,21 @@ namespace ChartBlazorApp.Models
         private DatedDataSeriesList loadRatesFile(string csvfile, int num)
         {
             var list = new DatedDataSeriesList() { DataSeriesList = new List<DatedDataSeries>() };
+            DateTime prevDt = DateTime.MinValue;
             foreach (var items in readFile(csvfile).Select(line => line.Trim().Split(','))) {
                 if (items._length() >= 2) {
                     if (items[0]._startsWith("#")) {
                         if (items[0]._startsWith("#modify")) {
                             list.UpdateDate = items[1]._parseDateTime();
+                            if (list.UpdateDate._notValid()) logger.Warn($"File: {csvfile}, Invalid Update Date: {items[1]}");
                         } else if (items[0]._startsWith("#base")) {
                             list.BaseDataSeries = items[1..].Select(item => item._parseDouble()).ToArray();
                         }
                     } else {
                         var date = items[0]._parseDateTime();
+                        if (date._notValid()) logger.Warn($"File: {csvfile}, Invalid Date: {items[0]}");
+                        if (date < prevDt) logger.Warn($"File: {csvfile}, Disordered Date: {items[0]}, prevDate: {prevDt._toDateString()}");
+                        prevDt = date;
                         double[] dataSeries;
                         int end = Math.Min(items.Length, num);
                         if (items[1]._startsWith("factor=")) {
@@ -281,14 +287,14 @@ namespace ChartBlazorApp.Models
             List<double> totalList = new List<double>();
             totalList.Add(0);
             //double prevTotal = 0;
-            PredictStartDate = new DateTime(2020, 5, 21);   // とりあえずの初期値
+            var nextStartDate = new DateTime(2020, 5, 21);   // とりあえずの初期値
             foreach (var items in readFile(Constants.INFECTION_RATE_FILE_PATH).Select(line => line.Trim().Split(','))) {
                 if (items[0]._startsWith("#")) {
                     if (items[0]._startsWith("#aveWeek")) {
                         RateAveWeeks = items._nth(1)._parseInt(3);
                     } else if (items[0]._startsWith("#start")) {
                         var dt = items[1]._parseDateTime();
-                        if (dt._isValid()) PredictStartDate = dt.AddDays(1);
+                        if (dt._isValid()) nextStartDate = dt.AddDays(1);
                     }
                     continue;
                 }
@@ -296,27 +302,36 @@ namespace ChartBlazorApp.Models
 
                 var prevCounts = infectCountsList.Last();
                 var prevTotal = totalList.Last();
-                var counts = items[1..10].Select(n => n._parseDouble(0)).ToArray();
+                double[] counts = items[1..10].Select(n => n._parseDouble(0)).ToArray();
                 var total = counts.Sum();
-                list.Add(new DatedDataSeries() {
-                    Date = PredictStartDate,
-                    DataSeries = counts.Select((n, i) => (n - prevCounts[i]) / (total - prevTotal)).ToArray()
-                });
-                PredictStartDate = items[0]._parseDateTime().AddDays(1);
-                infectCountsList.Add(counts);
-                totalList.Add(total);
+                if (items._nth(10)._equalsTo("%")) {
+                    RateAveWeeks = 0;
+                    list.Add(new DatedDataSeries() {
+                        Date = items[0]._parseDateTime(),
+                        DataSeries = counts.Select(x => x / total).ToArray(),
+                    });
+                } else {
+                    list.Add(new DatedDataSeries() {
+                        Date = nextStartDate,
+                        DataSeries = counts.Select((n, i) => (n - prevCounts[i]) / (total - prevTotal)).ToArray(),
+                    });
+                    infectCountsList.Add(counts);
+                    totalList.Add(total);
+                    nextStartDate = items[0]._parseDateTime().AddDays(1);
+                }
             }
 
-            {
+            if (RateAveWeeks > 0) {
                 var prevCounts = infectCountsList[^(RateAveWeeks + 1)];
                 var prevTotal = totalList[^(RateAveWeeks + 1)];
                 var counts = infectCountsList[^1];
                 var total = totalList[^1];
                 list.Add(new DatedDataSeries() {
-                    Date = PredictStartDate,
+                    Date = nextStartDate,
                     DataSeries = counts.Select((n, i) => (n - prevCounts[i]) / (total - prevTotal)).ToArray()
                 });
             }
+            PredictStartDate = list.Last().Date;
             return new DatedDataSeriesList { DataSeriesList = list };
         }
 
@@ -333,7 +348,7 @@ namespace ChartBlazorApp.Models
         private void loadDeathAndSerious()
         {
             var items = readFile(Constants.DEATH_AND_SERIOUS_FILE_PATH).Select(line => line.Trim().Split(',')).ToArray();
-            ChartStartDate = items[0][0]._parseDateTime();
+            CalcStartDate = items[0][0]._parseDateTime();
             PredDispStartDate = items[1][0]._parseDateTime();
             StartSeriousTotal = items[2][0]._parseDouble();
             StartRecoverTotal = items[2][1]._parseDouble();
@@ -668,8 +683,8 @@ namespace ChartBlazorApp.Models
 
         public double[] CalcFullPredictDeath(DatedDataSeriesList ratesByAges, double[][] infectsByAges, DateTime firstDate, int numDays)
         {
-            double predDeathTotal = RealDeathSeries.DataOn(ChartStartDate.AddDays(-1));
-            return ratesByAges.CalcTotalData(predDeathTotal, infectsByAges, firstDate, ChartStartDate, numDays);
+            double predDeathTotal = RealDeathSeries.DataOn(CalcStartDate.AddDays(-1));
+            return ratesByAges.CalcTotalData(predDeathTotal, infectsByAges, firstDate, CalcStartDate, numDays);
         }
 
         public double[] CalcFullPredictSerious(double[][] infectsByAges, DateTime firstDate, int numDays, double[] fullPredictDeath)
@@ -680,11 +695,11 @@ namespace ChartBlazorApp.Models
         public double[] CalcFullPredictSerious(DatedDataSeriesList ratesByAges, double[][] infectsByAges, DateTime firstDate, int numDays, double[] fullPredictDeath)
         {
             double predSeriousTotal = StartSeriousTotal;
-            var fullPredictSeriousTotal = ratesByAges.CalcTotalData(predSeriousTotal, infectsByAges, firstDate, ChartStartDate, numDays);
+            var fullPredictSeriousTotal = ratesByAges.CalcTotalData(predSeriousTotal, infectsByAges, firstDate, CalcStartDate, numDays);
 
             double predRecoverTotal = StartRecoverTotal;
 
-            double[] preambleSerious = RealSeriousSeries.GetSubSeriesTo(ChartStartDate);
+            double[] preambleSerious = RealSeriousSeries.GetSubSeriesTo(CalcStartDate);
             double[] fullPredictSerious = preambleSerious._extend(preambleSerious.Length + fullPredictSeriousTotal.Length);
             double[] fullPredictRecoverTotal = new double[fullPredictSeriousTotal.Length];
             for (int i = preambleSerious.Length; i < fullPredictSerious.Length; ++i) {
@@ -719,13 +734,21 @@ namespace ChartBlazorApp.Models
 
         public bool ExtendDispDays { get; set; } = false;
 
+        public bool UseTimeMachine { get; set; } = false;
+
         public bool UseFourStep { get; set; } = false;
 
-        private int PredictDays { get { return UseFourStep ? Constants.FORECAST_PREDICTION_DAYS_FOR_DETAIL : Constants.FORECAST_PREDICTION_DAYS * (ExtendDispDays ? 2 : 1); } }
+        public DateTime FourStepLastChangeDate { get; set; }
 
-        private DateTime ChartStartDate { get; set; }
+        private int FourStepPredDays => ((FourStepLastChangeDate - chartPredStartDate).Days + 14)._lowLimit(Constants.FORECAST_PREDICTION_DAYS_FOR_DETAIL);
 
-        public DateTime LastRealDate { get { return ChartStartDate.AddDays((RealDeath._length() - 1)._lowLimit(0)); } }
+        /// <summary> 予測期間表示日数 </summary>
+        private int PredictDays => (UseFourStep ? FourStepPredDays : Constants.FORECAST_PREDICTION_DAYS) + (ExtendDispDays ? (UseFourStep ? Constants.FORECAST_PREDICTION_DAYS_FOR_DETAIL : Constants.FORECAST_PREDICTION_DAYS) : 0);
+
+        /// <summary> チャートの実際の表示開始日(X軸日付ラベルの初日) </summary>
+        private DateTime ChartLabelStartDate { get; set; }
+
+        public DateTime LastRealDate { get { return ChartLabelStartDate.AddDays((RealDeath._length() - 1)._lowLimit(0)); } }
 
         public string LastRealDateStr { get { return LastRealDate.ToString("M月d日"); } }
 
@@ -747,11 +770,15 @@ namespace ChartBlazorApp.Models
 
         public string[] LabelDates { get; set; } = null;
 
+        /// <summary> チャート表示開始日以降の実死亡者数</summary>
         public double[] RealDeath { get; set; } = null;
+        /// <summary> チャート表示開始日以降の予測死亡者数</summary>
         public double[] FullPredictDeath { get; set; } = null;
         public double RealDeathMax { get; set; }
 
+        /// <summary> チャート表示開始日以降の実重症者数</summary>
         public double[] RealSerious { get; set; } = null;
+        /// <summary> チャート表示開始日以降の予測重症者数</summary>
         public double[] FullPredictSerious { get; set; } = null;
         public double RealSeriousMax { get; set; }
 
@@ -767,39 +794,61 @@ namespace ChartBlazorApp.Models
         public double[] BothSumRealPredictDiff { get; set; } = null;
         public double BothDiffMSE { get; set; } = 0;
 
+        /// <summary> 予測に利用する実データの終了日(の翌日) </summary>
         private DateTime chartPredStartDate;
 
         /// <summary>
         /// 予測に必要なデータの準備
         /// </summary>
         /// <param name="infectData"></param>
-        public UserForecastData MakeData(ForecastData forecastData, InfectData infectData, RtDecayParam rtParam, bool byUser = false)
+        /// <param name="chartLabelStartDt">チャート表示開始日(X軸日付ラベルの初日)</param>
+        public UserForecastData MakeData(ForecastData forecastData, InfectData infectData, RtDecayParam rtParam, DateTime chartLabelStartDt, bool bTimeMachine, bool byUser = false)
         {
-            UseFourStep = rtParam?.Fourstep ?? false;
-            chartPredStartDate = forecastData.PredictStartDate;
-
+            // 元データの最初日
             DateTime firstDate = infectData.Dates._first();
-            ChartStartDate = forecastData.ChartStartDate;
 
-            int preambleDays = Math.Max((ChartStartDate - firstDate).Days, 0);
+            UseTimeMachine = bTimeMachine;
+            UseFourStep = rtParam?.Fourstep ?? false;
+            FourStepLastChangeDate = rtParam.StartDateFourstep.AddDays(rtParam.DaysToRt1._lowLimit(0) + rtParam.DaysToRt2._lowLimit(0) + rtParam.DaysToRt3._lowLimit(0) + rtParam.DaysToRt4._lowLimit(0));
+            chartPredStartDate = Helper.Array(forecastData.PredictStartDate, firstDate).Max();
+
+            // 元データにおける起算日(計算の起点として実データを使用する初日)
+            DateTime calcStartDate = Helper.Array(forecastData.CalcStartDate, firstDate).Max();
+            ChartLabelStartDate = Helper.Array(calcStartDate, chartLabelStartDt).Max();
+            int chartLabelMaxDays = (ChartLabelStartDate.AddYears(1) - ChartLabelStartDate).Days;
+
+            // 元データの最初日から起算日までの日数
+            int preambleDays = (calcStartDate - firstDate).Days;
+            // プリアンブル以降で、チャートに表示されず破棄される、非表示期間の実データの日数
+            int discardedDays = (ChartLabelStartDate - calcStartDate).Days;
+
+            // 予測期間表示日数
             int predDays = PredictDays;
 
-            DateTime calcPredStartDt = (rtParam != null && chartPredStartDate <= rtParam.EffectiveStartDate) ? rtParam.EffectiveStartDate.AddDays(1) : chartPredStartDate ;
+            // 予測計算開始日
+            DateTime calcPredStartDt = (rtParam != null && chartPredStartDate <= rtParam.EffectiveStartDate) ? rtParam.EffectiveStartDate.AddDays(1) : chartPredStartDate;
+            // 予測計算に使用する実データ日数
             int calcFullRealDays = Math.Max((calcPredStartDt - firstDate).Days, 0);
             //int calcFullPredDays = calcFullRealDays + predDays;
-            int calcRealDays = calcFullRealDays - preambleDays;
 
-            int chartFullRealDays = Math.Max((chartPredStartDate - firstDate).Days, 0);
-            int chartFullPredDays = chartFullRealDays + predDays;
-            int chartFullDays = chartFullPredDays + Constants.FORECAST_AVERAGE_SHIFT_DAYS + 7;
-            int chartLabelDays = chartFullPredDays + 1 - preambleDays;
+            // プリアンブル＋非表示期間+表示期間の実データの日数
+            int chartFullRealDays = (chartPredStartDate - firstDate).Days;
+            // プリアンブル＋非表示期間+表示期間の実＋予測データの日数
+            int chartFullDays = chartFullRealDays + predDays;
+            // プリアンブル＋非表示期間＋表示期間＋末尾の平均値計算期間のデータの日数
+            int chartFullDaysExtraAdded = chartFullDays + Constants.FORECAST_AVERAGE_SHIFT_DAYS + 7;
 
-            logger.Debug($"CALL UserPredictData.PredictValuesEx({rtParam}, fullDays={chartFullDays}, extDays={predDays + 7}, predStartDt={calcPredStartDt._toDateString()})");
-            var predData = UserPredictData.PredictValuesEx(infectData, rtParam, chartFullDays, predDays + 7, calcPredStartDt);
+            // X軸日付ラベルの表示日数(実際にチャートに表示される日数)
+            int chartLabelDays = (chartFullDays + 1 - (preambleDays + discardedDays))._highLimit(chartLabelMaxDays);
+            // チャート表示期間における実データ日数
+            int chartLabelRealDays = calcFullRealDays - (preambleDays + discardedDays);
+
+            logger.Debug($"CALL UserPredictData.PredictValuesEx({rtParam}, fullDays={chartFullDaysExtraAdded}, extDays={predDays + 7}, predStartDt={calcPredStartDt._toDateString()})");
+            var predData = UserPredictData.PredictValuesEx(infectData, rtParam, chartFullDaysExtraAdded, predDays + 7, calcPredStartDt);
 
             double[] dailyInfect = infectData.Newly.Take(calcFullRealDays).ToArray();
-            double[] dailyPredInfect = predData.PredNewly.Take(chartFullDays).Select((x, i) => (i < calcFullRealDays && dailyInfect._nth(i) > 0) ? dailyInfect[i] : x).ToArray();
-            LabelDates = chartLabelDays._range().Select(n => forecastData.ChartStartDate.AddDays(n)._toShortDateString()).ToArray();
+            double[] dailyPredInfect = predData.PredNewly.Take(chartFullDaysExtraAdded).Select((x, i) => (i < calcFullRealDays && dailyInfect._nth(i) > 0) ? dailyInfect[i] : x).ToArray();
+            LabelDates = chartLabelDays._range().Select(n => ChartLabelStartDate.AddDays(n)._toShortDateString()).ToArray();
 
             // 予測期間における新規陽性者数累計
             LastAccumPositive = (int)Math.Round(predData.PredNewly.Skip(calcFullRealDays).Take(predDays).Sum(), 0);
@@ -810,25 +859,26 @@ namespace ChartBlazorApp.Models
             double[][] infectsByAges = forecastData.calcInfectsByAges(firstDate, dailyPredInfect);
 
             // death予想
-            RealDeath = forecastData.RealDeathSeries.GetSubSeriesFrom(forecastData.ChartStartDate);
-            double[] fullPredictDeath = forecastData.CalcFullPredictDeath(infectsByAges, firstDate, chartFullPredDays);
-            FullPredictDeath = fullPredictDeath.Select((x, i) => Math.Round(x)).ToArray();
+            RealDeath = forecastData.RealDeathSeries.GetSubSeriesFrom(ChartLabelStartDate);
+            double[] fullPredictDeath = forecastData.CalcFullPredictDeath(infectsByAges, firstDate, chartFullDays);
+            FullPredictDeath = fullPredictDeath.Skip(discardedDays).Take(chartLabelDays).Select((x, i) => Math.Round(x)).ToArray();
             LastPredictDeath = (int)FullPredictDeath.Last();
             RealDeathMax = RealDeath.Max();
 
             // serious予想
-            RealSerious = forecastData.RealSeriousSeries.GetSubSeriesFrom(forecastData.ChartStartDate);
-            FullPredictSerious = forecastData.CalcFullPredictSerious(infectsByAges, firstDate, chartFullPredDays, fullPredictDeath);
+            RealSerious = forecastData.RealSeriousSeries.GetSubSeriesFrom(ChartLabelStartDate);
+            double[] fullPredictSerious = forecastData.CalcFullPredictSerious(infectsByAges, firstDate, chartFullDays, fullPredictDeath);
+            FullPredictSerious = fullPredictSerious.Skip(discardedDays).Take(chartLabelDays).ToArray();
             RealSeriousMax = RealSerious.Max();
 
-            (var idx, var val) = FullPredictSerious.Skip(calcRealDays)._top1();
+            (var idx, var val) = FullPredictSerious.Skip(chartLabelRealDays)._top1();
             MaxPredictSerious = (int)Math.Round(val);
             MaxPredictSeriousDate = chartPredStartDate.AddDays(idx);
 
             LastPredictSerious = (int)FullPredictSerious.Last();
 
             // 日別死亡者数
-            double firstVal = forecastData.RealDeathSeries.DataOn(forecastData.ChartStartDate) - forecastData.RealDeathSeries.DataOn(forecastData.ChartStartDate.AddDays(-1));
+            double firstVal = forecastData.RealDeathSeries.DataOn(ChartLabelStartDate) - forecastData.RealDeathSeries.DataOn(ChartLabelStartDate.AddDays(-1));
             DailyRealDeath = RealDeath.Length._range().Select(i => i == 0 ? firstVal : RealDeath[i] - RealDeath[i - 1]).ToArray();
             DailyPredictDeath = new double[FullPredictDeath.Length];
             //for (int i = DailyRealDeath.Length; i < DailyPredictDeath.Length; ++i) DailyPredictDeath[i] = FullPredictDeath[i] - FullPredictDeath[i - 1];

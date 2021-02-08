@@ -48,6 +48,22 @@ namespace ChartBlazorApp.Models
             await jsRuntime._invokeAsyncEx(callerLoc(method, path, linenum), "renderChart2", chartId, barWidth, scrollRatio, jsonStr);
         }
 
+        public static async Task _insertDescription(this IJSRuntime jsRuntime, string divId, string html,
+            [System.Runtime.CompilerServices.CallerMemberName] string method = "",
+            [System.Runtime.CompilerServices.CallerFilePath] string path = "",
+            [System.Runtime.CompilerServices.CallerLineNumber] int linenum = 0)
+        {
+            await jsRuntime._invokeAsyncEx(callerLoc(method, path, linenum), "insertDescription", divId, html);
+        }
+
+        public static async Task _initializeDescription(this IJSRuntime jsRuntime,
+            [System.Runtime.CompilerServices.CallerMemberName] string method = "",
+            [System.Runtime.CompilerServices.CallerFilePath] string path = "",
+            [System.Runtime.CompilerServices.CallerLineNumber] int linenum = 0)
+        {
+            await jsRuntime._invokeAsyncEx(callerLoc(method, path, linenum), "initializeDescription");
+        }
+
         public static async Task _selectDescription(this IJSRuntime jsRuntime, string pageId,
             [System.Runtime.CompilerServices.CallerMemberName] string method = "",
             [System.Runtime.CompilerServices.CallerFilePath] string path = "",

@@ -34,6 +34,8 @@ namespace ChartBlazorApp.Models
 
         public double[] Average { get; set; }
 
+        public double[] PosiRates { get; set; }
+
         public double[] Rt { get; set; }
 
         /// <summary> イベント("日付:アノテーション,..."形式) </summary>
@@ -52,10 +54,25 @@ namespace ChartBlazorApp.Models
             return PrefData.MakeData(extraData, InitialSubParams);
         }
 
+        public InfectData ShiftStartDate(DateTime startDt)
+        {
+            InfectData data = (InfectData)this.MemberwiseClone();
+            int idx = Dates._findIndex(startDt);
+            if (idx > 0) {
+                data.Dates = Dates.Skip(idx).ToArray();
+                data.Newly = Newly.Skip(idx).ToArray();
+                data.Average = Average.Skip(idx).ToArray();
+                data.PosiRates = PosiRates.Skip(idx).ToArray();
+                data.Rt = Rt.Skip(idx).ToArray();
+            }
+            return data;
+        }
+
         public static InfectData DummyData { get; } = new InfectData() {
             Dates = new DateTime[] { DateTime.Now._toDate() },
             Newly = new double[] { 1 },
             Average = new double[] { 1 },
+            PosiRates = new double[] { 1 },
             Rt = new double[] { 1 },
             InitialDecayParam = new RtDecayParam(),
             InitialSubParams = new SubParams() { StartDate = "2020/12/1" },
@@ -712,7 +729,7 @@ namespace ChartBlazorApp.Models
     {
         private static ConsoleLog logger = ConsoleLog.GetLogger();
 
-        private static DateTime _firstDate = "2020/6/1"._parseDateTime();
+        private static DateTime _firstDate = Constants.FIRST_EFFECTIVE_DATE._parseDateTime();
 
         private string Title { get; set; }
 
@@ -727,7 +744,8 @@ namespace ChartBlazorApp.Models
         //public List<double> Total { get; set; }
         //public int PreDataNum { get; set; }
 
-        private Dictionary<DateTime, double> cumulatives = new Dictionary<DateTime, double>();
+        private Dictionary<DateTime, double> posiCumulatives = new Dictionary<DateTime, double>();
+        private Dictionary<DateTime, double> testCumulatives = new Dictionary<DateTime, double>();
 
         public void InitializeIfNecessary(string dispName)
         {
@@ -754,16 +772,16 @@ namespace ChartBlazorApp.Models
         public void ShiftPrefData()
         {
             if (ShiftRanges._notEmpty()) {
-                var minDt = cumulatives.Keys.Min();
-                var maxDt = cumulatives.Keys.Max();
+                var minDt = posiCumulatives.Keys.Min();
+                var maxDt = posiCumulatives.Keys.Max();
                 foreach (var pair in ShiftRanges) {
                     var end = pair.Item2._highLimit(maxDt);
                     var dt = pair.Item1._lowLimit(minDt);
                     while (dt <= end) {
-                        cumulatives[dt.AddDays(-1)] = cumulatives[dt];
+                        posiCumulatives[dt.AddDays(-1)] = posiCumulatives[dt];
                         dt = dt.AddDays(1);
                     }
-                    if (end == maxDt) cumulatives.Remove(end);
+                    if (end == maxDt) posiCumulatives.Remove(end);
                 }
             }
         }
@@ -785,13 +803,14 @@ namespace ChartBlazorApp.Models
 
         }
 
-        public void AddData(DateTime dt, double val, string flag)
+        public void AddData(DateTime dt, double nPosi, double nTest, string flag)
         {
             if (flag._isEmpty()) {
-                cumulatives[dt] = val;
+                posiCumulatives[dt] = nPosi;
+                testCumulatives[dt] = nTest;
             } else {
-                if (flag._startsWith("O") || !cumulatives.ContainsKey(dt)) {    // O: OverWrite
-                    cumulatives[dt] = cumulatives._safeGet(dt.AddDays(-1)) + val;
+                if (flag._startsWith("O") || !posiCumulatives.ContainsKey(dt)) {    // O: OverWrite
+                    posiCumulatives[dt] = posiCumulatives._safeGet(dt.AddDays(-1)) + nPosi;
                 }
             }
         }
@@ -872,12 +891,26 @@ namespace ChartBlazorApp.Models
 
         public InfectData MakeData(int[] extraData = null, SubParams subParams = null)
         {
-            var minDt = cumulatives.Keys.Min();
-            var _dates = ((cumulatives.Keys.Max() - minDt).Days + 1)._range().Select(i => minDt.AddDays(i)).ToArray();
+            var minDt = posiCumulatives.Keys.Min();
+            var _dates = ((posiCumulatives.Keys.Max() - minDt).Days + 1)._range().Select(i => minDt.AddDays(i)).ToArray();
             var _total = new double[_dates.Length];
             foreach (int idx in _dates.Length._range()) {
-                var val = cumulatives._safeGet(_dates[idx], -1);
+                var val = posiCumulatives._safeGet(_dates[idx], -1);
                 _total[idx] = val >= 0 ? val : idx > 0 ? _total[idx - 1] : 0;
+            }
+            var _testCumu = new double[_dates.Length];
+            int _testCumuEnd = 0;
+            foreach (int idx in _dates.Length._range()) {
+                var val = testCumulatives._safeGet(_dates[idx], -1);
+                if (val >= 0) {
+                    _testCumuEnd = idx + 1;
+                    _testCumu[idx] = val;
+                } else {
+                    _testCumu[idx] = idx > 0 ? _testCumu[idx - 1] : 0;
+                }
+            }
+            if (_testCumuEnd < _testCumu.Length) {
+                _testCumu = _testCumu[0.._testCumuEnd];
             }
 
             if (extraData._notEmpty()) {
@@ -903,15 +936,29 @@ namespace ChartBlazorApp.Models
 
             int predatanum = (_firstDate - minDt).Days;
             double total(int i) => _total._nth(i + predatanum);
+            double testCumu(int i) => _testCumu._nth(i + predatanum);
             double newly(int i) => total(i) - total(i - 1);
-            var dates = _dates[predatanum..];
-            var newlies = (_total.Length - predatanum)._range().Select(i => newly(i)).ToArray();
+            DateTime[] dates = _dates[predatanum..];
+            double[] newlies = (_total.Length - predatanum)._range().Select(i => newly(i)).ToArray();
+            double[] posiRates = new double[_testCumu.Length - predatanum];
+            int prevIdx = -7;
+            foreach (int i in posiRates.Length._range()) {
+                if (testCumu(i) > testCumu(i - 1)) {
+                    posiRates[i] = ((total(i) - total(prevIdx)) / (testCumu(i) - testCumu(prevIdx)))._gtZeroOr(0.000001);
+                    if (posiRates[i] > 1.0) {
+                        logger.Warn($"{Title}: {_dates._nth(i)._toDateString()}: posiRates[{i}]={posiRates[i]:f3}; {i - prevIdx} days total={total(i) - total(prevIdx)}, {i - prevIdx} days tests={testCumu(i) - testCumu(prevIdx)}");
+                    }
+                } else {
+                    posiRates[i] = i > 0 ? posiRates[i-1] : 0;
+                }
+                if (testCumu(i - 5) > testCumu(i - 6)) prevIdx = i - 6;
+            }
             double[] adjustedTotal = adjustTotal(_total);
             double adjTotal(int i) => adjustedTotal._nth(i + predatanum);
             //double weekly(int i) => total(i) - total(i - 7);
             double weekly(int i) => adjTotal(i) - adjTotal(i - 7);
             double average(int i) => weekly(i) / 7;
-            var averages = (_total.Length - predatanum)._range().Select(i => average(i)).ToArray();
+            double[] averages = (_total.Length - predatanum)._range().Select(i => average(i)).ToArray();
             double rt(int i) { double w7 = weekly(i - 7); return w7 > 0 ? Math.Pow(weekly(i) / w7, 5.0 / 7.0) : 0.0; };
             var rts = (_total.Length - predatanum)._range().Select(i => rt(i)).ToArray();
             var y1_max = Y1_Max > 0 ? Y1_Max : calcY1Max(newlies);
@@ -930,6 +977,7 @@ namespace ChartBlazorApp.Models
                 Dates = dates,
                 Newly = newlies,
                 Average = averages,
+                PosiRates = posiRates,
                 Rt = rts,
                 InitialDecayParam = DecayParam,
                 PrefData = this,

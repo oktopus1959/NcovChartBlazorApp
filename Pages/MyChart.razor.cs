@@ -133,6 +133,14 @@ namespace ChartBlazorApp.Pages
 
         private InfectData _infectData { get { return _effectiveParams.MyInfectData; } }
 
+        private DateTime _latestDate => _infectData.Dates._last();
+
+        private int _latestPositives => (int)_infectData.Newly._last();
+
+        private double _latestRt => _infectData.Rt._last();
+
+        private string _dispStartDate => _effectiveParams.DispStartDate;
+
         private int _radioIdx { get { return _timeMachineInfectEnabled ? _selectorPos : _effectiveParams.RadioIdx; } }
 
         private int _prefIdx { get { return _timeMachineInfectEnabled ? _timeMachineInfectIdx : Math.Max(_effectiveParams.PrefIdx, _mainPrefNum); } }
@@ -156,11 +164,17 @@ namespace ChartBlazorApp.Pages
 
         private int _estimatedBarMinWidth { get { return _effectiveParams.EstimatedBarMinWidth; } }
 
+        private bool _drawPosiRates { get { return _effectiveParams.DrawPosiRates; } }
+
+        private bool _posiRatePercent { get { return _effectiveParams.PosiRatePercent; } }
+
         private bool _detailSettings { get { return _effectiveParams.DetailSettings; } }
 
         private bool _fourstepSettings { get { return _effectiveParams.FourstepSettings; } }
 
         private bool _fourstepDataDefault { get { return _effectiveParams.FourstepDataDefault; } }
+
+        private bool _useYAxis1LowerLimt { get; set; } = false;
 
         private bool _onlyOnClick { get { return _effectiveParams.OnlyOnClick; } }
 
@@ -235,16 +249,17 @@ namespace ChartBlazorApp.Pages
             _effectiveParams = await EffectiveParams.CreateByGettingUserSettings(JSRuntime, dailyData, _debugLevel);
         }
 
-        //private async Task insertStaticDescription()
-        //{
-        //    var html = Helper.GetFileContent("wwwroot/html/Description.html", System.Text.Encoding.UTF8);
-        //    if (html._notEmpty()) await JSRuntime.InvokeAsync<string>("insertStaticDescription", html);
-        //}
-
-        private async Task selectStaticDescription()
+        private async Task insertStaticDescription()
         {
-            await JSRuntime._selectDescription("home-page");
+            var html = Helper.GetFileContent("wwwroot/html/Home.html", System.Text.Encoding.UTF8);
+            //if (html._notEmpty()) await JSRuntime.InvokeAsync<string>("insertDescription", "home-description", html);
+            if (html._notEmpty()) await JSRuntime._insertDescription("home-description", html);
         }
+
+        //private async Task selectStaticDescription()
+        //{
+        //    await JSRuntime._selectDescription("home-page");
+        //}
 
         /// <summary>
         /// プリレンダリングが終わった後に呼び出されるメソッド。
@@ -259,9 +274,11 @@ namespace ChartBlazorApp.Pages
         {
             if (firstRender) {
                 logger.Info($"CALLED");
+                await insertStaticDescription();
                 await getSettings();
+                initializeTimeMachineInfectData();
                 await RenderChartMethod(true, true);
-                await selectStaticDescription();
+                //await selectStaticDescription();
                 StateHasChanged();
             }
         }
@@ -297,9 +314,16 @@ namespace ChartBlazorApp.Pages
             await RenderChartMethod();
         }
 
+        public async Task ChangeDispStartDate(ChangeEventArgs args)
+        {
+            _effectiveParams.SetDispStartDate(args.Value.ToString()._reReplace(@"[年月]", "/") + "1");
+            await RenderChartMethod();
+        }
+
         public async Task ChangeChart(ChangeEventArgs args)
         {
             _effectiveParams.RadioIdx = args.Value.ToString()._parseInt();
+            await NormalMode();
             await RenderChartMethod();
         }
 
@@ -307,6 +331,7 @@ namespace ChartBlazorApp.Pages
         {
             _effectiveParams.PrefIdx = args.Value.ToString()._parseInt();
             _effectiveParams.RadioIdx = _selectorPos;
+            await NormalMode();
             await RenderChartMethod();
         }
 
@@ -352,6 +377,15 @@ namespace ChartBlazorApp.Pages
             await RenderChartMethod();
         }
 
+        public async Task UseYAxisLowerLimit(ChangeEventArgs args)
+        {
+            _useYAxis1LowerLimt = (bool)args.Value;
+            if (!_useYAxis1LowerLimt) {
+                _yAxisMin = 0;
+                await RenderChartMethod();
+            }
+        }
+
         public async Task ChangeYAxis2Max(ChangeEventArgs args)
         {
             var val = args.Value.ToString();
@@ -377,7 +411,7 @@ namespace ChartBlazorApp.Pages
                 if (dt._notValid()) dt = _effectiveParams.getParamStartDate(-1, true)._parseDateTime();
                 if (dt._isValid()) {
                     dts = dt._toDateString();
-                    int days = (_dateOnOne._parseDateTime() - dt).Days._lowLimit(0)._highLimit(100);
+                    int days = (_dateOnOne._parseDateTime() - dt).Days._lowLimit(0)._highLimit(300);
                     _effectiveParams.CurrentSettings.setParamDaysToOne(days);
                 }
             }
@@ -426,7 +460,7 @@ namespace ChartBlazorApp.Pages
             await RenderChartMethod();
         }
 
-        /// <summary>予想曲線表示日数<summary>
+        /// <summary>近似曲線表示日数<summary>
         public async Task ChangeExtensionDays(ChangeEventArgs args)
         {
             await changeRtParam(args, 9999,
@@ -536,7 +570,7 @@ namespace ChartBlazorApp.Pages
                 dt = dt._toFullDateStr();
             }
             //if (dt._reMatch(@"^\d+/\d+$")) dt = $"{DateTime.Now._yyyy()}/{dt}";
-            int days = (dt._parseDateTime() - _effectiveParams.getParamStartDate()._parseDateTime()).Days._lowLimit(0)._highLimit(100);
+            int days = (dt._parseDateTime() - _effectiveParams.getParamStartDate()._parseDateTime()).Days._lowLimit(0)._highLimit(300);
             await changeRtParamCustom(days, 9999,
                 _effectiveParams.CurrentSettings.setParamDaysToOne,
                 () => _effectiveParams.RenewDecaySubParams(),
@@ -737,6 +771,20 @@ namespace ChartBlazorApp.Pages
             await RenderChartMethod(false, _barWidth < _estimatedBarMinWidth);
         }
 
+        public async Task DrawPosiRates(ChangeEventArgs args)
+        {
+            _effectiveParams.CurrentSettings.setDrawPosiRates((bool)args.Value);
+            _cancellable = false;
+            await RenderChartMethod();
+        }
+
+        public async Task PosiRatePercent(ChangeEventArgs args)
+        {
+            _effectiveParams.CurrentSettings.posiRatePercent = (bool)args.Value;
+            _cancellable = false;
+            await RenderChartMethod();
+        }
+
         public async Task ShowDetailSettings(ChangeEventArgs args)
         {
             _effectiveParams.CurrentSettings.setDetailSettings((bool)args.Value);
@@ -849,7 +897,12 @@ namespace ChartBlazorApp.Pages
             await RenderChartMethod();
         }
 
-        private string _timeMachineData = "";
+        private string _timeMachineData => _effectiveParams.TimeMachineData;
+
+        private void initializeTimeMachineInfectData()
+        {
+            if (_effectiveParams.TimeMachineMode) _effectiveParams.MakeTimeMachineInfectData();
+        }
 
         public async Task TimeMachineMode()
         {
@@ -869,11 +922,10 @@ namespace ChartBlazorApp.Pages
 
         private async Task updateTimeMachineData(string tmData)
         {
-            _timeMachineData = _effectiveParams.UseTimeMachineInfectData(tmData);
             await changeRtParam(tmData, "-",
-                null,
+                _effectiveParams.UseTimeMachineInfectData,
                 () => _timeMachineData,
-                (val) => _timeMachineData = val);
+                (val) => _effectiveParams.TimeMachineData = val);
         }
 
         public async Task AdoptTimeMachineData()
@@ -920,12 +972,12 @@ namespace ChartBlazorApp.Pages
         {
             logger.Trace("ENTER");
             RtDecayParam rtParam = _effectiveParams.MakeRtDecayParam(!_detailSettings);
-            int extDays = _drawExpectation || _drawExpectationChecked ? _extensionDays : Math.Min(_extensionDays, 5);  // 予想曲線を表示したことがないときは、余分な表示日は5日とする
+            int extDays = _drawExpectation || _drawExpectationChecked ? _extensionDays : Math.Min(_extensionDays, 5);  // 近似曲線を表示したことがないときは、余分な表示日は5日とする
             int barWidth = _drawExpectation && _estimatedBar ? Math.Max(_barWidth, _estimatedBarMinWidth) : _barWidth;
             bool bTailPadding = !_estimatedBar || barWidth > -4;
-            (var jsonStr, int dispDays) = MakeJsonData(rtParam, extDays, bTailPadding, bFirst);
+            (var jsonStr, int dispDays, int realDays) = MakeJsonData(rtParam, extDays, bTailPadding, bFirst);
 
-            double scrlbarRatio = bResetScrollBar || barWidth != _barWidth ? newlyDaysRatio(dispDays) : 0;
+            double scrlbarRatio = bResetScrollBar || barWidth != _barWidth ? newlyDaysRatio(dispDays, realDays) : 0;
             _cancellable = bCancellable;
             await JSRuntime._renderChart2("chart-wrapper-home", barWidth, scrlbarRatio, jsonStr);
 
@@ -933,37 +985,39 @@ namespace ChartBlazorApp.Pages
             logger.Trace("LEAVE");
         }
 
-        private double newlyDaysRatio(int dispDays)
+        private double newlyDaysRatio(double dispDays, double realDays)
         {
-            return dispDays > 0 ? (double)_infectData.Dates._safeCount() / dispDays : 100;
+            return dispDays > 0 && realDays > 0 ? realDays / dispDays : 1.0;
         }
 
         /// <summary>
         /// Chart描画のためのJsonデータを構築して返す
         /// </summary>
         /// <param name="dataIdx">描画対象(0:全国/1:東京/...)</param>
-        /// <param name="endDate">グラフ表示最終日</param>
         /// <param name="aheadParamIdx">事前作成予想データインデックス(負なら使わない)</param>
         /// <param name="bAnimation">グラフアニメーションの有無</param>
         /// <returns></returns>
-        public (string, int) MakeJsonData(RtDecayParam rtDecayParam, int extensionDays, bool bTailPadding = true, bool bAnimation = false)
+        public (string, int, int) MakeJsonData(RtDecayParam rtDecayParam, int extensionDays, bool bTailPadding = true, bool bAnimation = false)
         {
             ChartJson chartData = null;
             UserPredictData predData = null;
             string title = "";
             int dispDays = 0;       // 予想日含め、実際に表示する日付数
+            int realDays = 0;       // 実際に表示する実データの日付数
 
-            InfectData infData = _infectData;
-            DateTime endDate = _endDate._parseDateTime();
+            DateTime dispStartDate = _dispStartDate._parseDateTime();
+            DateTime endDate = dispStartDate.AddYears(1).AddDays(-1);
+            InfectData infData = _infectData.ShiftStartDate(dispStartDate);
 
             if (infData != null) {
                 title = infData.Title;
                 var rtp = rtDecayParam;
                 logger.Info(
-                    $"pref={title}, " +
+                    $"pref={(_timeMachineInfectEnabled ? $"({title})" : title)}, " +
                     $"exp={_drawExpectation}, " +
                     $"det={_detailSettings}, " +
                     $"est={_estimatedBar}, " +
+                    $"pos={_drawPosiRates}, " +
                     //$"rtDur={_localMaxRtDuration}, " +
                     $"expDt={rtp?.EffectiveStartDate.ToShortDateString()}, " +
                     $"days={(rtp?.Fourstep == false ? rtp.DaysToOne.ToString() : "")}, " +
@@ -974,15 +1028,15 @@ namespace ChartBlazorApp.Pages
                 chartData = new ChartJson { type = "bar" };
                 //var borderDash = new double[] { 10, 3 };
                 var fullDates = infData.Dates.Select(x => x._toShortDateString()).ToList();     // 全表示日(1年間とか)の日付文字列を格納する (ここではまだ実データの日付のみ)
-                var firstDate = infData.Dates._first();    // 実データの開始日
-                var lastDate = infData.Dates._last();      // 実データの最終日
+                var firstDate = infData.Dates._first();     // 実データの開始日
+                var lastDate = infData.Dates._last();       // 実データの最終日
                 if (firstDate._isValid() && lastDate._isValid()) {
                     if (endDate._isValid() && endDate > lastDate) {
                         // endDate: 最大想定表示最終日 (例: 2021/05/31)
                         int days = Math.Min((endDate - lastDate).Days, 400);
                         fullDates.AddRange(Enumerable.Range(1, days).Select(d => lastDate.AddDays(d)._toShortDateString()));    // ここで endDate まで表示日付(候補含む)を拡張しておく
                     }
-                    int realDays = (lastDate - firstDate).Days + 1;
+                    realDays = (lastDate - firstDate).Days + 1;
                     //int predDays = realDays + 21;
                     int predDays = realDays + extensionDays;
                     if (_drawExpectation) {
@@ -996,7 +1050,7 @@ namespace ChartBlazorApp.Pages
 
                     (double, double) calcYAxisScale(double yMax0, double yStep0, double yMax) => yMax > 0 ? (yMax, yMax / (yMax == 2.5 ? 5 : 10)) : (yMax0, yStep0);
                     (double y1_max, double y1_step) = calcYAxisScale(infData.Y1_Max, infData.Y1_Step, _yAxisMax._lowLimit(_yAxisMin));
-                    (double y2_max, double y2_step) = calcYAxisScale(infData.Y2_Max, infData.Y2_Step, _yAxis2Max);
+                    (double y2_max, double y2_step) = calcYAxisScale(infData.Y2_Max, infData.Y2_Step, _drawPosiRates && _posiRatePercent ? 20 : _yAxis2Max);
 
                     Options options = Options.CreateTwoAxes(new Ticks(y1_max, y1_step), new Ticks(y2_max, y2_step));
                     if (!bAnimation) options.AnimationDuration = 0;
@@ -1014,26 +1068,32 @@ namespace ChartBlazorApp.Pages
                     chartData.options = options;
 
                     var dataSets = new List<Dataset>();
-#if DEBUG
-                    //if (predData != null) {
-                    //    dataSets.Add(Dataset.CreateDotLine("逆算移動平均", predData.RevAverage.Take(predData.DispDays)._toNullableArray(1), "darkblue"));
-                    //    //dataSets.Add(Dataset.CreateDotLine2("逆算Rt", predData.RevRt.Take(predData.DispDays)._toNullableArray(1), "crimson"));
-                    //}
-#endif
+
+                    if (ConsoleLog.DEBUG_LEVEL > 1) {
+                        if (predData != null) {
+                            dataSets.Add(Dataset.CreateDotLine("逆算推計移動平均", predData.RevPredAverage.Take(predData.DispDays)._toNullableArray(1), "darkblue"));
+                            //dataSets.Add(Dataset.CreateDotLine2("逆算Rt", predData.RevRt.Take(predData.DispDays)._toNullableArray(1), "crimson"));
+                        }
+                    }
+
                     if (bTailPadding) { dataSets.Add(Dataset.CreateLine("                ", new double?[fullDates.Count], "rgba(0,0,0,0)", "rgba(0,0,0,0)")); }
                     double?[] predRts = null;
                     double?[] predAverage = null;
                     if (predData != null) {
                         int dashLineOrder = _expectOverReal ? 1 : 3;
                         predRts = predData.FullPredRt.Take(predDays)._toNullableArray(3);
-                        dataSets.Add(Dataset.CreateDashLine2("予想実効再生産数", predRts, "brown").SetOrder(dashLineOrder).SetDispOrder(6));
+                        dataSets.Add(Dataset.CreateDashLine2("近似実効再生産数", predRts, "brown").SetOrder(dashLineOrder).SetDispOrder(6));
                         predAverage = predData.PredAverage.Take(predDays)._toNullableArray(1);
-                        dataSets.Add(Dataset.CreateDashLine("予想移動平均", predAverage, "darkgreen").SetOrder(dashLineOrder).SetDispOrder(4));
+                        dataSets.Add(Dataset.CreateDashLine("近似移動平均", predAverage, "darkgreen").SetOrder(dashLineOrder).SetDispOrder(4));
                     }
                     int lineOrder = _expectOverReal ? 3 : 1;
                     double?[] realRts = infData.Rt.Take(realDays)._toNullableArray(3);
                     dataSets.Add(Dataset.CreateLine2("実効再生産数(右軸)", realRts, "darkorange", "yellow").SetOrder(lineOrder).SetDispOrder(5));
-                    double?[] realAverage = infData.Average.Take(realDays)._toNullableArray(1);
+                    if (_drawPosiRates) {
+                        double?[] realPosiRates = infData.PosiRates.Take(realDays).Select(r => _posiRatePercent ? r * 100 : r * 10)._toNullableArray(_posiRatePercent ? 1 : 2);
+                        dataSets.Add(Dataset.CreateLine2($"7日間陽性率{(_posiRatePercent ? "(%:" : "x10(")}右軸)", realPosiRates, "darkviolet", "lightpink").SetOrder(lineOrder).SetDispOrder(7));
+                    }
+                    double?[] realAverage = infData.Average.Take(realDays).Select(x => x > 0 ? x : 0.00001)._toNullableArray(1);
                     dataSets.Add(Dataset.CreateLine("陽性者数移動平均", realAverage, "darkblue", "lightblue").SetOrder(lineOrder).SetDispOrder(3));
                     double?[] positives = infData.Newly.Take(realDays)._toNullableArray(0, 0);
                     var positiveDataset = Dataset.CreateBar("新規陽性者数", positives, "royalblue").SetHoverColors("mediumblue").SetDispOrder(1);
@@ -1068,7 +1128,7 @@ namespace ChartBlazorApp.Pages
                     };
                 }
             }
-            return (chartData._toString(), dispDays);
+            return (chartData._toString(), dispDays, realDays);
         }
 
     }

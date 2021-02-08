@@ -70,15 +70,25 @@ namespace ChartBlazorApp.Models
             return this;
         }
 
+        public string TimeMachineData {
+            get { return CurrentSettings.timeMachineData; }
+            set { CurrentSettings.timeMachineData = value; }
+        }
+
+        public bool TimeMachineMode {
+            get { return CurrentSettings.timeMachineMode; }
+            set { CurrentSettings.timeMachineMode = value; }
+        }
+
         // TimeMachine用の InfectData
         private InfectData _timeMachineInfectData = null;
 
         /// <summary>
-        /// ソースデータからテスト用InfectDataを作成して、整形されたデータを返す
+        /// ソースデータからテスト用InfectDataを作成して、整形されたデータを保存する
         /// </summary>
         /// <param name="srcIdx"></param>
         /// <returns></returns>
-        public string UseTimeMachineInfectData(string tmData)
+        public void UseTimeMachineInfectData(string tmData)
         {
             logger.Info($"{GetTitle()}: {tmData}");
             _timeMachineInfectData = null;
@@ -87,12 +97,26 @@ namespace ChartBlazorApp.Models
             if (extraData._notEmpty() && extraData[0] < 0) extraData[0] = extraData[0]._lowLimit(-90);
             _timeMachineInfectData = NthInfectData(-1).CreateData(extraData);
             RenewDecaySubParams();
-            return extraData._join(",");
+            TimeMachineData = extraData._join(",");
+            TimeMachineMode = true;
+        }
+
+        /// <summary>
+        /// 保存してあるタイムマシンデータからInfectDataを作成する
+        /// </summary>
+        public void MakeTimeMachineInfectData()
+        {
+            if (TimeMachineData._notEmpty()) {
+                _timeMachineInfectData = null;
+                _timeMachineInfectData = NthInfectData(-1).CreateData(TimeMachineData._split(',').Select(x => x._strip()._parseInt(0)).ToArray());
+                RenewDecaySubParams();
+            }
         }
 
         public void ClearTimeMachineInfectData()
         {
             _timeMachineInfectData = null;
+            TimeMachineMode = false;
             RenewDecaySubParams();
         }
 
@@ -122,6 +146,11 @@ namespace ChartBlazorApp.Models
         }
 
         public InfectData MyInfectData { get { return NthInfectData(MyDataIdx); } }
+
+        // 表示開始日
+        public string DispStartDate => CurrentSettings.dispStartDate._orElse(() => DateTime.Now.AddMonths(-(6 + (DateTime.Now.Month % 3)))._toFirstInMonth()._toDateString());
+
+        public void SetDispStartDate(string value) { CurrentSettings.dispStartDate = value; }
 
         // タイトル（地域名）
         public string GetTitle(int n = -1) { return NthInfectData(n).Title ?? ""; }
@@ -159,6 +188,9 @@ namespace ChartBlazorApp.Models
 
         public int EstimatedBarMinWidth { get { return CurrentSettings.estimatedBarMinWidth; } }
 
+        public bool DrawPosiRates { get { return CurrentSettings.drawPosiRates; } }
+        public bool PosiRatePercent { get { return CurrentSettings.posiRatePercent; } }
+
         public bool DetailSettings { get { return CurrentSettings.detailSettings; } }
 
         public bool FourstepSettings { get { return CurrentSettings.fourstepSettings; } }
@@ -184,6 +216,10 @@ namespace ChartBlazorApp.Models
         }
 
         public bool OnlyOnClick { get { return CurrentSettings.onlyOnClick; } }
+
+        public bool OtherForecastCharts { get { return CurrentSettings.otherForecastCharts; } }
+
+        public bool ThinForecastBar { get { return CurrentSettings.thinForecastBar; } }
 
         public bool ExpectOverReal { get { return CurrentSettings.expectOverReal; } }
 
@@ -441,7 +477,7 @@ namespace ChartBlazorApp.Models
 
         public void SetParamDaysToOne(string value)
         {
-            CurrentSettings.setParamDaysToOne(Math.Min(value._parseInt(0), 100));
+            CurrentSettings.setParamDaysToOne(Math.Min(value._parseInt(0), 300));
         }
 
         public void SetParamDecayFactor(string value)
@@ -481,7 +517,7 @@ namespace ChartBlazorApp.Models
 
         public void SetParamDaysToRt1(string value)
         {
-            CurrentSettings.setParamDaysToRt1(Math.Min(value._parseInt(0), 100));
+            CurrentSettings.setParamDaysToRt1(Math.Min(value._parseInt(0), 300));
         }
 
         public void SetParamRt1(string value)
@@ -491,7 +527,7 @@ namespace ChartBlazorApp.Models
 
         public void SetParamDaysToRt2(string value)
         {
-            CurrentSettings.setParamDaysToRt2(Math.Min(value._parseInt(0), 100));
+            CurrentSettings.setParamDaysToRt2(Math.Min(value._parseInt(0), 300));
         }
 
         public void SetParamRt2(string value)
@@ -506,7 +542,7 @@ namespace ChartBlazorApp.Models
 
         public void SetParamDaysToRt3(string value)
         {
-            CurrentSettings.setParamDaysToRt3(Math.Min(value._parseInt(0), 100));
+            CurrentSettings.setParamDaysToRt3(Math.Min(value._parseInt(0), 300));
         }
 
         public void SetParamRt4(string value)
@@ -516,7 +552,7 @@ namespace ChartBlazorApp.Models
 
         public void SetParamDaysToRt4(string value)
         {
-            CurrentSettings.setParamDaysToRt4(Math.Min(value._parseInt(0), 100));
+            CurrentSettings.setParamDaysToRt4(Math.Min(value._parseInt(0), 300));
         }
 
         public void SetFourstepSettings(string value)

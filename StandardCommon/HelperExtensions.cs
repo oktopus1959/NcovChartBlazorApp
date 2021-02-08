@@ -429,6 +429,16 @@ namespace StandardCommon
             return vector;
         }
 
+        /// <summary>
+        /// bool値を Int32値 に変換する
+        /// </summary>
+        /// <param name="val"></param>
+        /// <returns></returns>
+        public static int _toInt(this bool val)
+        {
+            return Convert.ToInt32(val);
+        }
+
     } // BoolExtension
 
     /// <summary>
@@ -526,7 +536,7 @@ namespace StandardCommon
         }
 
         /// <summary>
-        /// 配列のN番目(0始まり)の要素を取得する。配列長がN未満なら defVal を返す。
+        /// 配列のN番目(0始まり)の要素を取得する。配列長がN以下なら defVal を返す。
         /// </summary>
         public static T _nth<T>(this T[] ary, int n, T defVal = default(T))
         {
@@ -534,7 +544,7 @@ namespace StandardCommon
         }
 
         /// <summary>
-        /// 配列のN番目(0始まり)の要素を取得する。配列長がN未満なら defVal を返す。
+        /// 配列のN番目(0始まり)の要素を取得する。配列長がN以下なら defVal を返す。
         /// </summary>
         public static T _Nth<T>(this T[] ary, int n, T defVal = default(T))
         {
@@ -542,11 +552,19 @@ namespace StandardCommon
         }
 
         /// <summary>
-        /// 配列のN番目(0始まり)の要素を取得する。配列長がN未満なら defVal を返す。
+        /// 配列のN番目(0始まり)の要素を取得する。配列長がN以下なら defVal を返す。
         /// </summary>
         public static T _getNth<T>(this T[] ary, int n, T defVal = default(T))
         {
             return _safeGet(ary, n, defVal);
+        }
+
+        /// <summary>
+        /// リストの最後からN番目(1始まり)の要素を取得する。配列長がN未満なら defVal を返す。
+        /// </summary>
+        public static T _lastNth<T>(this T[] ary, int n, T defVal = default(T))
+        {
+            return _safeGet(ary, ary.Length - n, defVal);
         }
 
         /// <summary>
@@ -1128,6 +1146,14 @@ namespace StandardCommon
         public static bool _containedIn(this string lhs, string rhs1, string rhs2, string rhs3 = null, string rhs4 = null)
         {
             return lhs != null && (lhs == rhs1 || lhs == rhs2 || lhs == rhs3 || lhs == rhs4);
+        }
+
+        /// <summary>
+        /// レシーバとオペランドのいずれかと一致すれば true を返す
+        /// </summary>
+        public static bool _containedIn(this string lhs, params string[] rhses)
+        {
+            return lhs != null && rhses._notEmpty() && rhses.Contains(lhs);
         }
 
         /// <summary>
@@ -1876,7 +1902,7 @@ namespace StandardCommon
         }
 
         /// <summary>
-        /// リストのN番目(0始まり)の要素を取得する。リスト長がN未満なら defVal を返す。
+        /// リストのN番目(0始まり)の要素を取得する。リスト長がN以下なら defVal を返す。
         /// </summary>
         public static T _nth<T>(this List<T> list, int n, T defVal = default(T))
         {
@@ -1884,7 +1910,7 @@ namespace StandardCommon
         }
 
         /// <summary>
-        /// リストのN番目(0始まり)の要素を取得する。リスト長がN未満なら defVal を返す。
+        /// リストのN番目(0始まり)の要素を取得する。リスト長がN以下なら defVal を返す。
         /// </summary>
         public static T _Nth<T>(this List<T> list, int n, T defVal = default(T))
         {
@@ -1892,11 +1918,19 @@ namespace StandardCommon
         }
 
         /// <summary>
-        /// リストのN番目(0始まり)の要素を取得する。リスト長がN未満なら defVal を返す。
+        /// リストのN番目(0始まり)の要素を取得する。リスト長がN以下なら defVal を返す。
         /// </summary>
         public static T _getNth<T>(this List<T> list, int n, T defVal = default(T))
         {
             return _safeGet(list, n, defVal);
+        }
+
+        /// <summary>
+        /// リストの最後からN番目(1始まり)の要素を取得する。リスト長がN未満なら defVal を返す。
+        /// </summary>
+        public static T _lastNth<T>(this List<T> list, int n, T defVal = default(T))
+        {
+            return _safeGet(list, list.Count - n, defVal);
         }
 
         /// <summary>

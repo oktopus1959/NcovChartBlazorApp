@@ -1,5 +1,6 @@
 ﻿@page "/about"
 
+@using Models
 @using StandardCommon
 
 @inject IJSRuntime JSRuntime
@@ -10,8 +11,9 @@
         //var html = Helper.GetFileContent("wwwroot/html/About.html", System.Text.Encoding.UTF8);
         //if (html._notEmpty()) await JSRuntime.InvokeAsync<string>("insertAboutDescription", html);
         var html = Helper.GetFileContent("wwwroot/html/Others.html", System.Text.Encoding.UTF8);
-        if (html._notEmpty()) await JSRuntime.InvokeAsync<string>("insertOthersDescription", html);
-        await JSRuntime.InvokeAsync<string>("selectDescription", "about-page");
+        //if (html._notEmpty()) await JSRuntime.InvokeAsync<string>("insertDescription", "about-description", html);
+        if (html._notEmpty()) await JSRuntime._insertDescription("about-description", html);
+        //await JSRuntime.InvokeAsync<string>("selectDescription", "about-page");
     }
 
     protected override async Task OnAfterRenderAsync(bool firstRender)

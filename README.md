@@ -5,11 +5,11 @@ Chart.js を使って実装したものです。もともと、Web アプリの�
 公開することにしました。
 
 ## Web サイト
-このアプリは、下記「[新型コロナ 陽性者数グラフ](https://ncov.oktopus59.net/)」サイトにて実際に稼動しています。
+このアプリは、下記サイトにて実際に稼動しています。
 
 https://ncov.oktopus59.net/
 
-陽性者数の他、 日本における COVID-19 [重症者や死亡者数の予測](https://ncov.oktopus59.net/forecast/)も下記ページで行っています。
+陽性者数の他、 日本における COVID-19 重症者や死亡者数の予測も下記ページで行っています。
 
 https://ncov.oktopus59.net/forecast/
 
@@ -49,12 +49,6 @@ $ ./update_data.sh --load
 実行には camelot という python モジュールが必要となります。
 作成されたデータは、都道府県別のPCR検査数、陽性率を抽出するために利用することも可能です。
 抽出方法については `make_pref_data.rb` を参考にしてください。
-
-#### 2021/02/03 追記
-上記PDFからテキストを抽出するためのDockerイメージを構築する Dockerfile を別プロジェクトして作成しました。
-
-[camelot-mhlw](https://github.com/oktopus1959/camelot-mhlw)
-
 
 ### 年齢階級別陽性者数データ
 重症者数・死亡者数の予測には、 Data/infect_by_ages.txt が必要です。

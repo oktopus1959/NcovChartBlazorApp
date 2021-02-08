@@ -18,6 +18,9 @@ namespace ChartBlazorApp.Models
 
         public bool _oldValuesCopied { get; set; }
 
+        /// <summary> グラフ表示開始日 </summary>
+        public string dispStartDate { get; set; }
+
         public int radioIdx { get; set; }
         /// <summary> select で表示している道府県のインデックス </summary>
         public int prefIdx { get; set; }
@@ -32,6 +35,8 @@ namespace ChartBlazorApp.Models
         public bool drawExpectation { get; set; }
         public bool estimatedBar { get; set; }
         public int estimatedBarMinWidth { get; set; }
+        public bool drawPosiRates { get; set; }
+        public bool posiRatePercent { get; set; }
         public bool detailSettings { get; set; }
         public bool fourstepSettings { get; set; }
         public bool onlyOnClick { get; set; }
@@ -43,6 +48,10 @@ namespace ChartBlazorApp.Models
         public bool useDateForChangePoint { get; set; }
         public bool usePostDecayRt1 { get; set; }
         public double postDecayFactorRt2 { get; set; }
+        public bool otherForecastCharts { get; set; }
+        public bool thinForecastBar { get; set; }
+        public bool forecastFullWidthCharts { get; set; }
+        public bool forecastExpandChartDates { get; set; }
 
         public string[] paramRtStartDate { get; set; }
         public string[] paramRtStartDateFourstep { get; set; }
@@ -66,6 +75,11 @@ namespace ChartBlazorApp.Models
 
         /// <summary> アノテーション </summary>
         public string[] events { get; set; }
+
+        /// <summary> タイムマシンデータ </summary>
+        public string timeMachineData { get; set; }
+
+        public bool timeMachineMode { get; set; }
 
         // ---- 上のところまでが LocalStorage に保存される
 
@@ -107,6 +121,7 @@ namespace ChartBlazorApp.Models
 
         public UserSettings Initialize(int numData)
         {
+            dispStartDate = "";
             radioIdx = 0;
             prefIdx = MainPrefNum;
             favorPrefIdxes = new int[Constants.FAVORITE_PREF_MAX];
@@ -117,6 +132,8 @@ namespace ChartBlazorApp.Models
             drawExpectation = false;
             estimatedBar = false;
             estimatedBarMinWidth = 0;
+            drawPosiRates = false;
+            posiRatePercent = false;
             detailSettings = false;
             fourstepSettings = false;
             onlyOnClick = false;
@@ -128,6 +145,10 @@ namespace ChartBlazorApp.Models
             useDateForChangePoint = false;
             usePostDecayRt1 = false;
             postDecayFactorRt2 = 0;
+            thinForecastBar = false;
+            forecastFullWidthCharts = false;
+            forecastExpandChartDates = false;
+            otherForecastCharts = false;
             paramRtStartDate = new string[numData];
             paramRtStartDateFourstep = new string[numData];
             paramRtDaysToOne = new int[numData];
@@ -147,6 +168,8 @@ namespace ChartBlazorApp.Models
             paramRtDaysToRt4 = new int[numData];
             paramRtRt4 = new double[numData];
             events = new string[numData];
+            timeMachineData = "";
+            timeMachineMode = false;
             return this;
         }
 
@@ -401,6 +424,10 @@ namespace ChartBlazorApp.Models
         {
             estimatedBarMinWidth = value;
         }
+        public void setDrawPosiRates(bool value)
+        {
+            drawPosiRates = value;
+        }
         public void setDetailSettings(bool value)
         {
             detailSettings = value;
@@ -412,6 +439,14 @@ namespace ChartBlazorApp.Models
         public void setOnlyOnClick(bool value)
         {
             onlyOnClick = value;
+        }
+        public void setThinForecastBar(bool value)
+        {
+            thinForecastBar = value;
+        }
+        public void setOtherForecastCharts(bool value)
+        {
+            otherForecastCharts = value;
         }
         public void setExpectOverReal(bool value)
         {

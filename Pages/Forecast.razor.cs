@@ -33,25 +33,31 @@ namespace ChartBlazorApp.Pages
 
         private UserForecastData _userData { get; set; } = new UserForecastData();
 
-        private InfectData _infectData0 { get { return dailyData.InfectDataList[0]; } }
-
         private EffectiveParams _effectiveParams = new EffectiveParams(null, null);
 
-        //private async Task insertStaticDescription()
-        //{
-        //    var html = Helper.GetFileContent("wwwroot/html/Description2.html", System.Text.Encoding.UTF8);
-        //    if (html._notEmpty()) await JSRuntime.InvokeAsync<string>("insertStaticDescription2", html);
-        //}
+        //private InfectData _infectData0 { get { return dailyData.InfectDataList[0]; } }
 
-        private async Task selectStaticDescription()
+        private async Task insertStaticDescription()
         {
-            await JSRuntime._selectDescription("forecast-page");
+            var html = Helper.GetFileContent("wwwroot/html/Forecast.html", System.Text.Encoding.UTF8);
+            //if (html._notEmpty()) await JSRuntime.InvokeAsync<string>("insertDescription", "forecast-description", html);
+            if (html._notEmpty()) await JSRuntime._insertDescription("forecast-description", html);
         }
+
+        //private async Task selectStaticDescription()
+        //{
+        //    await JSRuntime._selectDescription("forecast-page");
+        //}
 
         private async Task getSettings()
         {
             logger.Info($"CALLED");
             _effectiveParams = await EffectiveParams.CreateByGettingUserSettings(JSRuntime, dailyData);
+        }
+
+        private void initializeTimeMachineInfectData()
+        {
+            if (_effectiveParams.TimeMachineMode) _effectiveParams.MakeTimeMachineInfectData();
         }
 
         /// <summary>
@@ -67,9 +73,12 @@ namespace ChartBlazorApp.Pages
         {
             if (firstRender) {
                 logger.Info($"CALLED");
+                await insertStaticDescription();
                 await getSettings();
+                initializeTimeMachineInfectData();
+                if (_showOtherCharts) StateHasChanged();
                 await RenderDeathAndSeriousChart();
-                await selectStaticDescription();
+                //await selectStaticDescription();
                 StateHasChanged();
             }
         }
@@ -80,20 +89,42 @@ namespace ChartBlazorApp.Pages
             //forecastData.Initialize();
         }
 
-        private bool _showOtherCharts = ConsoleLog.DEBUG_LEVEL > 0;
+        private bool _showOtherCharts => _effectiveParams.OtherForecastCharts;
 
         public async Task ShowOtherCharts(ChangeEventArgs args)
         {
-            _showOtherCharts = (bool)(args.Value);
+            _effectiveParams.CurrentSettings.setOtherForecastCharts((bool)args.Value);
+            await _effectiveParams.CurrentSettings.SaveSettings();
             await RenderDeathAndSeriousChart(false);
             StateHasChanged();
         }
 
-        private bool _extendDispDays = false; // ConsoleLog.DEBUG_LEVEL > 0;
+        private bool _extendDispDays => _effectiveParams.CurrentSettings.forecastExpandChartDates; // ConsoleLog.DEBUG_LEVEL > 0;
 
         public async Task ExtendDispDays(ChangeEventArgs args)
         {
-            _extendDispDays = (bool)(args.Value);
+            _effectiveParams.CurrentSettings.forecastExpandChartDates = (bool)(args.Value);
+            await _effectiveParams.CurrentSettings.SaveSettings();
+            await RenderDeathAndSeriousChart(false);
+            StateHasChanged();
+        }
+
+        private bool _thinBar => _effectiveParams.ThinForecastBar;
+
+        public async Task ThinBar(ChangeEventArgs args)
+        {
+            _effectiveParams.CurrentSettings.setThinForecastBar((bool)args.Value);
+            await _effectiveParams.CurrentSettings.SaveSettings();
+            await RenderDeathAndSeriousChart(false);
+            StateHasChanged();
+        }
+
+        private bool _fullWidthChart => _effectiveParams.CurrentSettings.forecastFullWidthCharts;
+
+        public async Task FullWidthChart(ChangeEventArgs args)
+        {
+            _effectiveParams.CurrentSettings.forecastFullWidthCharts = (bool)args.Value;
+            await _effectiveParams.CurrentSettings.SaveSettings();
             await RenderDeathAndSeriousChart(false);
             StateHasChanged();
         }
@@ -111,37 +142,50 @@ namespace ChartBlazorApp.Pages
         /// <returns></returns>
         public async Task RenderDeathAndSeriousChart(bool bAnimation = true)
         {
-            // システム設定によるパラメータ
-            RtDecayParam rtParam = _effectiveParams.MakeRtDecayParam(true, 0);  // 0: 全国
-            // ユーザ設定によるパラメータ
-            RtDecayParam rtParamByUser = _effectiveParams.DetailSettings && !_effectiveParams.FourstepEnabled ? _effectiveParams.MakeRtDecayParam(false, 0) : null;
+            RtDecayParam rtParam;               // システム設定によるパラメータ
+            RtDecayParam rtParamByUser = null;  // ユーザ設定によるパラメータ
+            InfectData infectData;
+
+            bool timeMachineMode = _effectiveParams.TimeMachineMode && _effectiveParams.RadioIdx == 0;  // タイムマシンモードを使うか
+            if (timeMachineMode) {
+                rtParam = _effectiveParams.MakeRtDecayParam(false, _effectiveParams.MyDataIdx);
+                infectData = _effectiveParams.MyInfectData;
+            } else {
+                rtParam = _effectiveParams.MakeRtDecayParam(true, 0);
+                if (_effectiveParams.DetailSettings && !_effectiveParams.FourstepEnabled) {
+                    rtParamByUser = _effectiveParams.MakeRtDecayParam(false, 0);
+                }
+                infectData = _effectiveParams.NthInfectData(0);
+            }
 
             // 予測に必要なデータの準備
-            _userData = new UserForecastData(_extendDispDays).MakeData(forecastData, _infectData0, rtParam);
-            var userDataByUser = rtParamByUser != null ? new UserForecastData(_extendDispDays).MakeData(forecastData, _infectData0, rtParamByUser, true) : null;
+            var startDt = _effectiveParams.DispStartDate._parseDateTime();
+            _userData = new UserForecastData(_extendDispDays).MakeData(forecastData, infectData, rtParam, startDt, timeMachineMode);
+            var userDataByUser = rtParamByUser != null ? new UserForecastData(_extendDispDays).MakeData(forecastData, infectData, rtParamByUser, startDt, false, true) : null;
 
             bool onlyOnClick = _effectiveParams.OnlyOnClick;
+            int barWidth = _thinBar ? -4 : -2;
 
             string jsonStr;
 
             jsonStr = forecastData.MakeSeriousJsonData(_userData, userDataByUser, onlyOnClick, bAnimation);
-            await JSRuntime._renderChart2("chart-wrapper-serious", -2, newlyDaysRatio(), jsonStr);
+            await JSRuntime._renderChart2("chart-wrapper-serious", barWidth, newlyDaysRatio(), jsonStr);
 
             jsonStr = forecastData.MakeDeathJsonData(_userData, userDataByUser, onlyOnClick, bAnimation);
-            await JSRuntime._renderChart2("chart-wrapper-death", -2, newlyDaysRatio(), jsonStr);
+            await JSRuntime._renderChart2("chart-wrapper-death", barWidth, newlyDaysRatio(), jsonStr);
 
             if (_showOtherCharts) {
                 jsonStr = forecastData.MakeDailyDeathJonData(_userData, userDataByUser, onlyOnClick);
-                await JSRuntime._renderChart2("chart-wrapper-dailydeath", -2, newlyDaysRatio(), jsonStr);
+                await JSRuntime._renderChart2("chart-wrapper-dailydeath", barWidth, newlyDaysRatio(), jsonStr);
 
                 jsonStr = forecastData.MakeSeriousDiffJsonData(_userData, onlyOnClick);
-                await JSRuntime._renderChart2("chart-wrapper-seriousdiff", -2, 100, jsonStr);
+                await JSRuntime._renderChart2("chart-wrapper-seriousdiff", barWidth, 100, jsonStr);
 
                 jsonStr = forecastData.MakeDeathDiffJsonData(_userData, onlyOnClick);
-                await JSRuntime._renderChart2("chart-wrapper-deathdiff", -2, 100, jsonStr);
+                await JSRuntime._renderChart2("chart-wrapper-deathdiff", barWidth, 100, jsonStr);
 
                 jsonStr = forecastData.MakeBothDiffJsonData(_userData, onlyOnClick);
-                await JSRuntime._renderChart2("chart-wrapper-bothsum", -2, 100, jsonStr);
+                await JSRuntime._renderChart2("chart-wrapper-bothsum", barWidth, 100, jsonStr);
             }
         }
 

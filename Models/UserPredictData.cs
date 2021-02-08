@@ -15,8 +15,6 @@ namespace ChartBlazorApp.Models
 
         /// <summary> 予想実効再生産数 </summary>
         public double[] FullPredRt { get; private set; }
-        /// <summary> 逆算移動平均 </summary>
-        public double[] RevAverage { get; private set; }
         /// <summary> 推計移動平均 </summary>
         public double[] PredAverage { get; private set; }
         /// <summary> 予想開始日位置 </summary>
@@ -25,6 +23,8 @@ namespace ChartBlazorApp.Models
         //public double[] PredRt { get; private set; }
         /// <summary> 推計陽性者数 </summary>
         public double[] PredNewly { get; private set; }
+        /// <summary> 逆算推計移動平均 </summary>
+        public double[] RevPredAverage { get; private set; }
         /// <summary> 逆算Rt </summary>
         public double[] RevRt { get; private set; }
         /// <summary> 表示日数 </summary>
@@ -65,10 +65,13 @@ namespace ChartBlazorApp.Models
             //logger.Debug($"rtDecayParam.StartDate={rtDecayParam.StartDate.ToLongDateString()}, " +
             //    $"StartDateFourstep={rtDecayParam.StartDateFourstep.ToLongDateString()}, " +
             //    $"EffectiveStartDate={rtDecayParam.EffectiveStartDate.ToLongDateString()}");
-            RevAverage = new double[numFullDays];
-            FullPredRt = new double[numFullDays];
 
             const int ExtraDaysForAverage = Constants.EXTRA_DAYS_FOR_AVERAGE;
+            // 逆算移動平均
+            double[] revAverage = new double[numFullDays + ExtraDaysForAverage];
+            // 予想実効再生産数
+            double[] fullPredRt = new double[numFullDays + ExtraDaysForAverage];
+
             PredStartIdx = (rtDecayParam.EffectiveStartDate - firstRealDate).Days;
             if (PredStartIdx < 0 || PredStartIdx >= infData.Average.Length) {
                 logger.Error($"PredStartIdx({PredStartIdx}) is out of range. "
@@ -76,44 +79,64 @@ namespace ChartBlazorApp.Models
                     + $"Use realEndDate={realEndDate} instead");
                 PredStartIdx = (realEndDate - firstRealDate).Days;
             }
-            Array.Copy(infData.Average, RevAverage, PredStartIdx);
-            int predRtLen = rtDecayParam.CalcAndCopyPredictRt(infData.Rt, PredStartIdx, FullPredRt, realDays, extensionDays + ExtraDaysForAverage);
+            Array.Copy(infData.Average, revAverage, PredStartIdx);
+            int predRtLen = rtDecayParam.CalcAndCopyPredictRt(infData.Rt, PredStartIdx, fullPredRt, realDays, extensionDays + ExtraDaysForAverage);
 
             for (int i = 0; i < predRtLen; ++i) {
                 int idx = PredStartIdx + i;
-                var rt = FullPredRt[idx];
-                if (idx >= 7 && idx < RevAverage.Length && rt > 0) {
-                    RevAverage[idx] = Math.Pow(rt, 7.0 / 5.0) * RevAverage[idx - 7];
+                var rt = fullPredRt[idx];
+                if (idx >= 7 && idx < revAverage.Length && rt > 0) {
+                    revAverage[idx] = Math.Pow(rt, 7.0 / 5.0) * revAverage[idx - 7];
                 }
             }
+            FullPredRt = fullPredRt.Take(numFullDays).ToArray();
 
             predRtLen -= ExtraDaysForAverage;
-            double[] revAveAverage = new double[numFullDays];   // 逆算移動平均の平均
+            double[] revAveAverage = new double[numFullDays + ExtraDaysForAverage];   // 逆算移動平均の平均
             for (int i = 0; i < predRtLen; ++i) {
                 int idx = PredStartIdx + i;
-                int beg = idx - 3;
-                int end = idx + 4;
-                if (beg >= 0 && end <= RevAverage.Length) {
-                    revAveAverage[idx] = RevAverage[beg..end].Sum() / 7;
+                int margin = i._highLimit(ExtraDaysForAverage - 1);
+                int beg = idx - margin;
+                int end = idx + margin + 1;
+                if (beg >= 0 && end <= revAverage.Length) {
+                    revAveAverage[idx] = revAverage[beg..end].Sum() / (margin * 2 + 1);
                 }
             }
 
             // 推計移動平均
-            PredAverage = revAveAverage._extend(numFullDays);
+            PredAverage = revAveAverage._extend(numFullDays).Take(numFullDays).ToArray();
 
             // 推計陽性者数(3週平均)
             double[] predNewlyMean = calcPredictInfectMean(infData.Newly, infData.Average, PredAverage, realDays, PredStartIdx);
             PredNewly = predNewlyMean;
 
             // 推計陽性者数(前週差分)
-            //PredNewly = predictInfect(infData.Newly, predNewlyMean, PredAverage, realDays, PredStartIdx);
+            //PredNewly = predictInfect(infData.Newly, predNewlyMean, PrePredAverage, realDays, PredStartIdx);
+
+            // 累積推計の計算
+            double predTotal = 0;
+            double[] predTotals = PredNewly.Select((n, i) => predTotal += (n > 0 ? n : infData.Newly._nth(i))).ToArray();
+
+            // 逆算移動平均による推計陽性者数の調整
+            for (int predChkIdx = PredStartIdx + 1; predChkIdx < PredAverage.Length; predChkIdx += 7) {
+                int chkEnd = (predChkIdx + 7)._highLimit(PredAverage.Length) - 1;
+                double adjustFact = PredAverage[chkEnd] / ((predTotals[chkEnd] - predTotals[chkEnd - 7]) / 7.0);   // 推計移動平均と逆算移動平均の相違率
+                for (int i = predChkIdx; i <= chkEnd; ++i) {
+                    PredNewly[i] = PredNewly[i] * adjustFact;
+                }
+            }
+
+            // 累積推計の再計算
+            predTotal = 0;
+            predTotals = PredNewly.Select((n, i) => predTotal += (n > 0 ? n : infData.Newly._nth(i))).ToArray();
+
+            // 逆算推計移動平均
+            RevPredAverage = predTotals.Select((_, i) => i >= 7 ? (predTotals[i] - predTotals[i - 7]) / 7.0 : 0.0).ToArray();
 
             // 逆算Rt
-            double total = 0;
-            double[] totals = PredNewly.Select((n, i) => total += (n > 0 ? n : infData.Newly._nth(i))).ToArray();
             RevRt = new double[numFullDays];
             for (int i = PredStartIdx; i < PredNewly.Length; ++i) {
-                RevRt[i] = DailyData.CalcRt(totals, i);
+                RevRt[i] = DailyData.CalcRt(predTotals, i);
             }
 
             PredDays = PredStartIdx + predRtLen;

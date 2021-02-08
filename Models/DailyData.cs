@@ -147,9 +147,15 @@ namespace ChartBlazorApp.Models
                     if (data != null) {
                         var dt = items._nth(0)._parseDateTime();
                         if (dt._isValid()) {
-                            var val = items._nth(3)._parseDouble(0);
+                            var nPosi = items._nth(3)._parseDouble(0);
                             var flag = items._nth(4);
-                            data.AddData(dt, val, flag);
+                            var nTest = flag._parseDouble(0);
+                            if (nTest._isNaN()) {
+                                nTest = 0;
+                            } else {
+                                flag = "";
+                            }
+                            data.AddData(dt, nPosi, nTest, flag);
                         }
                     }
                 }

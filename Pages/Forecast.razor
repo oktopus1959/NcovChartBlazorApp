@@ -5,8 +5,8 @@
     private bool _debug = ConsoleLog.DEBUG_LEVEL > 0;
 }
 <div style="width: 100%">
-<div class="chart-block" style="@(false && _userData.UseFourStep ? "max-width: 100%" : null)">
-<h4><span>新型コロナ</span> <span>重症者数グラフ</span> <span>@(_userData.UseFourStep ? "（4段階設定使用）" : "")</span></h4>
+<div class="chart-block" style="@(_fullWidthChart /*|| _userData.UseFourStep */ ? "max-width: 100%" : null)">
+<h4><span>新型コロナ</span> <span>重症者数グラフ</span> <span>@(_userData.UseTimeMachine ? "（タイムマシン）" : _userData.UseFourStep ? "（4段階設定使用）" : "")</span></h4>
 <span>@(_userData.LastRealDateStr)現在：@(_userData.RealSerious._last()._formatComma())名</span> <span>／</span>
     @if (_userData.MaxPredictSerious > _userData.LastPredictSerious){
         <span>@(_userData.MaxPredictSeriousDateStr)最大予測：@(_userData.MaxPredictSerious._formatComma())名</span> <span>／</span>
@@ -25,8 +25,8 @@
     ※青の縦線の日付は「年代別の陽性者割合」の最終行の日付</span></div> 
 </div>
 
-<div class="chart-block right-block" style="@(false && _userData.UseFourStep ? "max-width: 100%" : null)">
-<h4><span>新型コロナ</span> <span>累計死亡者数グラフ</span> <span>@(_userData.UseFourStep ? "（4段階設定使用）" : "")</span></h4>
+<div class="chart-block right-block" style="@(_fullWidthChart /*|| _userData.UseFourStep */ ? "max-width: 100%" : null)">
+<h4><span>新型コロナ</span> <span>累計死亡者数グラフ</span> <span>@(_userData.UseTimeMachine ? "（タイムマシン）" : _userData.UseFourStep ? "（4段階設定使用）" : "")</span></h4>
 <span>@(_userData.LastRealDateStr)現在：@(_userData.RealDeath._last()._formatComma())名</span> ／
     <span>@(_userData.LastPredictDateStr)予測：@(_userData.LastPredictDeath._formatComma())名</span> @*<span>（予測日：@(forecastData.PredictStartDateStr)）</span>*@
 @* Chart の Canvas *@
@@ -57,10 +57,20 @@
         <input type="checkbox" name="other-charts" id="other-charts" @onchange="ShowOtherCharts" checked="@_showOtherCharts" />
         <span>その他グラフ</span>
     </label></div>
+<div class="inline-wrapper" style="margin-top: 10px;">
+    <label for="thin-bar">
+        <input type="checkbox" name="thin-bar" id="thin-bar" @onchange="ThinBar" checked="@_thinBar" />
+        <span>細い棒グラフ</span>
+    </label></div>
+<div class="inline-wrapper" style="margin-top: 10px;">
+    <label for="one-lane">
+        <input type="checkbox" name="one-lane" id="one-lane" @onchange="FullWidthChart" checked="@_fullWidthChart" />
+        <span>全幅表示</span>
+    </label></div>
 <div class="inline-wrapper position-right" style="margin-top: 10px;">
     <label for="extend-disp-days">
         <input type="checkbox" name="extend-disp-days" id="extend-disp-days" @onchange="ExtendDispDays" checked="@_extendDispDays" />
-        <span>表示期間延長</span>
+        <span>延長表示</span>
     </label></div>
 @if (ConsoleLog.DEBUG_FLAG) {
     <div class="inline-wrapper my-0 position-right">
@@ -70,7 +80,7 @@
 
 <div style="margin-top: 10px; display: @(_showOtherCharts ? "blcok" : "none"); width: 100%">
 <div class="chart-block">
-<span style="font-size: 1.25em;">日別死亡者数グラフ</span> <span>@(_userData.UseFourStep ? "（4段階設定使用）" : "")</span>
+<span style="font-size: 1.25em;">日別死亡者数グラフ</span> <span>@(_userData.UseTimeMachine ? "（タイムマシン）" : _userData.UseFourStep ? "（4段階設定使用）" : "")</span>
 @* Chart の Canvas *@
 <div class="scrollableChartWrapper" id="chart-wrapper-dailydeath">
     <div id="scrollWrapper-dd">
@@ -126,7 +136,7 @@
 
 <div style="margin-top:20px">
 <div class="table table-block">
-<span class="h5">想定重症化率（@(forecastData.SeriousRatesByAges.UpdateDate.ToString("M月d日"))更新）</span>
+<span class="h5">想定重症化率（@(forecastData.SeriousRatesByAges.UpdateDate.ToString("yyyy年M月d日"))更新）</span>
 <div class="tbl-scroll">
 <table class="table">
     <thead>
@@ -139,7 +149,7 @@
     <tbody>
         @foreach (var rates in forecastData.SeriousRatesByAges.DataSeriesList) {
             <tr style="text-align: right">
-                <td>@(rates.Date.ToString("M月d日"))</td>
+                <td>@(rates.Date.ToString("yy年M月d日"))</td>
                 @foreach (var rate in rates.DataSeries) {
                     <td>@String.Format("{0:f1}%", rate * 100)</td>
                 }
@@ -152,7 +162,7 @@
 </div>
 
 <div class="table table-block">
-<span class="h5">想定死亡率（@(forecastData.DeathRatesByAges.UpdateDate.ToString("M月d日"))更新）</span>
+<span class="h5">想定死亡率（@(forecastData.DeathRatesByAges.UpdateDate.ToString("yyyy年M月d日"))更新）</span>
 <div class="tbl-scroll">
 <table class="table">
     <thead>
@@ -165,7 +175,7 @@
     <tbody>
         @foreach (var rates in forecastData.DeathRatesByAges.DataSeriesList) {
             <tr style="text-align: right">
-                <td>@(rates.Date.ToString("M月d日"))</td>
+                <td>@(rates.Date.ToString("yy年M月d日"))</td>
                 @foreach (var rate in rates.DataSeries) {
                     <td>@String.Format("{0:f1}%", rate * 100)</td>
                 }
@@ -190,7 +200,7 @@
     <tbody>
         @foreach (var rates in forecastData.InfectRatesByAges.DataSeriesList.TakeLast(4)) {
             <tr style="text-align: right">
-                <td>@(rates.Date.ToString("M月d日"))</td>
+                <td>@(rates.Date.ToString("yy年M月d日"))</td>
                 @foreach (var rate in rates.DataSeries) {
                     <td>@String.Format("{0:f1}%", rate * 100)</td>
                 }
@@ -199,12 +209,14 @@
     </tbody>
 </table>
 </div>
-<div style="position: absolute; bottom: 0px; margin-top: 2px;">
-    <span style="margin-left: 20px; font-size: small">※最終行は直前@(forecastData.RateAveWeeks)週の平均</span></div> 
+@if (forecastData.RateAveWeeks > 0) {
+    <div style="position: absolute; bottom: 0px; margin-top: 2px;">
+        <span style="margin-left: 20px; font-size: small">※最終行は直前@(forecastData.RateAveWeeks)週の平均</span></div> 
+}
 </div>
 
 <div class="table-block">
-<span class="h5">想定改善率（@(forecastData.RecoverRates.UpdateDate.ToString("M月d日"))更新）</span>
+<span class="h5">想定改善率（@(forecastData.RecoverRates.UpdateDate.ToString("yyyy年M月d日"))更新）</span>
 <table class="table">
     <thead>
         <tr style="text-align: center">
@@ -216,7 +228,7 @@
     <tbody>
         @foreach (var rates in forecastData.RecoverRates.DataSeriesList) {
             <tr style="text-align: right">
-                <td>@(rates.Date.ToString("M月d日"))</td>
+                <td>@(rates.Date.ToString("yy年M月d日"))</td>
                 <td>@String.Format("{0:f1}%", rates.DataSeries[0] * 100)</td>
                 <td>@(rates.OffsetDays)</td>
             </tr>
@@ -227,5 +239,6 @@
 
 </div>
 
-<div id="static-description2"></div>
+<hr style="margin: 0.75rem 0em 0.75em 0em;"/>
+<div id="forecast-description"></div>
 

@@ -15,11 +15,13 @@ namespace ChartBlazorApp.Models
 
         public bool Fourstep { get; set; }
 
-        /// <summary>予測開始日</summary>
+        /// <summary>予想基点日(2段階階)</summary>
         public DateTime StartDate { get; set; }
 
+        /// <summary>予想基点日(4段階)</summary>
         public DateTime StartDateFourstep { get; set; }
 
+        /// <summary>予想基点日(2段階または4段階)</summary>
         public DateTime EffectiveStartDate { get { return Fourstep ? StartDateFourstep : StartDate; } }
 
         public int DaysToOne { get; set; }
