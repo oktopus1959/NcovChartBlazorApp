@@ -133,11 +133,13 @@ mkdir -p $CSVDIR $WORKDIR
 FIRST_DATE='2020.0?5.18'
 
 # ヘッダー部
-sed -n '1,/#end_of_header/ p' $PREF_PARAM_FILE > $PREF_WORK_FILE
+echo '#start_of_header' > $PREF_WORK_FILE
+[ -f reload_magic.txt ] && RUN_CMD -fm "cat reload_magic.txt >> $PREF_WORK_FILE"
+RUN_CMD -fm "sed -n '1,/#end_of_header/ p' $PREF_PARAM_FILE >> $PREF_WORK_FILE"
 
 # 全国データのダウンロード
-RUN_CMD -f "downloadCsv https://www.mhlw.go.jp/content/$POSI_DAILY_FILE ${POSI_DAILY_WORK}"
-RUN_CMD -f "downloadCsv https://www.mhlw.go.jp/content/$TEST_DAILY_FILE ${TEST_DAILY_WORK}"
+RUN_CMD -fm "downloadCsv https://www.mhlw.go.jp/content/$POSI_DAILY_FILE ${POSI_DAILY_WORK}"
+RUN_CMD -fm "downloadCsv https://www.mhlw.go.jp/content/$TEST_DAILY_FILE ${TEST_DAILY_WORK}"
 
 ruby_script() {
 cat <<EOS
@@ -172,30 +174,30 @@ echo "#end_of_mhlw_pref" >> ${PREF_WORK_FILE}
 
 # 追加陽性者数
 #RUN_CMD -f -m "addExtraTotal $PREF_PARAM_FILE $PREF_WORK_FILE"
-RUN_CMD -f -m "sed -n '/#overwrite/,/#append/ p' $PREF_PARAM_FILE | grep -v '^#' | \
+RUN_CMD -fm "sed -n '/#overwrite/,/#append/ p' $PREF_PARAM_FILE | grep -v '^#' | \
                sed 's/$/,OVERWRITE/' >> $PREF_WORK_FILE"
-RUN_CMD -f -m "sed -n '/#append/,$ p' $PREF_PARAM_FILE | grep -v '^#' | \
+RUN_CMD -fm "sed -n '/#append/,$ p' $PREF_PARAM_FILE | grep -v '^#' | \
                sed 's/$/,APPEND/' >> $PREF_WORK_FILE"
-RUN_CMD -f -m "sed 's/[府県],/,/' $PREF_WORK_FILE | sed 's/東京都,/東京,/' > $PREF_TARGET_FILE"
+RUN_CMD -fm "sed 's/[府県],/,/' $PREF_WORK_FILE | sed 's/東京都,/東京,/' > $PREF_TARGET_FILE"
 
 # 重症者&死亡者&改善率
-RUN_CMD -f "downloadCsv https://www.mhlw.go.jp/content/$DEATH_TOTAL_FILE ${DEATH_TOTAL_WORK}"
-RUN_CMD -f "downloadCsv https://www.mhlw.go.jp/content/$SEVERE_DAILY_FILE ${SEVERE_DAILY_WORK}"
+RUN_CMD -fm "downloadCsv https://www.mhlw.go.jp/content/$DEATH_TOTAL_FILE ${DEATH_TOTAL_WORK}"
+RUN_CMD -fm "downloadCsv https://www.mhlw.go.jp/content/$SEVERE_DAILY_FILE ${SEVERE_DAILY_WORK}"
 tailFromDate() {
     RUN_CMD -f "sed -ne '/2020\\/6\\/1/,$ p' $1 | ruby -ne 'puts \$_.strip'"
 }
-RUN_CMD -f "tailFromDate $DEATH_TOTAL_WORK > ${DEATH_TOTAL_WORK}.tmp2"
-RUN_CMD -f "tailFromDate $SEVERE_DAILY_WORK | cut -d, -f2 > ${SEVERE_DAILY_WORK}.tmp2"
+RUN_CMD -fm "tailFromDate $DEATH_TOTAL_WORK > ${DEATH_TOTAL_WORK}.tmp2"
+RUN_CMD -fm "tailFromDate $SEVERE_DAILY_WORK | cut -d, -f2 > ${SEVERE_DAILY_WORK}.tmp2"
 
 cp $DEATH_SERIOUS_PARAM $DEATH_SERIOUS_TARGET
-RUN_CMD -f -m "paste -d, ${DEATH_TOTAL_WORK}.tmp2 ${SEVERE_DAILY_WORK}.tmp2 >> $DEATH_SERIOUS_TARGET"
+RUN_CMD -fm "paste -d, ${DEATH_TOTAL_WORK}.tmp2 ${SEVERE_DAILY_WORK}.tmp2 >> $DEATH_SERIOUS_TARGET"
 
 for x in Data/*_rate.txt $CHART_SCALES_PARAM $FOURSTEP_EXPECT_PARAM; do
     RUN_CMD -m "cp -p $x $CSVDIR/$(basename ${x/.txt/.csv})"
 done
 
 # 年代別陽性者数
-RUN_CMD -f -m "cp -p Data/$INFECT_AGES_FILE $CSVDIR/${INFECT_AGES_FILE/.txt/.csv}"
+RUN_CMD -fm "cp -p Data/$INFECT_AGES_FILE $CSVDIR/${INFECT_AGES_FILE/.txt/.csv}"
 
 # 作成したファイルをリモートにコピー
-RUN_CMD -f "copy_files"
+RUN_CMD -fm "copy_files"
