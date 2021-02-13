@@ -156,6 +156,8 @@ EOS
 
 # 全国陽性者数
 RUN_CMD -fm "sed -nr '/^${FIRST_DATE},/,$ s/\r//p' $POSI_DAILY_WORK > ${POSI_DAILY_WORK}.tmp"
+#RUN_CMD -fm "sed -ri 's/^2021\/2\/10,1691/2021\/2\/11,1691/' ${POSI_DAILY_WORK}.tmp"
+#RUN_CMD -fm "sed -ri 's/^2021\/2\/11,1297/2021\/2\/12,1297/' ${POSI_DAILY_WORK}.tmp"
 RUN_CMD -fm "sed -nr '/^${FIRST_DATE},/,$ s/\r//p' $TEST_DAILY_WORK | cut -d, -f2 > ${TEST_DAILY_WORK}.tmp"
 RUN_CMD -fm "paste -d, ${POSI_DAILY_WORK}.tmp ${TEST_DAILY_WORK}.tmp > $ALL_PCR_DAILY_WORK"
 RUN_CMD -fm "ruby -e '$(ruby_script)' $ALL_PCR_DAILY_WORK >> ${PREF_WORK_FILE}"
