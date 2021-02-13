@@ -361,7 +361,7 @@ function ChartDrawer(wrapperId) {
                 var ypos = (count + 1) * 14 + 16;
                 //console.log("ChartWidth:" + chartWidth + ", xpos:" + xpos + ", ypos:" + ypos + ", count:" + count);
                 return {
-                    x: Math.round(xpos - (xpos >= chartWidth / 2 ? 8 : -8)),
+                    x: Math.round(xpos - (xpos >= chartWidth / 2 ? 2 : -2)),    // 表示位置を少し横にずらす
                     y: Math.round(isHighest && ymax > ypos ? ymax : ypos)
                 };
             } else {
@@ -412,7 +412,7 @@ function ChartDrawer(wrapperId) {
                 xpos /= count;
                 ypos /= count;
                 return {
-                    x: Math.round(xpos - (xpos >= chartWidth / 2 ? 8 : -8)),
+                    x: Math.round(xpos - (xpos >= chartWidth / 2 ? 4 : -4)),    // 表示位置を少し横にずらす
                     y: Math.round(ypos)
                 };
             } else {

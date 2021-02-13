@@ -9,6 +9,8 @@ namespace ChartBlazorApp.Models
 {
     public static class HelperExtensions
     {
+        private static ConsoleLog logger = ConsoleLog.GetLogger();
+
         public static double?[] _toNullableArray(this IEnumerable<double> array, int roundDigit, double? defval = null)
         {
             return array.Select(x => x > 0 ? Math.Round(x, roundDigit) : defval).ToArray();
@@ -45,7 +47,17 @@ namespace ChartBlazorApp.Models
             [System.Runtime.CompilerServices.CallerFilePath] string path = "",
             [System.Runtime.CompilerServices.CallerLineNumber] int linenum = 0)
         {
+            logger.Debug(() => $"renderChart2: json len={jsonStr.Length}");
             await jsRuntime._invokeAsyncEx(callerLoc(method, path, linenum), "renderChart2", chartId, barWidth, scrollRatio, jsonStr);
+        }
+
+        public static async Task _insertHtmlFile(this IJSRuntime jsRuntime, string htmlPath, string divId,
+            [System.Runtime.CompilerServices.CallerMemberName] string method = "",
+            [System.Runtime.CompilerServices.CallerFilePath] string path = "",
+            [System.Runtime.CompilerServices.CallerLineNumber] int linenum = 0)
+        {
+            var html = Helper.GetFileContent(htmlPath, System.Text.Encoding.UTF8);
+            if (html._notEmpty()) await jsRuntime._invokeAsyncEx(callerLoc(method, path, linenum), "insertDescription", divId, html);
         }
 
         public static async Task _insertDescription(this IJSRuntime jsRuntime, string divId, string html,

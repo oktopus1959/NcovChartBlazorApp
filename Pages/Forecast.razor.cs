@@ -39,9 +39,8 @@ namespace ChartBlazorApp.Pages
 
         private async Task insertStaticDescription()
         {
-            var html = Helper.GetFileContent("wwwroot/html/Forecast.html", System.Text.Encoding.UTF8);
-            //if (html._notEmpty()) await JSRuntime.InvokeAsync<string>("insertDescription", "forecast-description", html);
-            if (html._notEmpty()) await JSRuntime._insertDescription("forecast-description", html);
+            await JSRuntime._insertHtmlFile("wwwroot/html/Forecast-desc1.html", "forecast-desc1");
+            await JSRuntime._insertHtmlFile("wwwroot/html/Forecast.html", "forecast-description");
         }
 
         //private async Task selectStaticDescription()
@@ -104,6 +103,16 @@ namespace ChartBlazorApp.Pages
         public async Task ExtendDispDays(ChangeEventArgs args)
         {
             _effectiveParams.CurrentSettings.forecastExpandChartDates = (bool)(args.Value);
+            await _effectiveParams.CurrentSettings.SaveSettings();
+            await RenderDeathAndSeriousChart(false);
+            StateHasChanged();
+        }
+
+        private bool _onlyOnClick { get { return _effectiveParams.OnlyOnClick; } }
+
+        public async Task ChangeOnlyOnClick(ChangeEventArgs args)
+        {
+            _effectiveParams.CurrentSettings.setOnlyOnClick((bool)args.Value);
             await _effectiveParams.CurrentSettings.SaveSettings();
             await RenderDeathAndSeriousChart(false);
             StateHasChanged();

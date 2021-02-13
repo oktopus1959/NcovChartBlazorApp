@@ -16,7 +16,7 @@ namespace ChartBlazorApp.Models
 
         /***  DailyData.cs ***/
         public const string PREF_FILE_PATH = "Data/csv/prefectures_ex.csv";
-        public const string EXPECT_FILE_PATH = "Data/csv/4step_expect_params.csv";
+        public const string EXPECT_FILE_PATH = "Data/csv/multi_step_expect_params.csv";
 
         /// <summary> Y軸の最大値を計算するための期間 </summary>
         public const int Y_MAX_CALC_DURATION = 60;
@@ -185,7 +185,7 @@ namespace ChartBlazorApp.Models
         /// <summary> 予測日数 </summary>
         public const int FORECAST_PREDICTION_DAYS = 28;
 
-        /// <summary> 4段階設定用の予測日数 </summary>
+        /// <summary> 多段階設定用の予測日数 </summary>
         public const int FORECAST_PREDICTION_DAYS_FOR_DETAIL = 100;
 
         /// <summary> 7日移動平均の中央までシフトする日数 </summary>
@@ -198,7 +198,7 @@ namespace ChartBlazorApp.Models
         /// <summary> 予測表示期間のデフォルト </summary>
         public const int EXTENSION_DAYS = 25;
 
-        /// <summary> 予測表示期間のデフォルト(4段階設定用) </summary>
+        /// <summary> 予測表示期間のデフォルト(多段階設定用) </summary>
         public const int EXTENSION_DAYS_EX = 15;
 
         /*** RtDecayParam.cs ***/

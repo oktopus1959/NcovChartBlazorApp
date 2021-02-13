@@ -73,7 +73,7 @@ div.flex-box {
 
 div.with-border {
     padding-top: 4px;
-    padding-bottom: 8px;
+    padding-bottom: 4px;
     padding-left: 8px;
     margin-left: 0px !important;
     margin-right: 8px !important;
@@ -230,6 +230,7 @@ table {
     div.right-block { margin-top: 20px; margin-left: 0px; }
     div.table-block { margin-right: 0px; }
     div.tbl-scroll { overflow-x: scroll; }
+    div.br-800-1000 { display: none; }
 }
 
 @media (min-width: 330px) {
@@ -255,9 +256,14 @@ table {
     div.table-block { margin-right: 20px; }
 }
 
+@media (min-width: 840px) {
+    div.br-800-1000 { display: block; height: 0px; margin: 0px; border: 0px; padding: 0px; }
+}
+
 @media (min-width: 1000px) {
     div.chart-block { max-width: 48%; }
     div.right-block { margin-top: 0px; margin-left: 20px; }
+    div.br-800-1000 { display: none; }
 }
 
 

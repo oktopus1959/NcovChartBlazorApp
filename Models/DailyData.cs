@@ -73,7 +73,7 @@ namespace ChartBlazorApp.Models
                         // ファイルが更新されていたら再ロードする
                         _lastFileDt = fileInfo.ModifyDt;
                         _infectDataList = loadPrefectureData(readFile(filePath), lastRealDt);
-                        loadFourstepHopeParams();
+                        loadMultiStepExpectParams();
                         LastUpdateDt = _lastInitializedDt;
                         logger.Info($"prev Initialized at {prevDt}, Reload:{filePath}");
                     }
@@ -101,7 +101,7 @@ namespace ChartBlazorApp.Models
                 var keyName = items[2];
                 if (keyName._notEmpty()) {
                     data = prefDataDict._safeGetOrNewInsert(keyName);
-                    data.InitializeIfNecessary(dispName);
+                    data.InitializeIfNecessary(dispName, keyName);
                     if (bAddOrder && !prefOrder.Contains(keyName)) prefOrder.Add(keyName);
                 }
                 return data;
@@ -119,7 +119,7 @@ namespace ChartBlazorApp.Models
                 } else if (items[0]._startsWith("#params")) {
                     var data = getOrNewData(items, false);
                     if (data != null) {
-                        data.AddYAxesMax(items._nth(3)._parseDouble(0.0), items._nth(4)._parseDouble(0.0));
+                        //data.AddYAxesMax(items._nth(3)._parseDouble(0.0), items._nth(4)._parseDouble(0.0));
                         data.AddDecayParam(
                             items._nth(5)._parseDateTime(),
                             items._nth(6)._parseInt(0),
@@ -166,10 +166,11 @@ namespace ChartBlazorApp.Models
                 var data = prefDataDict._safeGet(pref);
                 if (data != null) infectList.Add(data.MakeData());
             }
+
             return infectList;
         }
 
-        public class ExpectdFourstepParam
+        public class ExpectdMultiStepParam
         {
             public string ButtonText;
             public string StartDate;
@@ -181,31 +182,58 @@ namespace ChartBlazorApp.Models
             public double Rt3;
             public int DaysToRt4;
             public double Rt4;
+            public int DaysToRt5;
+            public double Rt5;
+            public int DaysToRt6;
+            public double Rt6;
+            public string Events;
         }
 
-        public static ExpectdFourstepParam[] ExpectedFourstepParams { get; private set; } = null;
+        public static Dictionary<string, List<ExpectdMultiStepParam>> ExpectedMultiStepParams { get; private set; } = new Dictionary<string, List<ExpectdMultiStepParam>>();
 
         /// <summary>
-        /// 4段階設定の希望設定をロードする
+        /// 多段階設定の希望設定をロードする
         /// </summary>
-        private void loadFourstepHopeParams()
+        private void loadMultiStepExpectParams()
         {
-            ExpectedFourstepParams = readFile(Constants.EXPECT_FILE_PATH).
+            logger.Info("CALLED");
+            ExpectedMultiStepParams = new Dictionary<string, List<ExpectdMultiStepParam>>();
+            foreach (var items in readFile(Constants.EXPECT_FILE_PATH).
                 Select(line => line.Trim()._reReplace(" *", "")._reReplace(",#.*", "").Split(',')).
-                Where(items => items._length() >= 3 && !items[0]._startsWith("#")).
-                Select(items => new ExpectdFourstepParam() {
-                    ButtonText = items[0],
-                    StartDate = items[1],
-                    DaysToRt1 = items._nth(2)._parseInt(0),
-                    Rt1 = items._nth(3)._parseDouble(1),
-                    DaysToRt2 = items._nth(4)._parseInt(0),
-                    Rt2 = items._nth(5)._parseDouble(1),
-                    DaysToRt3 = items._nth(6)._parseInt(0),
-                    Rt3 = items._nth(7)._parseDouble(1),
-                    DaysToRt4 = items._nth(8)._parseInt(0),
-                    Rt4 = items._nth(9)._parseDouble(1),
-                }).
-                ToArray();
+                Where(items => items._length() >= 3 && !items[0]._startsWith("#"))) {
+                var param = new ExpectdMultiStepParam();
+                int idx = 1;
+                param.ButtonText = items[idx++];
+                param.StartDate = items[idx++];
+                if (items._nth(idx)._ne("|")) {
+                    param.DaysToRt1 = items._nth(idx++)._parseInt(0);
+                    param.Rt1 = items._nth(idx++)._parseDouble(1);
+                }
+                if (items._nth(idx)._ne("|")) {
+                    param.DaysToRt2 = items._nth(idx++)._parseInt(0);
+                    param.Rt2 = items._nth(idx++)._parseDouble(1);
+                }
+                if (items._nth(idx)._ne("|")) {
+                    param.DaysToRt3 = items._nth(idx++)._parseInt(0);
+                    param.Rt3 = items._nth(idx++)._parseDouble(1);
+                }
+                if (items._nth(idx)._ne("|")) {
+                    param.DaysToRt4 = items._nth(idx++)._parseInt(0);
+                    param.Rt4 = items._nth(idx++)._parseDouble(1);
+                }
+                if (items._nth(idx)._ne("|")) {
+                    param.DaysToRt5 = items._nth(idx++)._parseInt(0);
+                    param.Rt5 = items._nth(idx++)._parseDouble(1);
+                }
+                if (items._nth(idx)._ne("|")) {
+                    param.DaysToRt6 = items._nth(idx++)._parseInt(0);
+                    param.Rt6 = items._nth(idx++)._parseDouble(1);
+                }
+                if (items._nth(idx)._equalsTo("|")) ++idx;
+                param.Events = items.Length > idx ? param.Events = items[idx..]._join(",") : null;
+
+                ExpectedMultiStepParams._safeGetOrNewInsert(items[0]).Add(param);
+            }
         }
 
         // [JSInvokable] 属性を付加すると JavaScript から呼び出せるようになる。(今回は使用していないが参考のため残してある)

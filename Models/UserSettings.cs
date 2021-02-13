@@ -27,6 +27,8 @@ namespace ChartBlazorApp.Models
         public int[] favorPrefIdxes { get; set; }
 
         public int barWidth { get; set; }
+        public int lastBarWidthRange { get; set; }
+
         public int yAxisMin { get; set; }
 
         public int[] yAxisMax { get; set; }
@@ -72,6 +74,12 @@ namespace ChartBlazorApp.Models
         public double[] paramRtRt3 { get; set; }
         public int[] paramRtDaysToRt4 { get; set; }
         public double[] paramRtRt4 { get; set; }
+        public int[] paramRtDaysToRt5 { get; set; }
+        public double[] paramRtRt5 { get; set; }
+        public int[] paramRtDaysToRt6 { get; set; }
+        public double[] paramRtRt6 { get; set; }
+        /// <summary> 多段階設定の保存用</summary>
+        public string[] paramRtMultiSave { get; set; }
 
         /// <summary> アノテーション </summary>
         public string[] events { get; set; }
@@ -126,6 +134,7 @@ namespace ChartBlazorApp.Models
             prefIdx = MainPrefNum;
             favorPrefIdxes = new int[Constants.FAVORITE_PREF_MAX];
             barWidth = 0;
+            lastBarWidthRange = 0;
             yAxisMin = 0;
             yAxisMax = new int[numData];
             yAxis2Max = new double[numData];
@@ -167,6 +176,11 @@ namespace ChartBlazorApp.Models
             paramRtRt3 = new double[numData];
             paramRtDaysToRt4 = new int[numData];
             paramRtRt4 = new double[numData];
+            paramRtDaysToRt5 = new int[numData];
+            paramRtRt5 = new double[numData];
+            paramRtDaysToRt6 = new int[numData];
+            paramRtRt6 = new double[numData];
+            paramRtMultiSave = new string[numData];
             events = new string[numData];
             timeMachineData = "";
             timeMachineMode = false;
@@ -193,6 +207,7 @@ namespace ChartBlazorApp.Models
         {
             var jsonStr = await jsRuntime._getSettings();
             if (jsonStr._isEmpty()) throw new Exception("Settings is empty");
+            logger.Debug(() => $"Load json len={jsonStr.Length}");
             return jsonStr._jsonDeserialize<UserSettings>().SetJsRuntime(jsRuntime).fillEmptyValues(numData);
         }
 
@@ -218,7 +233,9 @@ namespace ChartBlazorApp.Models
         public async Task SaveSettings()
         {
             try {
-                await JSRuntime._saveSettings(this._jsonSerialize());
+                string jsonStr = this._jsonSerialize();
+                logger.Debug(() => $"Save json len={jsonStr.Length}");
+                await JSRuntime._saveSettings(jsonStr);
             } catch (Exception e) {
                 logger.Error($"settings write failed.\n{e}");
             }
@@ -246,6 +263,11 @@ namespace ChartBlazorApp.Models
             paramRtRt3 = _extendArray(paramRtRt3, numData);
             paramRtDaysToRt4 = _extendArray(paramRtDaysToRt4, numData);
             paramRtRt4 = _extendArray(paramRtRt4, numData);
+            paramRtDaysToRt5 = _extendArray(paramRtDaysToRt5, numData);
+            paramRtRt5 = _extendArray(paramRtRt5, numData);
+            paramRtDaysToRt6 = _extendArray(paramRtDaysToRt6, numData);
+            paramRtRt6 = _extendArray(paramRtRt6, numData);
+            paramRtMultiSave = _extendArray(paramRtMultiSave, numData);
             events = _extendArray(events, numData);
 
             if (_oldValuesCopied) {
@@ -286,8 +308,16 @@ namespace ChartBlazorApp.Models
         public double myParamRt3(int idx = -1) { return paramRtRt3._getNth(idx >= 0 ? idx : dataIdx); }
         public int myParamDaysToRt4(int idx = -1) { return paramRtDaysToRt4._getNth(idx >= 0 ? idx : dataIdx); }
         public double myParamRt4(int idx = -1) { return paramRtRt4._getNth(idx >= 0 ? idx : dataIdx); }
+        public int myParamDaysToRt5(int idx = -1) { return paramRtDaysToRt5._getNth(idx >= 0 ? idx : dataIdx); }
+        public double myParamRt5(int idx = -1) { return paramRtRt5._getNth(idx >= 0 ? idx : dataIdx); }
+        public int myParamDaysToRt6(int idx = -1) { return paramRtDaysToRt6._getNth(idx >= 0 ? idx : dataIdx); }
+        public double myParamRt6(int idx = -1) { return paramRtRt6._getNth(idx >= 0 ? idx : dataIdx); }
         public string myEvents(int idx = -1) { return events._getNth(idx >= 0 ? idx : dataIdx); }
 
+        public void setBarWidth(int value)
+        {
+            barWidth = value._lowLimit(-4)._highLimit(4);
+        }
         public void changeBarWidth(int value)
         {
             barWidth = Math.Min(Math.Max(barWidth + value, -4), 4);
@@ -552,11 +582,55 @@ namespace ChartBlazorApp.Models
         {
             if (paramRtRt4.Length > dataIdx) paramRtRt4[dataIdx] = value;
         }
+        public void setParamDaysToRt5(int value)
+        {
+            if (paramRtDaysToRt5.Length > dataIdx) paramRtDaysToRt5[dataIdx] = value;
+        }
+        public void setParamRt5(double value)
+        {
+            if (paramRtRt5.Length > dataIdx) paramRtRt5[dataIdx] = value;
+        }
+        public void setParamDaysToRt6(int value)
+        {
+            if (paramRtDaysToRt6.Length > dataIdx) paramRtDaysToRt6[dataIdx] = value;
+        }
+        public void setParamRt6(double value)
+        {
+            if (paramRtRt6.Length > dataIdx) paramRtRt6[dataIdx] = value;
+        }
         public void setEvent(string value)
         {
             if (events.Length > dataIdx) events[dataIdx] = value;
         }
 
+        public void saveRtMultiParams()
+        {
+            if (paramRtMultiSave.Length > dataIdx) {
+                paramRtMultiSave[dataIdx] = $"{paramRtStartDateFourstep._nth(dataIdx)}," +
+                    $"{paramRtDaysToRt1._nth(dataIdx)},{paramRtRt1._nth(dataIdx):f3},{paramRtDaysToRt2._nth(dataIdx)},{paramRtRt2._nth(dataIdx):f3}," +
+                    $"{paramRtDaysToRt3._nth(dataIdx)},{paramRtRt3._nth(dataIdx):f3},{paramRtDaysToRt4._nth(dataIdx)},{paramRtRt4._nth(dataIdx):f3}," +
+                    $"{paramRtDaysToRt5._nth(dataIdx)},{paramRtRt5._nth(dataIdx):f3},{paramRtDaysToRt6._nth(dataIdx)},{paramRtRt6._nth(dataIdx):f3}";
+            }
+        }
+
+        public void loadRtMultiParams()
+        {
+            var items = paramRtMultiSave._nth(dataIdx)._split(',');
+            int idx = 0;
+            setParamStartDateFourstep(items._nth(idx++));
+            setParamDaysToRt1(items._nth(idx++)._parseInt(0));
+            setParamRt1(items._nth(idx++)._parseDouble(1));
+            setParamDaysToRt2(items._nth(idx++)._parseInt(0));
+            setParamRt2(items._nth(idx++)._parseDouble(1));
+            setParamDaysToRt3(items._nth(idx++)._parseInt(0));
+            setParamRt3(items._nth(idx++)._parseDouble(1));
+            setParamDaysToRt4(items._nth(idx++)._parseInt(0));
+            setParamRt4(items._nth(idx++)._parseDouble(1));
+            setParamDaysToRt5(items._nth(idx++)._parseInt(0));
+            setParamRt5(items._nth(idx++)._parseDouble(1));
+            setParamDaysToRt6(items._nth(idx++)._parseInt(0));
+            setParamRt6(items._nth(idx++)._parseDouble(1));
+        }
     }
 
     /// <summary>

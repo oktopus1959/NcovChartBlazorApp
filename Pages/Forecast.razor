@@ -6,7 +6,7 @@
 }
 <div style="width: 100%">
 <div class="chart-block" style="@(_fullWidthChart /*|| _userData.UseFourStep */ ? "max-width: 100%" : null)">
-<h4><span>新型コロナ</span> <span>重症者数グラフ</span> <span>@(_userData.UseTimeMachine ? "（タイムマシン）" : _userData.UseFourStep ? "（4段階設定使用）" : "")</span></h4>
+<h4><span>新型コロナ</span> <span>重症者数グラフ</span> <span>@(_userData.UseTimeMachine ? "（タイムマシン）" : _userData.UseFourStep ? "（多段階設定使用）" : "")</span></h4>
 <span>@(_userData.LastRealDateStr)現在：@(_userData.RealSerious._last()._formatComma())名</span> <span>／</span>
     @if (_userData.MaxPredictSerious > _userData.LastPredictSerious){
         <span>@(_userData.MaxPredictSeriousDateStr)最大予測：@(_userData.MaxPredictSerious._formatComma())名</span> <span>／</span>
@@ -26,7 +26,7 @@
 </div>
 
 <div class="chart-block right-block" style="@(_fullWidthChart /*|| _userData.UseFourStep */ ? "max-width: 100%" : null)">
-<h4><span>新型コロナ</span> <span>累計死亡者数グラフ</span> <span>@(_userData.UseTimeMachine ? "（タイムマシン）" : _userData.UseFourStep ? "（4段階設定使用）" : "")</span></h4>
+<h4><span>新型コロナ</span> <span>累計死亡者数グラフ</span> <span>@(_userData.UseTimeMachine ? "（タイムマシン）" : _userData.UseFourStep ? "（多段階設定使用）" : "")</span></h4>
 <span>@(_userData.LastRealDateStr)現在：@(_userData.RealDeath._last()._formatComma())名</span> ／
     <span>@(_userData.LastPredictDateStr)予測：@(_userData.LastPredictDeath._formatComma())名</span> @*<span>（予測日：@(forecastData.PredictStartDateStr)）</span>*@
 @* Chart の Canvas *@
@@ -42,15 +42,7 @@
 </div>
 </div>
 
-<div style="margin-top: 10px;">
-    <p>【日本集中治療医学会「<a href="https://www.jsicm.org/news/statement200401.html" target="_blank">新型コロナウイルス感染症（COVID-19）に関する理事長声明</a>」(2020/4/1)より】</p>
-    <div class="less-indent">
-    <p>「現在、本邦には約6,500床ほどのICUベッドがあると推定致しますが、約4倍のマンパワーが必要であること、他の重症患者の受け入れも必要であることを考えると、
-    このままでは、実際に新型コロナウイルス感染症の重症患者を収容できるベッド数は<font class="darkred">1,000床にも満たない</font>可能性があります。」</p>
-    </div>
-    <div class="indent"><p style="margin-left: 1rem; font-size: small">
-        ※現時点ではコロナ対応のICUベッド数は増加しているかと思いますが、それでも逼迫しつつあることは確かだろうと考えます。</p></div> 
- </div>
+<div id="forecast-desc1" style="margin-top: 10px;"></div>
 
 <div class="inline-wrapper" style="margin-top: 10px;">
     <label for="other-charts">
@@ -67,10 +59,15 @@
         <input type="checkbox" name="one-lane" id="one-lane" @onchange="FullWidthChart" checked="@_fullWidthChart" />
         <span>全幅表示</span>
     </label></div>
-<div class="inline-wrapper position-right" style="margin-top: 10px;">
+<div class="inline-wrapper" style="margin-top: 10px;">
     <label for="extend-disp-days">
         <input type="checkbox" name="extend-disp-days" id="extend-disp-days" @onchange="ExtendDispDays" checked="@_extendDispDays" />
         <span>延長表示</span>
+    </label></div>
+<div class="inline-wrapper position-right" style="margin-top: 10px;">
+    <label for="only-on-click">
+        <input type="checkbox" name="only-on-click" id="only-on-click" @onchange="ChangeOnlyOnClick" checked="@(_onlyOnClick)" />
+        <span>クリックで情報画面</span>
     </label></div>
 @if (ConsoleLog.DEBUG_FLAG) {
     <div class="inline-wrapper my-0 position-right">
@@ -80,7 +77,7 @@
 
 <div style="margin-top: 10px; display: @(_showOtherCharts ? "blcok" : "none"); width: 100%">
 <div class="chart-block">
-<span style="font-size: 1.25em;">日別死亡者数グラフ</span> <span>@(_userData.UseTimeMachine ? "（タイムマシン）" : _userData.UseFourStep ? "（4段階設定使用）" : "")</span>
+<span style="font-size: 1.25em;">日別死亡者数グラフ</span> <span>@(_userData.UseTimeMachine ? "（タイムマシン）" : _userData.UseFourStep ? "（多段階設定使用）" : "")</span>
 @* Chart の Canvas *@
 <div class="scrollableChartWrapper" id="chart-wrapper-dailydeath">
     <div id="scrollWrapper-dd">

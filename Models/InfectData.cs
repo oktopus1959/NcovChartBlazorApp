@@ -15,17 +15,9 @@ namespace ChartBlazorApp.Models
 
         public string Title { get; set; }
 
-        /// <summary>Y-1軸の Max <summary>
-        public double Y1_Max { get; set; }
+        public string KeyName { get; set; }
 
-        /// <summary>Y-1軸の Step <summary>
-        public double Y1_Step { get; set; }
-
-        /// <summary>Y-2軸の Max <summary>
-        public double Y2_Max { get; set; }
-
-        /// <summary>Y-2軸の Step <summary>
-        public double Y2_Step { get; set; }
+        public DateTime DispStartDate { get; set; }
 
         /// <summary>実データの存在する日付の列</summary>
         public DateTime[] Dates { get; set; }
@@ -54,9 +46,14 @@ namespace ChartBlazorApp.Models
             return PrefData.MakeData(extraData, InitialSubParams);
         }
 
+        public InfectData Clone()
+        {
+            return (InfectData)this.MemberwiseClone();
+        }
+
         public InfectData ShiftStartDate(DateTime startDt)
         {
-            InfectData data = (InfectData)this.MemberwiseClone();
+            InfectData data = Clone();
             int idx = Dates._findIndex(startDt);
             if (idx > 0) {
                 data.Dates = Dates.Skip(idx).ToArray();
@@ -718,7 +715,7 @@ namespace ChartBlazorApp.Models
             RtDecayParam param = InitialDecayParam.Clone();
             param.StartDate = minParam.startDt;
             minParam.CopyToDecayParam(param);
-            var predData = UserPredictData.PredictValuesEx(this, param, realDays + 10, 5);  // 10 と 5 は適当
+            var predData = UserPredictData.PredictValuesEx(this, param, 0, realDays + 10, 5);  // 10 と 5 は適当
             return predData.CalcAverageMSE(Average, realDays - duration, realDays);
             //return realDays._range(realDays - duration).Select(i => Math.Pow(predData.PredAverage[i] - Average[i], 2)).Sum();
         }
@@ -733,12 +730,12 @@ namespace ChartBlazorApp.Models
 
         private string Title { get; set; }
 
+        private string KeyName { get; set; }
+
         private string Events { get; set; }
 
         private (DateTime, DateTime)[] ShiftRanges { get; set; }
 
-        private double Y1_Max { get; set; }
-        private double Y2_Max { get; set; }
         private RtDecayParam DecayParam { get; set; } = new RtDecayParam();
         //public List<DateTime> Dates { get; set; }
         //public List<double> Total { get; set; }
@@ -747,10 +744,11 @@ namespace ChartBlazorApp.Models
         private Dictionary<DateTime, double> posiCumulatives = new Dictionary<DateTime, double>();
         private Dictionary<DateTime, double> testCumulatives = new Dictionary<DateTime, double>();
 
-        public void InitializeIfNecessary(string dispName)
+        public void InitializeIfNecessary(string dispName, string keyName)
         {
             if (Title._isEmpty()) {
                 Title = dispName;
+                KeyName = keyName;
                 //DecayParam = new RtDecayParam();   // 全て 0 の初期データ
                 //Dates = new List<DateTime>();
                 //Total = new List<double>();
@@ -784,12 +782,6 @@ namespace ChartBlazorApp.Models
                     if (end == maxDt) posiCumulatives.Remove(end);
                 }
             }
-        }
-
-        public void AddYAxesMax(double y1Max, double y2Max)
-        {
-            Y1_Max = y1Max;
-            Y2_Max = y2Max;
         }
 
         public void AddDecayParam(DateTime startDt, int daysToOne, double factor1, double rt1, double rt2, double factor2)
@@ -848,45 +840,6 @@ namespace ChartBlazorApp.Models
                 }
             }
             return adjTotal;
-        }
-
-        private double calcY1Max(double[] newlies)
-        {
-            int newlyMax = (int)(newlies[(newlies.Length - Constants.Y_MAX_CALC_DURATION)._lowLimit(0)..].Max() / 0.9);
-            if (newlyMax < 100) {
-                return ((newlyMax + 10) / 10) * 10.0;
-            } else if (newlyMax < 150) {
-                return 150;
-            } else if (newlyMax < 1000) {
-                return ((newlyMax + 100) / 100) * 100.0;
-            } else if (newlyMax < 1500) {
-                return 1500;
-            } else if (newlyMax < 10000) {
-                return ((newlyMax + 1000) / 1000) * 1000.0;
-            } else if (newlyMax < 15000) {
-                return 15000;
-            } else if (newlyMax < 100000) {
-                return ((newlyMax + 10000) / 10000) * 10000.0;
-            } else if (newlyMax < 150000) {
-                return 150000;
-            } else {
-                return ((newlyMax + 100000) / 100000) * 100000.0;
-            }
-        }
-
-        private double calcY2Max(double[] rts)
-        {
-            int nearPt = (rts.Length - 30)._lowLimit(0);
-            int longPt = (rts.Length - Constants.Y_MAX_CALC_DURATION)._lowLimit(0);
-            if (nearPt > 0 && rts[longPt..nearPt].Count((x) => x > 2.5) > 3)
-                return 5.0;
-            if (rts.Length > 0 && rts[nearPt..].Max() > 2.5)
-                return 5.0;
-            if (nearPt > 0 && rts[longPt..nearPt].Count((x) => x > 2.0) > 3)
-                return 2.5;
-            if (rts.Length > 0 && rts[nearPt..].Max() > 2.0)
-                return 2.5;
-            return 2.0;
         }
 
         public InfectData MakeData(int[] extraData = null, SubParams subParams = null)
@@ -961,19 +914,12 @@ namespace ChartBlazorApp.Models
             double[] averages = (_total.Length - predatanum)._range().Select(i => average(i)).ToArray();
             double rt(int i) { double w7 = weekly(i - 7); return w7 > 0 ? Math.Pow(weekly(i) / w7, 5.0 / 7.0) : 0.0; };
             var rts = (_total.Length - predatanum)._range().Select(i => rt(i)).ToArray();
-            var y1_max = Y1_Max > 0 ? Y1_Max : calcY1Max(newlies);
-            var y1_step = y1_max / 10;
-            var y2_max = Y2_Max > 0 ? Y2_Max : calcY2Max(rts);
-            var y2_step = y2_max == 2.5 ? y2_max / 5 : y2_max / 10;
             //以下を有効にしてしまうと、システム既定基準日とシステム既定検出遡及日による基準日との区別ができなくなってしまう。
             //if (DecayParam.StartDate._notValid()) DecayParam.StartDate = dates[0].AddDays(InfectData.FindRecentMaxIndex(rts));
             var infectData = new InfectData {
                 Title = Title,
+                KeyName = KeyName,
                 Events = Events,
-                Y1_Max = y1_max,
-                Y1_Step = y1_step,
-                Y2_Max = y2_max,
-                Y2_Step = y2_step,
                 Dates = dates,
                 Newly = newlies,
                 Average = averages,

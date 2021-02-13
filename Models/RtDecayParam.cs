@@ -18,10 +18,10 @@ namespace ChartBlazorApp.Models
         /// <summary>予想基点日(2段階階)</summary>
         public DateTime StartDate { get; set; }
 
-        /// <summary>予想基点日(4段階)</summary>
+        /// <summary>予想基点日(多段階)</summary>
         public DateTime StartDateFourstep { get; set; }
 
-        /// <summary>予想基点日(2段階または4段階)</summary>
+        /// <summary>予想基点日(2段階または多段階)</summary>
         public DateTime EffectiveStartDate { get { return Fourstep ? StartDateFourstep : StartDate; } }
 
         public int DaysToOne { get; set; }
@@ -52,6 +52,12 @@ namespace ChartBlazorApp.Models
         public int DaysToRt4 { get; set; }
         public double Rt4 { get; set; }
 
+        public int DaysToRt5 { get; set; }
+        public double Rt5 { get; set; }
+
+        public int DaysToRt6 { get; set; }
+        public double Rt6 { get; set; }
+
         //public bool UsePostDecayRt1 { get; set; } = true;
         public double PostDecayFactorRt2 { get; set; } = 0;
 
@@ -63,7 +69,8 @@ namespace ChartBlazorApp.Models
         public override string ToString()
         {
             if (Fourstep) {
-                return $"4step={Fourstep}, StartDt={StartDate._toDateString()}, Days1={DaysToRt1}, Rt1={Rt1:f3}, Days2={DaysToRt2}, Rt2={Rt2:f3}, Days3={DaysToRt3}, Rt3={Rt3:f3}, Days4={DaysToRt4}, Rt4={Rt4:f3}";
+                return $"4step={Fourstep}, StartDt={StartDate._toDateString()}, Days1={DaysToRt1}, Rt1={Rt1:f3}, Days2={DaysToRt2}, Rt2={Rt2:f3}, Days3={DaysToRt3}, Rt3={Rt3:f3}, " +
+                    $"Days4={DaysToRt4}, Rt4={Rt4:f3}, Days5={DaysToRt5}, Rt5={Rt5:f3}, Days6={DaysToRt6}, Rt6={Rt6:f3}";
             } else {
                 return $"StartDt={StartDate._toDateString()}, Days1={DaysToOne}, Rt1={EasyRt1:f3}, Factor1={DecayFactor}, Rt2={EasyRt2:f3}, Factor2={DecayFactorNext}";
             }
@@ -87,7 +94,7 @@ namespace ChartBlazorApp.Models
                 RtMin = 0.8,
                 EasyRt1 = 1.0,
                 EasyRt2 = 0.8,
-                DaysToRt1 = 0,  //45,
+                DaysToRt1 = 10,  //45,
                 Rt1 = 1,        //0.83,
                 DaysToRt2 = 0,  //60,
                 Rt2 = 1,
@@ -95,6 +102,10 @@ namespace ChartBlazorApp.Models
                 Rt3 = 1,        //1.4,
                 DaysToRt4 = 0,  //30,
                 Rt4 = 1,        //0.83,
+                DaysToRt5 = 0,
+                Rt5 = 1,
+                DaysToRt6 = 0,
+                Rt6 = 1,
             };
         }
 
@@ -108,7 +119,7 @@ namespace ChartBlazorApp.Models
             if (extensionDays == 0) extensionDays = Constants.EXTENSION_DAYS;
             double rt0 = rts[startIdx];
             if (Fourstep) {
-                // 4段階モード
+                // 多段階モード
                 double decayFactor = 10000;
                 double rt1 = Rt1;
                 int daysToRt1 = DaysToRt1;
@@ -157,13 +168,37 @@ namespace ChartBlazorApp.Models
                     daysToRt4 = 0;
                     rt4 = rt3;
                 }
+                // Rt4に到達してから
+                double rt5 = Rt5;
+                int daysToRt5 = DaysToRt5;
+                //if (daysToRt5 == 0) daysToRt5 = Constants.DAYS_TO_NEXT_RT;
+                double a5 = 0, b5 = 0;
+                if (daysToRt5 > 0) {
+                    a5 = (rt4 - rt5) * (decayFactor + daysToRt5) * decayFactor / daysToRt5;
+                    b5 = rt4 - (a5 / decayFactor);
+                } else {
+                    daysToRt5 = 0;
+                    rt5 = rt4;
+                }
+                // Rt5に到達してから
+                double rt6 = Rt6;
+                int daysToRt6 = DaysToRt6;
+                //if (daysToRt6 == 0) daysToRt6 = Constants.DAYS_TO_NEXT_RT;
+                double a6 = 0, b6 = 0;
+                if (daysToRt6 > 0) {
+                    a6 = (rt5 - rt6) * (decayFactor + daysToRt6) * decayFactor / daysToRt6;
+                    b6 = rt5 - (a6 / decayFactor);
+                } else {
+                    daysToRt6 = 0;
+                    rt6 = rt5;
+                }
 
-                int copyLen = ((daysToRt1 + daysToRt2 + daysToRt3 + daysToRt4)._lowLimit(realDays - startIdx) + extensionDays)._highLimit(predRt.Length - startIdx);
+                int copyLen = ((daysToRt1 + daysToRt2 + daysToRt3 + daysToRt4 + daysToRt5 + daysToRt6)._lowLimit(realDays - startIdx) + extensionDays)._highLimit(predRt.Length - startIdx);
                 double rt = 0;
                 for (int i = 0; i < copyLen; ++i) {
                     if (i == 0) {
                         rt = rt0;
-                    } else if (daysToRt1 + daysToRt2 + daysToRt3 + daysToRt4 == 0) {
+                    } else if (daysToRt1 + daysToRt2 + daysToRt3 + daysToRt4 + daysToRt5 + daysToRt6 == 0) {
                         rt = 0;
                     } else if (i <= daysToRt1) {
                         rt = a1 / (decayFactor + i) + b1;
@@ -187,6 +222,20 @@ namespace ChartBlazorApp.Models
                             if (rt < rt4) rt = rt4;
                         } else {
                             if (rt > rt4) rt = rt4;
+                        }
+                    } else if (i <= daysToRt1 + daysToRt2 + daysToRt3 + daysToRt4 + daysToRt5){
+                        rt = a5 / (decayFactor + i - daysToRt1 - daysToRt2 - daysToRt3 - daysToRt4) + b5;
+                        if (rt4 > rt5) {
+                            if (rt < rt5) rt = rt5;
+                        } else {
+                            if (rt > rt5) rt = rt5;
+                        }
+                    } else if (i <= daysToRt1 + daysToRt2 + daysToRt3 + daysToRt4 + daysToRt5 + daysToRt6){
+                        rt = a6 / (decayFactor + i - daysToRt1 - daysToRt2 - daysToRt3 - daysToRt4 - daysToRt5) + b6;
+                        if (rt5 > rt6) {
+                            if (rt < rt6) rt = rt6;
+                        } else {
+                            if (rt > rt6) rt = rt6;
                         }
                     }
                     predRt[startIdx + i] = rt;
@@ -216,30 +265,36 @@ namespace ChartBlazorApp.Models
                 (double a2, double b2) = Constants.CalcCoefficients2(rt0, rt1, tgtRt2, factor2, DaysToOne);
 
                 int ph3StartIdx = -1;
+                double rt2 = rts[^1] * 0.8;
                 double rt3 = 0;
+                double lastRt = 1;
                 for (int i = toOneLen; i < copyLen; ++i) {
                     int idx = startIdx + i;
                     if (ph3StartIdx < 0) {
                         var rt = Constants.CalcRt2(a2, b2, rt1, tgtRt2, factor2, i, i - toOneLen);
                         predRt[idx] = rt;
-                        if (PostDecayFactorRt2 > 0) {
-                            if (tgtRt2 >= 1 && rt > 1) {
+                        if (tgtRt2 >= 1 && rt > 1) {
+                            if (PostDecayFactorRt2 > 0) {
                                 if ((idx + 1 >= realDays && rt == tgtRt2) || (idx >= realDays + 9)) {
                                     ph3StartIdx = i;
                                     rt3 = rt;
                                 }
                             }
+                        } else if (rt2 < 1 && tgtRt2 < rt2 && rt < rt2) {
+                            // Rtが1以下で減少している時は、下限を最後のRtの8掛けとする
+                            predRt[idx] = lastRt = rt2;
+                            ph3StartIdx = copyLen;
                         }
                     } else if (ph3StartIdx < copyLen) {
                         //var rt = rt3 - ((rt3 - 1) / 30) * (i - ph3StartIdx);
                         var rt = rt3 - (i - ph3StartIdx) * PostDecayFactorRt2;
                         if (rt < 1) {
-                            rt = 1;
+                            lastRt = rt = 1;
                             ph3StartIdx = copyLen;
                         }
                         predRt[idx] = rt;
                     } else {
-                        predRt[idx] = 1;
+                        predRt[idx] = lastRt;
                     }
                 }
                 return copyLen;

@@ -176,11 +176,13 @@ namespace ChartBlazorApp.Models
 
         public int BarWidth { get { return CurrentSettings.barWidth; } }
 
-        public double YAxisMax { get { var res = CurrentSettings.myYAxisMax(); return res > 0 ? res : MyInfectData.Y1_Max; } }
+        public int LastBarWidthRange { get { return CurrentSettings.lastBarWidthRange; } }
+
+        public double YAxisMax { get { var res = CurrentSettings.myYAxisMax(); return res > 0 ? res : 0; } }
 
         public double YAxisMin { get { return CurrentSettings.yAxisMin; } }
 
-        public double YAxis2Max { get { var res = CurrentSettings.myYAxis2Max(); return res > 0 ? res : MyInfectData.Y2_Max; } }
+        public double YAxis2Max { get { var res = CurrentSettings.myYAxis2Max(); return res > 0 ? res : 0; } }
 
         public bool DrawExpectation { get { return CurrentSettings.drawExpectation; } }
 
@@ -195,23 +197,28 @@ namespace ChartBlazorApp.Models
 
         public bool FourstepSettings { get { return CurrentSettings.fourstepSettings; } }
 
-        public bool FourstepEnabled { get { return FourstepSettings && FourstepDataValid; } }
+        public bool FourstepEnabled => FourstepSettings;
+        //public bool FourstepEnabled { get { return FourstepSettings && FourstepDataValid; } }
 
-        public bool FourstepDataValid {
-            get {
-                return ParamDaysToRt1 > 0 ||
-                     CurrentSettings.myParamDaysToRt2() > 0 ||
-                     CurrentSettings.myParamDaysToRt3() > 0 ||
-                     CurrentSettings.myParamDaysToRt4() > 0;
-            }
-        }
+        //public bool FourstepDataValid {
+        //    get {
+        //        return ParamDaysToRt1 > 0 ||
+        //             CurrentSettings.myParamDaysToRt2() > 0 ||
+        //             CurrentSettings.myParamDaysToRt3() > 0 ||
+        //             CurrentSettings.myParamDaysToRt4() > 0 ||
+        //             CurrentSettings.myParamDaysToRt5() > 0 ||
+        //             CurrentSettings.myParamDaysToRt6() > 0;
+        //    }
+        //}
 
         public bool FourstepDataDefault {
             get {
                 return CurrentSettings.myParamDaysToRt1() > 0 ||
                      CurrentSettings.myParamDaysToRt2() > 0 ||
                      CurrentSettings.myParamDaysToRt3() > 0 ||
-                     CurrentSettings.myParamDaysToRt4() > 0;
+                     CurrentSettings.myParamDaysToRt4() > 0 ||
+                     CurrentSettings.myParamDaysToRt5() > 0 ||
+                     CurrentSettings.myParamDaysToRt6() > 0;
             }
         }
 
@@ -280,13 +287,7 @@ namespace ChartBlazorApp.Models
             if (dt._notEmpty()) return dt;
 
             return NthInfectData(idx).Dates.Last()._toDateString();
-            //var startDt = NthInfectData(idx).InitialDecayParam.StartDateFourstep;
-            //if (startDt._isValid()) return startDt._toDateString();
-
-            //return RtDecayParam.DefaultParam.StartDateFourstep._toDateString();
         }
-
-        //public string DefaultDaysToOne { get { var v = CurrentSettings.myParamDaysToOne(); return v > 0 ? "" : $"({NthInfectData(idx).InitialDecayParam.DaysToOne})"; } }
 
         public int ParamDaysToOne { get { return getParamDaysToOne(); } }
         public int getParamDaysToOne(int idx = -1, bool bSystem = false) {
@@ -369,10 +370,7 @@ namespace ChartBlazorApp.Models
 
         public int ParamDaysToRt1 { get { return getParamDaysToRt1(); } }
         public int getParamDaysToRt1(int idx = -1) {
-            return CurrentSettings.myParamDaysToRt1(idx)._neZeroOr(10);
-            //    return CurrentSettings.myParamDaysToRt1(idx).
-            //_gtZeroOr(() => NthInfectData(idx).InitialDecayParam.DaysToRt1).
-            //_gtZeroOr(() => RtDecayParam.DefaultParam.DaysToRt1);
+            return CurrentSettings.myParamDaysToRt1(idx);
         }
 
         public double ParamRt1 { get { return getParamRt1(); } }
@@ -385,9 +383,6 @@ namespace ChartBlazorApp.Models
         public int ParamDaysToRt2 { get { return getParamDaysToRt2(); } }
         public int getParamDaysToRt2(int idx = -1) {
             return CurrentSettings.myParamDaysToRt2(idx);
-            //return CurrentSettings.myParamDaysToRt2(idx).
-            //    _neZeroOr(() => NthInfectData(idx).InitialDecayParam.DaysToRt2).
-            //    _neZeroOr(() => RtDecayParam.DefaultParam.DaysToRt2);
         }
 
         public double ParamRt2 { get { return getParamRt2(); } }
@@ -400,9 +395,6 @@ namespace ChartBlazorApp.Models
         public int ParamDaysToRt3 { get { return getParamDaysToRt3(); } }
         public int getParamDaysToRt3(int idx = -1) {
             return CurrentSettings.myParamDaysToRt3(idx);
-            //return CurrentSettings.myParamDaysToRt3(idx).
-            //    _neZeroOr(() => NthInfectData(idx).InitialDecayParam.DaysToRt3).
-            //    _neZeroOr(() => RtDecayParam.DefaultParam.DaysToRt3);
         }
 
         public double ParamRt3 { get { return getParamRt3(); } }
@@ -415,9 +407,6 @@ namespace ChartBlazorApp.Models
         public int ParamDaysToRt4 { get { return getParamDaysToRt4(); } }
         public int getParamDaysToRt4(int idx = -1) {
             return CurrentSettings.myParamDaysToRt4(idx);
-            //return CurrentSettings.myParamDaysToRt4(idx).
-            //    _neZeroOr(() => NthInfectData(idx).InitialDecayParam.DaysToRt4).
-            //    _neZeroOr(() => RtDecayParam.DefaultParam.DaysToRt4);
         }
 
         public double ParamRt4 { get { return getParamRt4();}}
@@ -427,13 +416,37 @@ namespace ChartBlazorApp.Models
                 _gtZeroOr(() => RtDecayParam.DefaultParam.Rt4);
         }
 
+        public int ParamDaysToRt5 { get { return getParamDaysToRt5(); } }
+        public int getParamDaysToRt5(int idx = -1) {
+            return CurrentSettings.myParamDaysToRt5(idx);
+        }
+
+        public double ParamRt5 { get { return getParamRt5();}}
+        public double getParamRt5(int idx = -1) {
+            return CurrentSettings.myParamRt5(idx).
+                _gtZeroOr(() => NthInfectData(idx).InitialDecayParam.Rt5).
+                _gtZeroOr(() => RtDecayParam.DefaultParam.Rt5);
+        }
+
+        public int ParamDaysToRt6 { get { return getParamDaysToRt6(); } }
+        public int getParamDaysToRt6(int idx = -1) {
+            return CurrentSettings.myParamDaysToRt6(idx);
+        }
+
+        public double ParamRt6 { get { return getParamRt6();}}
+        public double getParamRt6(int idx = -1) {
+            return CurrentSettings.myParamRt6(idx).
+                _gtZeroOr(() => NthInfectData(idx).InitialDecayParam.Rt6).
+                _gtZeroOr(() => RtDecayParam.DefaultParam.Rt6);
+        }
+
         public int FavorPrefNum { get { return CurrentSettings.favorPrefNum; } }
 
         public int SelectorPos { get { return CurrentSettings.selectorRadioPos; } }
 
         public RtDecayParam MakeRtDecayParam(bool bSystem, int idx = -1)
         {
-            return new RtDecayParam {
+            var param = new RtDecayParam {
                 //UseOnForecast = UseOnForecast,
                 PostDecayFactorRt2 = getPostDecayFactorRt2(bSystem),
                 Fourstep = DetailSettings && FourstepEnabled,
@@ -455,7 +468,14 @@ namespace ChartBlazorApp.Models
                 Rt3 = getParamRt3(idx),
                 DaysToRt4 = getParamDaysToRt4(idx),
                 Rt4 = getParamRt4(idx),
+                DaysToRt5 = getParamDaysToRt5(idx),
+                Rt5 = getParamRt5(idx),
+                DaysToRt6 = getParamDaysToRt6(idx),
+                Rt6 = getParamRt6(idx),
             };
+            if ((param.DaysToRt1 + param.DaysToRt2 + param.DaysToRt3 + param.DaysToRt4 + param.DaysToRt5 + param.DaysToRt6) == 0)
+                param.DaysToRt1 = 10;
+            return param;
         }
 
         public void SetLocalMaxRtDuration(string value)
@@ -553,6 +573,26 @@ namespace ChartBlazorApp.Models
         public void SetParamDaysToRt4(string value)
         {
             CurrentSettings.setParamDaysToRt4(Math.Min(value._parseInt(0), 300));
+        }
+
+        public void SetParamRt5(string value)
+        {
+            CurrentSettings.setParamRt5(value._parseDouble(0));
+        }
+
+        public void SetParamDaysToRt5(string value)
+        {
+            CurrentSettings.setParamDaysToRt5(Math.Min(value._parseInt(0), 300));
+        }
+
+        public void SetParamRt6(string value)
+        {
+            CurrentSettings.setParamRt6(value._parseDouble(0));
+        }
+
+        public void SetParamDaysToRt6(string value)
+        {
+            CurrentSettings.setParamDaysToRt6(Math.Min(value._parseInt(0), 300));
         }
 
         public void SetFourstepSettings(string value)

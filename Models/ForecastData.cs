@@ -411,7 +411,8 @@ namespace ChartBlazorApp.Models
             var dataSets = new List<Dataset>();
             dataSets.Add(Dataset.CreateLine("  ", new double?[userData.FullPredictDeath.Length], "rgba(0,0,0,0)", "rgba(0,0,0,0)")); // 凡例の右端マージン用ダミー
             if (userDataByUser != null) {
-                double?[] predLineByUser = userDataByUser.FullPredictDeath._toNullableArray(0)._fill(0, ChartRealDays, null);
+                int realDaysToPredStart = (PredictStartDate - userDataByUser.ChartLabelStartDate).Days;
+                double?[] predLineByUser = userDataByUser.FullPredictDeath._toNullableArray(0)._fill(0, realDaysToPredStart, null);
                 dataSets.Add(Dataset.CreateLine("by利用者設定", predLineByUser, "royalblue", "royalblue").SetHoverColors("royalblue").SetOrders(2, 3).SetBorderWidth(0.8).SetPointRadius(0));
             }
             double?[] predLine = userData.FullPredictDeath._toNullableArray(0);
@@ -461,7 +462,8 @@ namespace ChartBlazorApp.Models
             var dataSets = new List<Dataset>();
             dataSets.Add(Dataset.CreateLine("  ", new double?[userData.FullPredictSerious.Length], "rgba(0,0,0,0)", "rgba(0,0,0,0)")); // 凡例の右端マージン用ダミー
             if (userDataByUser != null) {
-                double?[] predLineByUser = userDataByUser.FullPredictSerious._toNullableArray(0)._fill(0, ChartRealDays, null);
+                int realDaysToPredStart = (PredictStartDate - userDataByUser.ChartLabelStartDate).Days;
+                double?[] predLineByUser = userDataByUser.FullPredictSerious._toNullableArray(0)._fill(0, realDaysToPredStart, null);
                 dataSets.Add(Dataset.CreateLine("by利用者設定", predLineByUser, "royalblue", "royalblue").SetHoverColors("royalblue").SetOrders(2, 3).SetBorderWidth(0.8).SetPointRadius(0));
             }
             double?[] predLine = userData.FullPredictSerious._toNullableArray(0);
@@ -505,8 +507,9 @@ namespace ChartBlazorApp.Models
             var dataSets = new List<Dataset>();
             dataSets.Add(Dataset.CreateLine("  ", new double?[userData.DailyPredictDeath.Length], "rgba(0,0,0,0)", "rgba(0,0,0,0)")); // 凡例の右端マージン用ダミー
             if (userDataByUser != null) {
+                int realDaysToPredStart = (PredictStartDate - userDataByUser.ChartLabelStartDate).Days;
                 maxDeath = userDataByUser.DailyPredictDeath.Max();
-                double?[] predLineByUser = userDataByUser.DailyPredictDeath._toNullableArray(0)._fill(0, ChartRealDays, null);
+                double?[] predLineByUser = userDataByUser.DailyPredictDeath._toNullableArray(0)._fill(0, realDaysToPredStart, null);
                 dataSets.Add(Dataset.CreateLine("by利用者設定", predLineByUser, "royalblue", "royalblue").SetHoverColors("royalblue").SetOrders(2, 3).SetBorderWidth(0.8).SetPointRadius(0));
             }
             double[] dailyReal = userData.DailyRealDeath._extend(userData.DailyPredictDeath.Length);
@@ -746,7 +749,7 @@ namespace ChartBlazorApp.Models
         private int PredictDays => (UseFourStep ? FourStepPredDays : Constants.FORECAST_PREDICTION_DAYS) + (ExtendDispDays ? (UseFourStep ? Constants.FORECAST_PREDICTION_DAYS_FOR_DETAIL : Constants.FORECAST_PREDICTION_DAYS) : 0);
 
         /// <summary> チャートの実際の表示開始日(X軸日付ラベルの初日) </summary>
-        private DateTime ChartLabelStartDate { get; set; }
+        public DateTime ChartLabelStartDate { get; set; }
 
         public DateTime LastRealDate { get { return ChartLabelStartDate.AddDays((RealDeath._length() - 1)._lowLimit(0)); } }
 
@@ -809,7 +812,9 @@ namespace ChartBlazorApp.Models
 
             UseTimeMachine = bTimeMachine;
             UseFourStep = rtParam?.Fourstep ?? false;
-            FourStepLastChangeDate = rtParam.StartDateFourstep.AddDays(rtParam.DaysToRt1._lowLimit(0) + rtParam.DaysToRt2._lowLimit(0) + rtParam.DaysToRt3._lowLimit(0) + rtParam.DaysToRt4._lowLimit(0));
+            FourStepLastChangeDate = rtParam.StartDateFourstep.AddDays(
+                rtParam.DaysToRt1._lowLimit(0) + rtParam.DaysToRt2._lowLimit(0) + rtParam.DaysToRt3._lowLimit(0) +
+                rtParam.DaysToRt4._lowLimit(0) + rtParam.DaysToRt5._lowLimit(0) + rtParam.DaysToRt6._lowLimit(0));
             chartPredStartDate = Helper.Array(forecastData.PredictStartDate, firstDate).Max();
 
             // 元データにおける起算日(計算の起点として実データを使用する初日)
@@ -844,7 +849,7 @@ namespace ChartBlazorApp.Models
             int chartLabelRealDays = calcFullRealDays - (preambleDays + discardedDays);
 
             logger.Debug($"CALL UserPredictData.PredictValuesEx({rtParam}, fullDays={chartFullDaysExtraAdded}, extDays={predDays + 7}, predStartDt={calcPredStartDt._toDateString()})");
-            var predData = UserPredictData.PredictValuesEx(infectData, rtParam, chartFullDaysExtraAdded, predDays + 7, calcPredStartDt);
+            var predData = UserPredictData.PredictValuesEx(infectData, rtParam, 0, chartFullDaysExtraAdded, predDays + 7, calcPredStartDt);
 
             double[] dailyInfect = infectData.Newly.Take(calcFullRealDays).ToArray();
             double[] dailyPredInfect = predData.PredNewly.Take(chartFullDaysExtraAdded).Select((x, i) => (i < calcFullRealDays && dailyInfect._nth(i) > 0) ? dailyInfect[i] : x).ToArray();
