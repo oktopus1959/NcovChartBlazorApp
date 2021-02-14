@@ -89,6 +89,8 @@ namespace ChartBlazorApp.Models
 
         public bool timeMachineMode { get; set; }
 
+        public bool adminFlag { get; set; }
+
         // ---- 上のところまでが LocalStorage に保存される
 
         public int favorPrefNum {
@@ -184,6 +186,7 @@ namespace ChartBlazorApp.Models
             events = new string[numData];
             timeMachineData = "";
             timeMachineMode = false;
+            adminFlag = false;
             return this;
         }
 

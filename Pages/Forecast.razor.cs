@@ -169,8 +169,9 @@ namespace ChartBlazorApp.Pages
 
             // 予測に必要なデータの準備
             var startDt = _effectiveParams.DispStartDate._parseDateTime();
-            _userData = new UserForecastData(_extendDispDays).MakeData(forecastData, infectData, rtParam, startDt, timeMachineMode);
-            var userDataByUser = rtParamByUser != null ? new UserForecastData(_extendDispDays).MakeData(forecastData, infectData, rtParamByUser, startDt, false, true) : null;
+            bool byAdmin = _effectiveParams.AdminFlag;
+            _userData = new UserForecastData(_extendDispDays).MakeData(forecastData, infectData, rtParam, startDt, timeMachineMode, false, byAdmin);
+            var userDataByUser = rtParamByUser != null ? new UserForecastData(_extendDispDays).MakeData(forecastData, infectData, rtParamByUser, startDt, false, true, byAdmin) : null;
 
             bool onlyOnClick = _effectiveParams.OnlyOnClick;
             int barWidth = _thinBar ? -4 : -2;

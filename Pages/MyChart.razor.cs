@@ -250,7 +250,7 @@ namespace ChartBlazorApp.Pages
         /// <summary>idx は ラジオボタンのインデックス</summary>
         private string _radioPrefName(int idx) { return _effectiveParams.RadioPrefName(idx); }
 
-        private bool _adminFlag = false;
+        private bool _adminFlag => _effectiveParams.AdminFlag;
 
         private async Task getSettings()
         {
@@ -333,7 +333,7 @@ namespace ChartBlazorApp.Pages
         {
             _effectiveParams.RadioIdx = args.Value.ToString()._parseInt();
             await NormalMode();
-            await RenderChartMethod();
+            //await RenderChartMethod();
         }
 
         public async Task ChangePref(ChangeEventArgs args)
@@ -341,7 +341,7 @@ namespace ChartBlazorApp.Pages
             _effectiveParams.PrefIdx = args.Value.ToString()._parseInt();
             _effectiveParams.RadioIdx = _selectorPos;
             await NormalMode();
-            await RenderChartMethod();
+            //await RenderChartMethod();
         }
 
         public async Task MovePrefLeft()
@@ -558,7 +558,8 @@ namespace ChartBlazorApp.Pages
         {
             int days = args.Value.ToString()._parseInt(0);
             if (days == DailyData.ReloadMagicNumber && _cancellable) {
-                _adminFlag = true;
+                logger.Warn($"Promoted Admin: MagicNumber={days}");
+                _effectiveParams.AdminFlag = true;
                 reloadData();     // 「RESET」→「変化日までの日数:MagicNumber」でリロード
             }
             if (days < 0 || days > 999) { days = 0; }
@@ -576,7 +577,8 @@ namespace ChartBlazorApp.Pages
         {
             string dt = args.Value.ToString().Trim();
             if (dt == DailyData.ReloadMagicNumber.ToString() && _cancellable) {
-                _adminFlag = true;
+                logger.Warn($"Promoted Admin: MagicNumber={dt}");
+                _effectiveParams.AdminFlag = true;
                 reloadData();     // 「RESET」→「変化日までの日数:MagicNumber」でリロード
                 dt = "";
             } else {

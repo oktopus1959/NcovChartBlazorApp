@@ -3,10 +3,16 @@
 @using StandardCommon
 @code{
     private bool _debug = ConsoleLog.DEBUG_LEVEL > 0;
+    private bool _adminFlag => _effectiveParams.AdminFlag;
 }
 <div style="width: 100%">
-<div class="chart-block" style="@(_fullWidthChart /*|| _userData.UseFourStep */ ? "max-width: 100%" : null)">
-<h4><span>新型コロナ</span> <span>重症者数グラフ</span> <span>@(_userData.UseTimeMachine ? "（タイムマシン）" : _userData.UseFourStep ? "（多段階設定使用）" : "")</span></h4>
+@{
+    string addedStr = _userData.UseTimeMachine ? "（タイムマシン）" : _userData.UseFourStep ? "（多段階設定使用）" : "";
+ }
+
+@*重症者数グラフ*@
+<div class="resp-inline-block" style="@(_fullWidthChart ? "display: block; max-width: 100%" : null)">
+<p><span class="h4">新型コロナ</span> <span class="h4">重症者数グラフ</span> @if (addedStr._notEmpty()) { <span>@addedStr</span> }</p>
 <span>@(_userData.LastRealDateStr)現在：@(_userData.RealSerious._last()._formatComma())名</span> <span>／</span>
     @if (_userData.MaxPredictSerious > _userData.LastPredictSerious){
         <span>@(_userData.MaxPredictSeriousDateStr)最大予測：@(_userData.MaxPredictSerious._formatComma())名</span> <span>／</span>
@@ -25,8 +31,28 @@
     ※青の縦線の日付は「年代別の陽性者割合」の最終行の日付</span></div> 
 </div>
 
-<div class="chart-block right-block" style="@(_fullWidthChart /*|| _userData.UseFourStep */ ? "max-width: 100%" : null)">
-<h4><span>新型コロナ</span> <span>累計死亡者数グラフ</span> <span>@(_userData.UseTimeMachine ? "（タイムマシン）" : _userData.UseFourStep ? "（多段階設定使用）" : "")</span></h4>
+<div class="@(_fullWidthChart ? "inline-wrapper" : "inline-wrapper-lt-1000")" style="margin-top: 10px;">
+    <label for="thin-bar">
+        <input type="checkbox" name="thin-bar" id="thin-bar" @onchange="ThinBar" checked="@_thinBar" />
+        <span>細い棒グラフ</span>
+    </label></div>
+<div class="@(_fullWidthChart ? "inline-wrapper" : "inline-wrapper-lt-1000")" style="margin-top: 10px;">
+    <label for="extend-disp-days">
+        <input type="checkbox" name="extend-disp-days" id="extend-disp-days" @onchange="ExtendDispDays" checked="@_extendDispDays" />
+        <span>延長表示</span>
+    </label></div>
+@if (_fullWidthChart) {
+    <div class="inline-wrapper-ge-1000" style="margin-top: 10px;">
+        <label for="one-lane">
+            <input type="checkbox" name="one-lane" id="one-lane" @onchange="FullWidthChart" checked="@_fullWidthChart" />
+            <span>全幅表示</span>
+        </label></div>
+} else {
+}
+
+@*死亡者数グラフ*@
+<div class="resp-inline-block @(_fullWidthChart ? "mt-2" : "resp-right-2")" style="@(_fullWidthChart ? "display: block; max-width: 100%" : null)">
+<p><span class="h4">新型コロナ</span> <span class="h4">累計死亡者数グラフ</span> @if (addedStr._notEmpty()) { <span>@addedStr</span> }</p>
 <span>@(_userData.LastRealDateStr)現在：@(_userData.RealDeath._last()._formatComma())名</span> ／
     <span>@(_userData.LastPredictDateStr)予測：@(_userData.LastPredictDeath._formatComma())名</span> @*<span>（予測日：@(forecastData.PredictStartDateStr)）</span>*@
 @* Chart の Canvas *@
@@ -40,6 +66,7 @@
 <div style="margin-top: 2px;"><span style="margin-left: 4px; font-size: small">
     ※青の縦線の日付は「年代別の陽性者割合」の最終行の日付</span></div>
 </div>
+
 </div>
 
 <div id="forecast-desc1" style="margin-top: 10px;"></div>
@@ -49,34 +76,36 @@
         <input type="checkbox" name="other-charts" id="other-charts" @onchange="ShowOtherCharts" checked="@_showOtherCharts" />
         <span>その他グラフ</span>
     </label></div>
-<div class="inline-wrapper" style="margin-top: 10px;">
-    <label for="thin-bar">
-        <input type="checkbox" name="thin-bar" id="thin-bar" @onchange="ThinBar" checked="@_thinBar" />
-        <span>細い棒グラフ</span>
-    </label></div>
-<div class="inline-wrapper" style="margin-top: 10px;">
-    <label for="one-lane">
-        <input type="checkbox" name="one-lane" id="one-lane" @onchange="FullWidthChart" checked="@_fullWidthChart" />
-        <span>全幅表示</span>
-    </label></div>
-<div class="inline-wrapper" style="margin-top: 10px;">
-    <label for="extend-disp-days">
-        <input type="checkbox" name="extend-disp-days" id="extend-disp-days" @onchange="ExtendDispDays" checked="@_extendDispDays" />
-        <span>延長表示</span>
-    </label></div>
+@if (!_fullWidthChart) {
+    <div class="inline-wrapper-ge-1000" style="margin-top: 10px;">
+        <label for="thin-bar">
+            <input type="checkbox" name="thin-bar" id="thin-bar" @onchange="ThinBar" checked="@_thinBar" />
+            <span>細い棒グラフ</span>
+        </label></div>
+    <div class="inline-wrapper-ge-1000" style="margin-top: 10px;">
+        <label for="extend-disp-days">
+            <input type="checkbox" name="extend-disp-days" id="extend-disp-days" @onchange="ExtendDispDays" checked="@_extendDispDays" />
+            <span>延長表示</span>
+        </label></div>
+    <div class="inline-wrapper-ge-1000" style="margin-top: 10px;">
+        <label for="one-lane">
+            <input type="checkbox" name="one-lane" id="one-lane" @onchange="FullWidthChart" checked="@_fullWidthChart" />
+            <span>全幅表示</span>
+        </label></div>
+}
 <div class="inline-wrapper position-right" style="margin-top: 10px;">
     <label for="only-on-click">
         <input type="checkbox" name="only-on-click" id="only-on-click" @onchange="ChangeOnlyOnClick" checked="@(_onlyOnClick)" />
         <span>クリックで情報画面</span>
     </label></div>
-@if (ConsoleLog.DEBUG_FLAG) {
+@if (_adminFlag) {
     <div class="inline-wrapper my-0 position-right">
     <button class="btn btn-primary btn-sm py-0 px-1" @onclick="Reload">RELOAD</button>
     </div>
 }
 
 <div style="margin-top: 10px; display: @(_showOtherCharts ? "blcok" : "none"); width: 100%">
-<div class="chart-block">
+<div class="resp-inline-block">
 <span style="font-size: 1.25em;">日別死亡者数グラフ</span> <span>@(_userData.UseTimeMachine ? "（タイムマシン）" : _userData.UseFourStep ? "（多段階設定使用）" : "")</span>
 @* Chart の Canvas *@
 <div class="scrollableChartWrapper" id="chart-wrapper-dailydeath">
@@ -88,7 +117,7 @@
 </div>
 </div>
 
-<div class="chart-block right-block">
+<div class="resp-inline-block resp-right">
 <span style="font-size: 1.25em;">累計死亡者［実数／予測値 乖離］</span> @if (_debug) { <span>(@($"MSE={_userData.DeathDiffMSE:f1}"))</span> }
 @* Chart の Canvas *@
 <div class="scrollableChartWrapper" id="chart-wrapper-deathdiff">
@@ -102,7 +131,7 @@
 </div>
 
 <div style="margin-top: 10px; display: @(_showOtherCharts ? "blcok" : "none"); width: 100%">
-<div class="chart-block">
+<div class="resp-inline-block">
 <span style="font-size: 1.25em;">重症者［実数／予測値 乖離］</span> @if (_debug) { <span>(@($"MSE={_userData.SeriousDiffMSE:f1}"))</span> }
 @* Chart の Canvas *@
 <div class="scrollableChartWrapper" id="chart-wrapper-seriousdiff">
@@ -114,7 +143,7 @@
 </div>
 </div>
 
-<div class="chart-block right-block">
+<div class="resp-inline-block resp-right">
 <span style="font-size: 1.25em;">重症＋死亡者［実数／予測値 乖離］</span> @if (_debug) { <span>(@($"MSE={_userData.BothDiffMSE:f1}"))</span> }
 @* Chart の Canvas *@
 <div class="scrollableChartWrapper" id="chart-wrapper-bothsum">

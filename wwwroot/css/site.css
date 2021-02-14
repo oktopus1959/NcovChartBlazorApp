@@ -155,6 +155,10 @@ hr.narrow {
     margin-right: 1.3em !important;
 }
 
+.no-display {
+    display: none;
+}
+
 .inline-wrapper {
     display: inline-block;
     margin-top: 4px;
@@ -165,6 +169,16 @@ hr.narrow {
     display: inline-block;
     margin-top: 4px;
     /*margin-right: 1em;*/
+}
+
+div.inline-wrapper-lt-1000 {
+    margin-top: 4px;
+    margin-right: 1em;
+}
+
+div.inline-wrapper-ge-1000 {
+    margin-top: 4px;
+    margin-right: 1em;
 }
 
 .vertical-center .inline-wrapper,.inline-wrapper-narrow,select,input {
@@ -204,11 +218,6 @@ hr.narrow {
     }
 }
 
-div.chart-block {
-    display: inline-block;
-    /* margin-top: 10px; */
-}
-
 div.table-block {
     display: inline-block;
     margin-top: 10px;
@@ -226,11 +235,15 @@ table {
 @media (min-width: 0px) {
     div.inline-wrapper-narrow { margin-right: 3px; }
     div.inline-or-block { display: block; margin-top: 4px; }
-    div.chart-block { max-width: 100%; }
-    div.right-block { margin-top: 20px; margin-left: 0px; }
+    div.resp-inline-block { display: block; max-width: 100%; }
+    div.resp-right { margin-top: 18px; margin-left: 0px; }
+    div.resp-right-2 { margin-top: 10px; margin-left: 0px; }
     div.table-block { margin-right: 0px; }
     div.tbl-scroll { overflow-x: scroll; }
     div.br-800-1000 { display: none; }
+    div.inline-wrapper-lt-1000 { display: inline-block; }
+    div.inline-wrapper-ge-1000 { display: none; }
+    .resp-font-size { font-size: small; }
 }
 
 @media (min-width: 330px) {
@@ -239,6 +252,10 @@ table {
 
 @media (min-width: 370px) {
     div.inline-wrapper-narrow { margin-right: 1em; }
+}
+
+@media (min-width: 480px) {
+    .resp-font-size { font-size: medium; }
 }
 
 @media (min-width: 600px) {
@@ -261,9 +278,12 @@ table {
 }
 
 @media (min-width: 1000px) {
-    div.chart-block { max-width: 48%; }
-    div.right-block { margin-top: 0px; margin-left: 20px; }
+    div.resp-inline-block { display: inline-block; max-width: 48%; }
+    div.resp-right { margin-top: 0px; margin-left: 20px; }
+    div.resp-right-2 { margin-top: 0px; margin-left: 20px; }
     div.br-800-1000 { display: none; }
+    div.inline-wrapper-lt-1000 { display: none; }
+    div.inline-wrapper-ge-1000 { display: inline-block; }
 }
 
 

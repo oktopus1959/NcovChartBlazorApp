@@ -80,6 +80,11 @@ namespace ChartBlazorApp.Models
             set { CurrentSettings.timeMachineMode = value; }
         }
 
+        public bool AdminFlag {
+            get { return CurrentSettings.adminFlag; }
+            set { CurrentSettings.adminFlag = value; }
+        }
+
         // TimeMachine用の InfectData
         private InfectData _timeMachineInfectData = null;
 

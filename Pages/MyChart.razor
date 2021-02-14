@@ -121,7 +121,7 @@
             </label><span>）</span>
         }
     </div>
-    @if (ConsoleLog.DEBUG_FLAG) {
+    @if (_adminFlag) {
         <div class="inline-wrapper my-0 position-right">
         <button class="btn btn-primary btn-sm py-0 px-1" @onclick="RenderReloadMethod">RE INITIALIZE</button>
         </div>
@@ -423,7 +423,7 @@
                 _ym = _ym.AddMonths(-3);
             }
         }
-        <select style="padding: 1px" name="debug-level" value="@_dispStartMonth" @onchange="ChangeDispStartDate">
+        <select style="padding: 1px" name="disp-start-date" value="@_dispStartMonth" @onchange="ChangeDispStartDate">
             @foreach (var m in _ymOpts) {
                 <option value="@m" selected="@(m == _dispStartMonth)">@m</option>
             }
@@ -451,7 +451,7 @@
         }
     </div>
     @* デバッグレベル *@
-    @if (_debugFlag) {
+    @if (_adminFlag) {
     <div class="inline-wrapper">
         <span>トレースレベル：</span>
         <select style="padding: 1px" name="debug-level" value="@_traceLevel" @onchange="ChangeDebugLevel">

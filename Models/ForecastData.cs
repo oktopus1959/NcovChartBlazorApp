@@ -805,7 +805,8 @@ namespace ChartBlazorApp.Models
         /// </summary>
         /// <param name="infectData"></param>
         /// <param name="chartLabelStartDt">チャート表示開始日(X軸日付ラベルの初日)</param>
-        public UserForecastData MakeData(ForecastData forecastData, InfectData infectData, RtDecayParam rtParam, DateTime chartLabelStartDt, bool bTimeMachine, bool byUser = false)
+        public UserForecastData MakeData(ForecastData forecastData, InfectData infectData, RtDecayParam rtParam, DateTime chartLabelStartDt,
+            bool bTimeMachine, bool byUser, bool byAdmin)
         {
             // 元データの最初日
             DateTime firstDate = infectData.Dates._first();
@@ -858,7 +859,7 @@ namespace ChartBlazorApp.Models
             // 予測期間における新規陽性者数累計
             LastAccumPositive = (int)Math.Round(predData.PredNewly.Skip(calcFullRealDays).Take(predDays).Sum(), 0);
             //foreach (var p in predData.PredNewly.Skip(realDays).Take(predDays)) logger.Debug(p.ToString("f1"));
-            logger.Info($"LastAccumPositive={LastAccumPositive}, ByUser={byUser}, {rtParam}");
+            logger.Info($"LastAccumPositive={LastAccumPositive}, ByUser={byUser}, {rtParam}" + $"{(byAdmin ? ", admin" : "")}");
 
             // 年代ごとの日別陽性者数データ
             double[][] infectsByAges = forecastData.calcInfectsByAges(firstDate, dailyPredInfect);
