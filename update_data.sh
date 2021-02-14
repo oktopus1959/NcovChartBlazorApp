@@ -94,13 +94,17 @@ downloadCsv() {
         [ -f ${file} ] && currDt="$(tail -n 1 ${file} | cut -d, -f1)"
         currDt=$(date -d "$currDt" '+%s')
         VAR_PRINT currDt
-        RUN_CMD -m "curl ${url} -o ${file}.tmp"
-        local lastDt="$(tail -n 1 ${file}.tmp | cut -d, -f1)"
+        RUN_CMD -m "curl ${url} -o ${file}.download"
+        RUN_CMD -fm "sed -ri 's/^2021\/2\/10,1691/2021\/2\/11,1691/' ${file}.download"
+        RUN_CMD -fm "sed -ri 's/^2021\/2\/11,1297/2021\/2\/12,1297/' ${file}.download"
+        RUN_CMD -fm "sed -ri 's/^2021\/2\/12,1356/2021\/2\/13,1356/' ${file}.download"
+        local lastDt="$(tail -n 1 ${file}.download | cut -d, -f1)"
         if [[ "$lastDt" =~ ^[0-9]+/[0-9]+/[0-9]+$ ]]; then
+            VAR_PRINT -f lastDt
             lastDt=$(date -d "$lastDt" '+%s')
             VAR_PRINT lastDt
             if [ $lastDt -gt $currDt ]; then
-                RUN_CMD -m "mv ${file}.tmp ${file}"
+                RUN_CMD -m "mv ${file}.download ${file}"
             fi
         fi
     fi
@@ -156,8 +160,6 @@ EOS
 
 # 全国陽性者数
 RUN_CMD -fm "sed -nr '/^${FIRST_DATE},/,$ s/\r//p' $POSI_DAILY_WORK > ${POSI_DAILY_WORK}.tmp"
-#RUN_CMD -fm "sed -ri 's/^2021\/2\/10,1691/2021\/2\/11,1691/' ${POSI_DAILY_WORK}.tmp"
-#RUN_CMD -fm "sed -ri 's/^2021\/2\/11,1297/2021\/2\/12,1297/' ${POSI_DAILY_WORK}.tmp"
 RUN_CMD -fm "sed -nr '/^${FIRST_DATE},/,$ s/\r//p' $TEST_DAILY_WORK | cut -d, -f2 > ${TEST_DAILY_WORK}.tmp"
 RUN_CMD -fm "paste -d, ${POSI_DAILY_WORK}.tmp ${TEST_DAILY_WORK}.tmp > $ALL_PCR_DAILY_WORK"
 RUN_CMD -fm "ruby -e '$(ruby_script)' $ALL_PCR_DAILY_WORK >> ${PREF_WORK_FILE}"
