@@ -240,7 +240,7 @@ VAR_PRINT() {
         shift
     done
 
-    __YELLOW_PRINT "$prefix:" "$(echo $cmdline | sed 's/   */ /g')"
+    __YELLOW_PRINT "$prefix:" "$(echo $cmdline | sed 's/   */ /g' | sed -r 's/^(.{512}).*$/\1.../')"
 
     if [ $dryrun -eq 0 ]; then
         if [ $bgrun -ne 0 ]; then
