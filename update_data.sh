@@ -108,21 +108,29 @@ downloadCsv() {
     local file=$2
     if [ "$LOADFLAG" ]; then
         local currDt="2020/1/1"
-        [ -f ${file} ] && currDt="$(tail -n 1 ${file} | cut -d, -f1)"
+        local dtPos=1
+        [[ "$(basename $file)" == tokyo* ]] && dtPos=5
+        [ -f ${file} ] && currDt="$(tail -n 1 $file | cut -d, -f$dtPos)"
         currDt=$(date -d "$currDt" '+%s')
         VAR_PRINT currDt
-        RUN_CMD -m "curl ${url} -o ${file}.download"
-        RUN_CMD -m "ruby -e '$(repairCsv_rb)' ${file}.download > ${file}.tmp"
-        local lastDt="$(tail -n 1 ${file}.tmp | cut -d, -f1)"
-        if [[ "$lastDt" =~ ^[0-9]+/[0-9]+/[0-9]+$ ]]; then
+        RUN_CMD -m "curl ${url} -o ${file}.download 2>/dev/null"
+        if [[ "$(basename $file)" == pcr_posi* ]]; then
+            RUN_CMD -fm "ruby -e '$(repairCsv_rb)' ${file}.download > ${file}.tmp"
+        elif [[ "$(basename $file)" == tokyo* ]]; then
+            RUN_CMD -fm "grep -Ev '^\"\s*$' ${file}.download > ${file}.tmp"
+        else
+            RUN_CMD -fm "cp ${file}.download ${file}.tmp"
+        fi
+        local lastDt="$(tail -n 1 ${file}.tmp | cut -d, -f$dtPos)"
+        if [[ "$lastDt" =~ ^[0-9]+[/-][0-9]+[/-][0-9]+$ ]]; then
             VAR_PRINT -f lastDt
             lastDt=$(date -d "$lastDt" '+%s')
             VAR_PRINT lastDt
             if [ $lastDt -gt $currDt ]; then
-                RUN_CMD -m "mv ${file}.tmp ${file}"
+                RUN_CMD -fm "mv ${file}.tmp ${file}"
             fi
         fi
-        RUN_CMD -m "rm -f ${file}.tmp"
+        RUN_CMD -fm "rm -f ${file}.tmp"
     fi
 }
 
@@ -218,8 +226,8 @@ RUN_CMD -f "cat ${PREF_WORKDIR}/*.txt > $PREF_POSI_TEST_WORK"
 # 東京都データのダウンロードと集計
 TOKYO_POSI_WORK=$WORKDIR/tokyo_covid19_patients.csv
 TOKYO_DL_FILE=${TOKYO_POSI_WORK}.download
-RUN_CMD -fm "downloadCsv https://stopcovid19.metro.tokyo.lg.jp/data/130001_tokyo_covid19_patients.csv $TOKYO_DL_FILE"
-RUN_CMD -fm "ruby -e '$(makeTokyoPosiCnt_rb)' $TOKYO_DL_FILE | sed -nr '/^${FIRST_DATE},/,$ p' > ${TOKYO_POSI_WORK}.tmp"
+RUN_CMD -fm "downloadCsv https://stopcovid19.metro.tokyo.lg.jp/data/130001_tokyo_covid19_patients.csv $TOKYO_POSI_WORK"
+RUN_CMD -fm "ruby -e '$(makeTokyoPosiCnt_rb)' $TOKYO_POSI_WORK | sed -nr '/^${FIRST_DATE},/,$ p' > ${TOKYO_POSI_WORK}.tmp"
 RUN_CMD -fm "paste -d, ${TOKYO_POSI_WORK}.tmp <(grep ',Tokyo,' $PREF_POSI_TEST_WORK | cut -d, -f5) >> ${PREF_WORK_FILE}"
 
 # 東京以外の陽性者数と検査数
