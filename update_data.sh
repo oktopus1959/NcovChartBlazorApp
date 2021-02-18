@@ -104,9 +104,11 @@ EOS
 }
 
 downloadCsv() {
+    . $BINDIR/debug_util_inc_indent.sh
     local url=$1
     local file=$2
     if [ "$LOADFLAG" ]; then
+        YELLOW_PRINT "download $file"
         local currDt="2020/1/1"
         local dtPos=1
         [[ "$(basename $file)" == tokyo* ]] && dtPos=5
@@ -122,16 +124,21 @@ downloadCsv() {
             RUN_CMD -fm "cp ${file}.download ${file}.tmp"
         fi
         local lastDt="$(tail -n 1 ${file}.tmp | cut -d, -f$dtPos)"
+        local diffNum="$(diff -q ${file}.tmp ${file} | wc -l)"
+        VAR_PRINT -f lastDt
+        VAR_PRINT -f diffNum
         if [[ "$lastDt" =~ ^[0-9]+[/-][0-9]+[/-][0-9]+$ ]]; then
-            VAR_PRINT -f lastDt
             lastDt=$(date -d "$lastDt" '+%s')
             VAR_PRINT lastDt
-            if [ $lastDt -gt $currDt ]; then
+            if [ $lastDt -gt $currDt ] || [ $lastDt -eq $currDt -a "$diffNum" != "0" ]; then
                 RUN_CMD -fm "mv ${file}.tmp ${file}"
             fi
         fi
         RUN_CMD -fm "rm -f ${file}.tmp"
+    else
+        YELLOW_PRINT "no download flag specifed"
     fi
+    . $BINDIR/debug_util_rev_indent.sh
 }
 
 makeTokyoPosiCnt_rb() {

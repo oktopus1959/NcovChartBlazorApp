@@ -203,7 +203,7 @@ VAR_PRINT() {
 }
 
 # RUN_CMD
-    RUN_CMD() {
+RUN_CMD() {
     local dryrun=$__DRYRUN
     local nomsg=$__NOMSGRUN
     local bgrun=0
