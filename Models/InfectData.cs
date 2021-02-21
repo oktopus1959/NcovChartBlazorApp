@@ -41,7 +41,7 @@ namespace ChartBlazorApp.Models
 
         public PrefInfectData PrefData { get; set; }
 
-        public InfectData CreateData(int[] extraData)
+        public InfectData CreateData(string extraData)
         {
             return PrefData.MakeData(extraData, InitialSubParams);
         }
@@ -769,7 +769,7 @@ namespace ChartBlazorApp.Models
 
         public void ShiftPrefData()
         {
-            if (ShiftRanges._notEmpty()) {
+            if (posiCumulatives._notEmpty() && ShiftRanges._notEmpty()) {
                 var minDt = posiCumulatives.Keys.Min();
                 var maxDt = posiCumulatives.Keys.Max();
                 foreach (var pair in ShiftRanges) {
@@ -842,7 +842,7 @@ namespace ChartBlazorApp.Models
             return adjTotal;
         }
 
-        public InfectData MakeData(int[] extraData = null, SubParams subParams = null)
+        public InfectData MakeData(string extraData = null, SubParams subParams = null)
         {
             var minDt = posiCumulatives.Keys.Min();
             var _dates = ((posiCumulatives.Keys.Max() - minDt).Days + 1)._range().Select(i => minDt.AddDays(i)).ToArray();
@@ -854,8 +854,8 @@ namespace ChartBlazorApp.Models
             var _testCumu = new double[_dates.Length];
             int _testCumuEnd = 0;
             foreach (int idx in _dates.Length._range()) {
-                var val = testCumulatives._safeGet(_dates[idx], -1);
-                if (val >= 0) {
+                var val = testCumulatives._safeGet(_dates[idx], 0);
+                if (val > 0) {
                     _testCumuEnd = idx + 1;
                     _testCumu[idx] = val;
                 } else {
@@ -867,9 +867,12 @@ namespace ChartBlazorApp.Models
             }
 
             if (extraData._notEmpty()) {
-                int len = extraData.Length;
-                int n = extraData[0];
-                if (len == 1 && n <=0) {
+                int[] extraItems = extraData._split(',').Select(x => x._strip()._parseInt(0)).ToArray();
+                int len = extraItems.Length;
+                int n = extraItems[0];
+                if (len == 1 && n <= 0) {
+                    DateTime dt = extraData._toFullDateStr()._parseDateTime();  // "1/8" のように日付形式を有効とする
+                    if (dt._isValid()) n = ((dt - _dates._last()).Days)._highLimit(0);
                     n = Math.Min(-n, _dates._length() - 1);
                     if (n > 0) {
                         _dates = _dates[0..^n];
@@ -882,7 +885,7 @@ namespace ChartBlazorApp.Models
                     for (int i = 0; i < len; ++i) {
                         int idx = orig_len + i;
                         _dates[idx] = _dates[idx - 1].AddDays(1);
-                        _total[idx] = _total[idx - 1] + extraData[i]._lowLimit(0);
+                        _total[idx] = _total[idx - 1] + extraItems[i]._lowLimit(0);
                     }
                 }
             }

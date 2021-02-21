@@ -265,7 +265,7 @@ namespace ChartBlazorApp.Models
                 (double a2, double b2) = Constants.CalcCoefficients2(rt0, rt1, tgtRt2, factor2, DaysToOne);
 
                 int ph3StartIdx = -1;
-                double rt2 = rts[^1] * 0.8;
+                double rt2 = Math.Min(rts._nth(startIdx + DaysToOne), rts[^1]) * 0.9; // 減衰の下限
                 double rt3 = 0;
                 double lastRt = 1;
                 for (int i = toOneLen; i < copyLen; ++i) {

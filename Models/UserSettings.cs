@@ -202,6 +202,11 @@ namespace ChartBlazorApp.Models
 
         private const string SettingsKey = Constants.SETTINGS_KEY;
 
+        public class MyException : Exception
+        {
+            public MyException(string msg) : base(msg) { }
+        }
+
         /// <summary>
         /// ブラウザの LocalStorage から値を取得
         /// </summary>
@@ -209,7 +214,7 @@ namespace ChartBlazorApp.Models
         private static async ValueTask<UserSettings> getLocalStorage(IJSRuntime jsRuntime, int numData)
         {
             var jsonStr = await jsRuntime._getSettings();
-            if (jsonStr._isEmpty()) throw new Exception("Settings is empty");
+            if (jsonStr._isEmpty()) throw new MyException("Settings is empty");
             logger.Debug(() => $"Load json len={jsonStr.Length}");
             return jsonStr._jsonDeserialize<UserSettings>().SetJsRuntime(jsRuntime).fillEmptyValues(numData);
         }
@@ -223,7 +228,11 @@ namespace ChartBlazorApp.Models
             try {
                 return await getLocalStorage(jsRuntime, numData);
             } catch (Exception e) {
-                logger.Warn($"settings read failed.\n{e}");
+                if (e is MyException) {
+                    logger.Warn($"settings read failed: {e.Message}");
+                } else {
+                    logger.Error($"settings read failed.\n{e}");
+                }
                 logger.Info($"Use initail settings instead.");
                 return (new UserSettings().SetJsRuntime(jsRuntime)).Initialize(numData);
             }

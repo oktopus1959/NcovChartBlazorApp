@@ -57,6 +57,10 @@ namespace ChartBlazorApp.Models
     {
         public DateTime UpdateDate { get; set; }
 
+        public List<DateTime> AnnotationDates { get; set; }
+
+        public List<string> AnnotationLabels { get; set; }
+
         public double[] BaseDataSeries { get; set; }
 
         public List<DatedDataSeries> DataSeriesList { get; set; }
@@ -170,6 +174,16 @@ namespace ChartBlazorApp.Models
                         if (items[0]._startsWith("#modify")) {
                             list.UpdateDate = items[1]._parseDateTime();
                             if (list.UpdateDate._notValid()) logger.Warn($"File: {csvfile}, Invalid Update Date: {items[1]}");
+                        } else if (items[0]._startsWith("#annotation")) {
+                            list.AnnotationDates = new List<DateTime>();
+                            list.AnnotationLabels = new List<string>();
+                            for (int idx = 1; idx < items.Length; idx += 2) {
+                                var dt = items._nth(idx)._parseDateTime();
+                                var label = items._nth(idx + 1);
+                                if (dt._notValid() || label._isEmpty() || label._startsWith("#")) break;
+                                list.AnnotationDates.Add(dt);
+                                list.AnnotationLabels.Add(label);
+                            }
                         } else if (items[0]._startsWith("#base")) {
                             list.BaseDataSeries = items[1..].Select(item => item._parseDouble()).ToArray();
                         }
@@ -386,55 +400,22 @@ namespace ChartBlazorApp.Models
             }
         }
 
-        /// <summary>
-        /// 死亡者数予測グラフ用データの作成
-        /// </summary>
-        /// <returns></returns>
-        public string MakeDeathJsonData(UserForecastData userData, UserForecastData userDataByUser, bool onlyOnClick, bool bAnimation)
+        private void addAnnotations(Options options, DatedDataSeriesList list, DateTime startDt)
         {
-            //double maxPredDeath = userData.LastPredictDeath._lowLimit(userDataByUser?.LastPredictDeath ?? 0);
-            double maxPredDeath = Helper.Array(userData.RealDeathMax, userData.LastPredictDeath, userDataByUser?.LastPredictDeath ?? 0).Max();
-            double y1_max = roundYAxis(maxPredDeath, YAxisMaxDeath);
-            double y1_min = maxPredDeath > YAxisMaxDeath ? 0 : YAxisMinDeath;
-            double y1_step = (y1_max - y1_min) / 10;
-            Options options = Options.CreateTwoAxes(new Ticks(y1_max, y1_step, y1_min), new Ticks(y1_max, y1_step, y1_min));
-            options.AnimationDuration = bAnimation ? 500 : 0;
-            //options.tooltips.intersect = false;
-            options.tooltips.SetCustomAverage(0, -1);
+            foreach (var series in list.DataSeriesList) {
+                if (series.Date >= startDt) {
+                    options.AddAnnotation(series.Date._toShortDateString(), "適用");
+                }
+            }
+            if (list.AnnotationDates._notEmpty()) {
+                foreach ((int i, var dt) in list.AnnotationDates._enumerate()) {
+                    var label = list.AnnotationLabels._nth(i);
+                    if (dt < startDt || label._isEmpty()) break;
+                    options.AddAnnotation(dt._toShortDateString(), label);
+                }
+            }
             var predDate = PredictStartDate._toShortDateString();
             options.AddAnnotation(predDate, predDate);
-            options.legend.SetAlignEnd();
-            options.legend.reverse = true;
-            options.AddStackedAxis();
-            options.SetOnlyClickEvent(onlyOnClick);
-
-            var dataSets = new List<Dataset>();
-            dataSets.Add(Dataset.CreateLine("  ", new double?[userData.FullPredictDeath.Length], "rgba(0,0,0,0)", "rgba(0,0,0,0)")); // 凡例の右端マージン用ダミー
-            if (userDataByUser != null) {
-                int realDaysToPredStart = (PredictStartDate - userDataByUser.ChartLabelStartDate).Days;
-                double?[] predLineByUser = userDataByUser.FullPredictDeath._toNullableArray(0)._fill(0, realDaysToPredStart, null);
-                dataSets.Add(Dataset.CreateLine("by利用者設定", predLineByUser, "royalblue", "royalblue").SetHoverColors("royalblue").SetOrders(2, 3).SetBorderWidth(0.8).SetPointRadius(0));
-            }
-            double?[] predLine = userData.FullPredictDeath._toNullableArray(0);
-            dataSets.Add(Dataset.CreateDotLine("予測死亡者数", predLine, "indianred").SetHoverColors("firebrick").SetDispOrder(2));
-            //dataSets.Add(Dataset.CreateDotLine("予測死亡者数(日次)", predDailyDeath._toNullableArray(0), "darkgreen"));
-            double?[] realBar = userData.RealDeath._toNullableArray(0);
-            dataSets.Add(Dataset.CreateBar("死亡者実数", realBar, "dimgray").SetHoverColors("black").SetStackedAxisId());
-            double?[] dummyBars1 = userData.RealDeath.Select(v => y1_max - v).ToArray()._extend(userData.FullPredictDeath.Length, y1_max)._toNullableArray(0, 0);
-            //double?[] dummyBars2 = new double[0]._extend(userData.FullPredictDeath.Length, -1)._toNullableArray(0, -1);
-            //double?[] dummyBars3 = Dataset.CalcDummyData(userData.FullPredictDeath.Length, new double?[][] { realBar, dummyBars1, dummyBars2 }, new double?[][] { predLine }, null, y1_max);
-            dataSets.Add(Dataset.CreateBar("", dummyBars1, "rgba(0,0,0,0)").SetStackedAxisId().SetHoverColors("rgba(10,10,10,0.1)"));
-            //dataSets.Add(Dataset.CreateBar("", dummyBars2, "rgba(0,0,0,0)").SetStackedAxisId());
-            //dataSets.Add(Dataset.CreateBar("", dummyBars3, "rgba(0,0,0,0)").SetStackedAxisId());
-
-            return new ChartJson {
-                type = "bar",
-                data = new Data {
-                    labels = userData.LabelDates.ToArray(),
-                    datasets = dataSets.ToArray(),
-                },
-                options = options,
-            }._toString();
         }
 
         /// <summary>
@@ -447,13 +428,12 @@ namespace ChartBlazorApp.Models
             double y1_max = roundYAxis(maxPredSerious, YAxisMaxSerious);
             double y1_min = maxPredSerious > YAxisMaxSerious ? 0 : YAxisMinSerious;
             //double y1_max = 3000;
-            double y1_step = (y1_max - y1_min) / 10;
+            double y1_step = calcStep(y1_max - y1_min);
             Options options = Options.CreateTwoAxes(new Ticks(y1_max, y1_step, y1_min), new Ticks(y1_max, y1_step, y1_min));
             options.AnimationDuration = bAnimation ? 500 : 0;
             //options.tooltips.intersect = false;
             options.tooltips.SetCustomAverage(0, -1);
-            var predDate = PredictStartDate._toShortDateString();
-            options.AddAnnotation(predDate, predDate);
+            addAnnotations(options, SeriousRatesByAges, userData.ChartLabelStartDate);
             options.legend.SetAlignEnd();
             options.legend.reverse = true;
             options.AddStackedAxis();
@@ -464,7 +444,7 @@ namespace ChartBlazorApp.Models
             if (userDataByUser != null) {
                 int realDaysToPredStart = (PredictStartDate - userDataByUser.ChartLabelStartDate).Days;
                 double?[] predLineByUser = userDataByUser.FullPredictSerious._toNullableArray(0)._fill(0, realDaysToPredStart, null);
-                dataSets.Add(Dataset.CreateLine("by利用者設定", predLineByUser, "royalblue", "royalblue").SetHoverColors("royalblue").SetOrders(2, 3).SetBorderWidth(0.8).SetPointRadius(0));
+                dataSets.Add(Dataset.CreateLine("by利用者シナリオ", predLineByUser, "royalblue", "royalblue").SetHoverColors("royalblue").SetOrders(2, 3).SetBorderWidth(0.8).SetPointRadius(0));
             }
             double?[] predLine = userData.FullPredictSerious._toNullableArray(0);
             dataSets.Add(Dataset.CreateDotLine("予測重症者数", predLine, "darkorange").SetHoverColors("firebrick").SetDispOrder(2));
@@ -482,7 +462,57 @@ namespace ChartBlazorApp.Models
             return new ChartJson {
                 type = "bar",
                 data = new Data {
-                    labels = userData.LabelDates.ToArray(),
+                    labels = userData.LabelDates,
+                    datasets = dataSets.ToArray(),
+                },
+                options = options,
+            }._toString();
+        }
+
+        /// <summary>
+        /// 死亡者数予測グラフ用データの作成
+        /// </summary>
+        /// <returns></returns>
+        public string MakeDeathJsonData(UserForecastData userData, UserForecastData userDataByUser, bool onlyOnClick, bool bAnimation)
+        {
+            //double maxPredDeath = userData.LastPredictDeath._lowLimit(userDataByUser?.LastPredictDeath ?? 0);
+            double maxPredDeath = Helper.Array(userData.RealDeathMax, userData.LastPredictDeath, userDataByUser?.LastPredictDeath ?? 0).Max();
+            double y1_max = roundYAxis(maxPredDeath, YAxisMaxDeath);
+            double y1_min = maxPredDeath > YAxisMaxDeath ? 0 : YAxisMinDeath;
+            double y1_step = calcStep(y1_max - y1_min);
+            Options options = Options.CreateTwoAxes(new Ticks(y1_max, y1_step, y1_min), new Ticks(y1_max, y1_step, y1_min));
+            options.AnimationDuration = bAnimation ? 500 : 0;
+            //options.tooltips.intersect = false;
+            options.tooltips.SetCustomAverage(0, -1);
+            addAnnotations(options, DeathRatesByAges, userData.ChartLabelStartDate);
+            options.legend.SetAlignEnd();
+            options.legend.reverse = true;
+            options.AddStackedAxis();
+            options.SetOnlyClickEvent(onlyOnClick);
+
+            var dataSets = new List<Dataset>();
+            dataSets.Add(Dataset.CreateLine("  ", new double?[userData.FullPredictDeath.Length], "rgba(0,0,0,0)", "rgba(0,0,0,0)")); // 凡例の右端マージン用ダミー
+            if (userDataByUser != null) {
+                int realDaysToPredStart = (PredictStartDate - userDataByUser.ChartLabelStartDate).Days;
+                double?[] predLineByUser = userDataByUser.FullPredictDeath._toNullableArray(0)._fill(0, realDaysToPredStart, null);
+                dataSets.Add(Dataset.CreateLine("by利用者シナリオ", predLineByUser, "royalblue", "royalblue").SetHoverColors("royalblue").SetOrders(2, 3).SetBorderWidth(0.8).SetPointRadius(0));
+            }
+            double?[] predLine = userData.FullPredictDeath._toNullableArray(0);
+            dataSets.Add(Dataset.CreateDotLine("予測死亡者数", predLine, "indianred").SetHoverColors("firebrick").SetDispOrder(2));
+            //dataSets.Add(Dataset.CreateDotLine("予測死亡者数(日次)", predDailyDeath._toNullableArray(0), "darkgreen"));
+            double?[] realBar = userData.RealDeath._toNullableArray(0);
+            dataSets.Add(Dataset.CreateBar("死亡者実数", realBar, "dimgray").SetHoverColors("black").SetStackedAxisId());
+            double?[] dummyBars1 = userData.RealDeath.Select(v => y1_max - v).ToArray()._extend(userData.FullPredictDeath.Length, y1_max)._toNullableArray(0, 0);
+            //double?[] dummyBars2 = new double[0]._extend(userData.FullPredictDeath.Length, -1)._toNullableArray(0, -1);
+            //double?[] dummyBars3 = Dataset.CalcDummyData(userData.FullPredictDeath.Length, new double?[][] { realBar, dummyBars1, dummyBars2 }, new double?[][] { predLine }, null, y1_max);
+            dataSets.Add(Dataset.CreateBar("", dummyBars1, "rgba(0,0,0,0)").SetStackedAxisId().SetHoverColors("rgba(10,10,10,0.1)"));
+            //dataSets.Add(Dataset.CreateBar("", dummyBars2, "rgba(0,0,0,0)").SetStackedAxisId());
+            //dataSets.Add(Dataset.CreateBar("", dummyBars3, "rgba(0,0,0,0)").SetStackedAxisId());
+
+            return new ChartJson {
+                type = "bar",
+                data = new Data {
+                    labels = userData.LabelDates,
                     datasets = dataSets.ToArray(),
                 },
                 options = options,
@@ -495,6 +525,19 @@ namespace ChartBlazorApp.Models
             double calcAxis(double val) => Math.Round((double)(val * 1.11 + 499) / 1000.0, 0) * 1000;
             if (maxValue <= 3000) return calcAxis(maxValue * 2) / 2;
             return calcAxis(maxValue);
+        }
+
+        private double calcStep(double range)
+        {
+            if (range <= 500) return 50;
+            if (range <= 1500) return 100;
+            if (range <= 3000) return 200;
+            if (range <= 5000) return 500;
+            if (range <= 15000) return 1000;
+            if (range <= 30000) return 2000;
+            if (range <= 50000) return 5000;
+            if (range <= 150000) return 10000;
+            return range / 10;
         }
 
         /// <summary>
@@ -510,7 +553,7 @@ namespace ChartBlazorApp.Models
                 int realDaysToPredStart = (PredictStartDate - userDataByUser.ChartLabelStartDate).Days;
                 maxDeath = userDataByUser.DailyPredictDeath.Max();
                 double?[] predLineByUser = userDataByUser.DailyPredictDeath._toNullableArray(0)._fill(0, realDaysToPredStart, null);
-                dataSets.Add(Dataset.CreateLine("by利用者設定", predLineByUser, "royalblue", "royalblue").SetHoverColors("royalblue").SetOrders(2, 3).SetBorderWidth(0.8).SetPointRadius(0));
+                dataSets.Add(Dataset.CreateLine("by利用者シナリオ", predLineByUser, "royalblue", "royalblue").SetHoverColors("royalblue").SetOrders(2, 3).SetBorderWidth(0.8).SetPointRadius(0));
             }
             double[] dailyReal = userData.DailyRealDeath._extend(userData.DailyPredictDeath.Length);
             double?[] dailyPredNullable = userData.DailyPredictDeath._toNullableArray(0);
@@ -751,15 +794,20 @@ namespace ChartBlazorApp.Models
         /// <summary> チャートの実際の表示開始日(X軸日付ラベルの初日) </summary>
         public DateTime ChartLabelStartDate { get; set; }
 
+        /// <summary> チャート表示終了日(X軸日付ラベルの末日) </summary>
+        public DateTime ChartLabelLastDate { get; set; }
+
         public DateTime LastRealDate { get { return ChartLabelStartDate.AddDays((RealDeath._length() - 1)._lowLimit(0)); } }
 
         public string LastRealDateStr { get { return LastRealDate.ToString("M月d日"); } }
 
-        public DateTime LastPredictDate { get { return chartPredStartDate.AddDays(PredictDays - 1); } }
+        //public DateTime LastPredictDate { get { return chartPredStartDate.AddDays(PredictDays - 1); } }
 
-        public string LastPredictDateStr { get { return LastPredictDate.ToString("M月d日"); } }
+        //public string LastPredictDateStr { get { return LastPredictDate.ToString("M月d日"); } }
 
         public int LastPredictDeath { get; set; }
+
+        public int FirstPredictSerious { get; set; }
 
         public int LastPredictSerious { get; set; }
 
@@ -845,9 +893,11 @@ namespace ChartBlazorApp.Models
             int chartFullDaysExtraAdded = chartFullDays + Constants.FORECAST_AVERAGE_SHIFT_DAYS + 7;
 
             // X軸日付ラベルの表示日数(実際にチャートに表示される日数)
-            int chartLabelDays = (chartFullDays + 1 - (preambleDays + discardedDays))._highLimit(chartLabelMaxDays);
+            int chartLabelDays = (chartFullDays - (preambleDays + discardedDays))._highLimit(chartLabelMaxDays);
             // チャート表示期間における実データ日数
             int chartLabelRealDays = calcFullRealDays - (preambleDays + discardedDays);
+            // チャート表示期間の終了日
+            ChartLabelLastDate = ChartLabelStartDate.AddDays(chartLabelDays - 1);
 
             logger.Debug($"CALL UserPredictData.PredictValuesEx({rtParam}, fullDays={chartFullDaysExtraAdded}, extDays={predDays + 7}, predStartDt={calcPredStartDt._toDateString()})");
             var predData = UserPredictData.PredictValuesEx(infectData, rtParam, 0, chartFullDaysExtraAdded, predDays + 7, calcPredStartDt);
@@ -881,6 +931,7 @@ namespace ChartBlazorApp.Models
             MaxPredictSerious = (int)Math.Round(val);
             MaxPredictSeriousDate = chartPredStartDate.AddDays(idx);
 
+            FirstPredictSerious = (int)FullPredictSerious._nth(chartLabelRealDays);
             LastPredictSerious = (int)FullPredictSerious.Last();
 
             // 日別死亡者数

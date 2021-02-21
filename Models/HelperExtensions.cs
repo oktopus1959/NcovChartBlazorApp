@@ -115,10 +115,13 @@ namespace ChartBlazorApp.Models
         {
             try {
                 return await jsRuntime.InvokeAsync<string>(funcname, args);
-            } catch (Exception e) {
+            } catch (System.Threading.Tasks.TaskCanceledException e) {
                 ConsoleLog.ERROR($"[JSRuntime.InvokeAsync({funcname})] {e}", caller);
+                return null;
+            } catch (Exception e) {
+                ConsoleLog.WARN($"[JSRuntime.InvokeAsync({funcname})] {e}", caller);
                 await Task.Delay(1000);
-                ConsoleLog.INFO($"[JSRuntime.InvokeAsync({funcname}] RETRY");
+                ConsoleLog.WARN($"[JSRuntime.InvokeAsync({funcname}] RETRY");
                 try {
                     return await jsRuntime.InvokeAsync<string>(funcname, args);
                 } catch (Exception ex) {

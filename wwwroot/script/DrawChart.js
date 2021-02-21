@@ -308,12 +308,30 @@ function ChartDrawer(wrapperId) {
         }
 
         // ツールチップラベルの編集
-        //chartData.options.tooltips.callbacks = {
-        //    label: function (item, data) {
-        //        var dataset = data.datasets[item.datasetIndex];
-        //        return dataset ? dataset.label.trim() : "";
-        //    }
-        //};
+        chartData.options.tooltips.callbacks = {
+            label: function (item, data) {
+                //console.log(item);
+                //console.log(data);
+                var dataset = data.datasets[item.datasetIndex];
+                if (dataset) {
+                    var value = dataset.data[item.index];
+                    var suffix = "";
+                    var oldLabel = dataset.label;
+                    var newLabel = oldLabel.replace("x10", "");
+                    if (newLabel != oldLabel) {
+                        value = Math.round(value * 100) / 10;
+                        suffix = "%";
+                    } else {
+                        newLabel = oldLabel.replace("%:", "");
+                        if (newLabel != oldLabel) {
+                            suffix = "%";
+                        }
+                    }
+                    return newLabel.replace("(右軸)", "") + ": " + value + suffix;
+                }
+                return "";
+            }
+        };
 
         // ツールチップが表示されているか
         //var tooltipShown = false;

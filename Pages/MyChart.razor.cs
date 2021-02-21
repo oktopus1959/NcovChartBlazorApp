@@ -141,6 +141,8 @@ namespace ChartBlazorApp.Pages
 
         private string _dispStartDate => _effectiveParams.DispStartDate;
 
+        private string _rawDispStartDate => _effectiveParams.CurrentSettings.dispStartDate;
+
         private int _radioIdx { get { return _timeMachineInfectEnabled ? _selectorPos : _effectiveParams.RadioIdx; } }
 
         private int _prefIdx { get { return _timeMachineInfectEnabled ? _timeMachineInfectIdx : Math.Max(_effectiveParams.PrefIdx, _mainPrefNum); } }
@@ -325,8 +327,14 @@ namespace ChartBlazorApp.Pages
 
         public async Task ChangeDispStartDate(ChangeEventArgs args)
         {
-            _effectiveParams.SetDispStartDate(args.Value.ToString()._reReplace(@"[年月]", "/") + "1");
-            await RenderChartMethod();
+            var val = args.Value.ToString();
+            if (val._equalsTo("自動")) {
+                val = "";
+            } else {
+                val = val._reReplace(@"[年月]", "/") + "1";
+            }
+            _effectiveParams.SetDispStartDate(val);
+            await RenderChartMethod(false, true);
         }
 
         public async Task ChangeChart(ChangeEventArgs args)
@@ -1139,7 +1147,7 @@ namespace ChartBlazorApp.Pages
             }
         }
 
-        private double calcY2Max(double[] rts)
+        private double calcRtMax(double[] rts)
         {
             int nearPt = (rts.Length - 30)._lowLimit(0);
             int longPt = (rts.Length - Constants.Y_MAX_CALC_DURATION)._lowLimit(0);
@@ -1150,6 +1158,25 @@ namespace ChartBlazorApp.Pages
             if (nearPt > 0 && rts[longPt..nearPt].Count((x) => x > 2.0) > 3)
                 return 2.5;
             if (rts.Length > 0 && rts[nearPt..].Max() > 2.0)
+                return 2.5;
+            return 2.0;
+        }
+
+        private double calcPosiRateMax(double[] posiRates)
+        {
+            int nearPt = (posiRates.Length - 30)._lowLimit(0);
+            int longPt = (posiRates.Length - Constants.Y_MAX_CALC_DURATION)._lowLimit(0);
+            if (nearPt > 0 && posiRates[longPt..nearPt].Count((x) => x > 0.5) > 3)
+                return 10.0;
+            if (posiRates.Length > 0 && posiRates[nearPt..].Max() > 0.5)
+                return 10.0;
+            if (nearPt > 0 && posiRates[longPt..nearPt].Count((x) => x > 0.25) > 3)
+                return 5.0;
+            if (posiRates.Length > 0 && posiRates[nearPt..].Max() > 0.25)
+                return 5.0;
+            if (nearPt > 0 && posiRates[longPt..nearPt].Count((x) => x > 0.2) > 3)
+                return 2.5;
+            if (posiRates.Length > 0 && posiRates[nearPt..].Max() > 0.2)
                 return 2.5;
             return 2.0;
         }
@@ -1257,7 +1284,11 @@ namespace ChartBlazorApp.Pages
                     }
                     (double, double) calcYAxis2Scale(double yMax) {
                         if (yMax <= 0) {
-                            yMax = calcY2Max(infData.Rt);
+                            yMax = calcRtMax(infData.Rt);
+                            if (_drawPosiRates) {
+                                double yMaxPr = calcPosiRateMax(infData.PosiRates);
+                                if (yMax < yMaxPr || yMax > yMaxPr * 1.5) yMax = yMaxPr;
+                            }
                         }
                         return (yMax, yMax / (yMax == 2.5 ? 5 : 10));
                     }

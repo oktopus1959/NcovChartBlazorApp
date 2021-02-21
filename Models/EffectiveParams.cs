@@ -98,11 +98,9 @@ namespace ChartBlazorApp.Models
             logger.Info($"{GetTitle()}: {tmData}");
             _timeMachineInfectData = null;
             var trimData = tmData._strip()._orElse("0");
-            int[] extraData = trimData._isEmpty() ? null : trimData._split(',').Select(x => x._strip()._parseInt(0)).ToArray();
-            if (extraData._notEmpty() && extraData[0] < 0) extraData[0] = extraData[0]._lowLimit(-90);
-            _timeMachineInfectData = NthInfectData(-1).CreateData(extraData);
+            _timeMachineInfectData = NthInfectData(-1).CreateData(trimData);
             RenewDecaySubParams();
-            TimeMachineData = extraData._join(",");
+            TimeMachineData = trimData;
             TimeMachineMode = true;
         }
 
@@ -113,7 +111,7 @@ namespace ChartBlazorApp.Models
         {
             if (TimeMachineData._notEmpty()) {
                 _timeMachineInfectData = null;
-                _timeMachineInfectData = NthInfectData(-1).CreateData(TimeMachineData._split(',').Select(x => x._strip()._parseInt(0)).ToArray());
+                _timeMachineInfectData = NthInfectData(-1).CreateData(TimeMachineData);
                 RenewDecaySubParams();
             }
         }
