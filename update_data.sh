@@ -107,7 +107,7 @@ downloadCsv() {
     . $BINDIR/debug_util_inc_indent.sh
     local url=$1
     local file=$2
-    if [ "$LOADFLAG" ]; then
+    if [ "$LOADFLAG" ] || [ ! -f ${file} ]; then
         YELLOW_PRINT "download $file"
         local currDt="2020/1/1"
         local dtPos=1
@@ -124,7 +124,8 @@ downloadCsv() {
             RUN_CMD -fm "cp ${file}.download ${file}.tmp"
         fi
         local lastDt="$(tail -n 1 ${file}.tmp | cut -d, -f$dtPos)"
-        local diffNum="$(diff -q ${file}.tmp ${file} | wc -l)"
+        local diffNum=1
+        [ -f ${file} ] && diffNum="$(diff -q ${file}.tmp ${file} | wc -l)"
         VAR_PRINT -f lastDt
         VAR_PRINT -f diffNum
         if [[ "$lastDt" =~ ^[0-9]+[/-][0-9]+[/-][0-9]+$ ]]; then
@@ -136,7 +137,7 @@ downloadCsv() {
         fi
         RUN_CMD -fm "rm -f ${file}.tmp"
     else
-        YELLOW_PRINT "no download flag specifed"
+        YELLOW_PRINT "${file} exists"
     fi
     . $BINDIR/debug_util_rev_indent.sh
 }
