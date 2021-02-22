@@ -1,4 +1,5 @@
 #aveWeek,2,#平均を取る週数
+#keyvalues,colors=darkgreen|cadetblue|darkseagreen|tan,hovercolors=royalblue|royalblue,linecolors=mediumorchid|lightpink
 #start,2020/5/20
 2020/5/27,278,390,2717,2502,2620,2733,1865,1637,1733
 2020/6/3,284,411,2786,2559,2658,2759,1882,1682,1779
