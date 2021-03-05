@@ -195,6 +195,8 @@ DEATH_SERIOUS_TARGET=$CSVDIR/death_and_serious.csv
 CHART_SCALES_PARAM=Data/other_chart_scales.txt
 MULTI_STEP_EXPECT_PARAM=Data/multi_step_expect_params.txt
 
+PREF_SERIOUS_TARGET=$CSVDIR/pref_serious.csv
+
 INFECT_AGES_FILE=infect_by_ages.txt
 
 # 処理開始
@@ -231,6 +233,18 @@ for x in $(ls -1 Data/mhlw_pref/*.txt); do
 done
 RUN_CMD -f "cat ${PREF_WORKDIR}/*.txt > $PREF_POSI_TEST_WORK"
 
+# 都道府県重症者数
+PREF_SERDIR=$WORKDIR/serious
+mkdir -p $PREF_SERDIR
+PREF_SERIOUS_WORK=$WORKDIR/pref_serious_work.csv
+for x in $(ls -1 Data/mhlw_pref/*.txt); do
+    pref_work_file=$PREF_SERDIR/$(basename $x)
+    if [[ ! -f $pref_work_file || $x -nt $pref_work_file ]]; then
+        RUN_CMD -f -m "$BINDIR/make_serious.sh $x > $pref_work_file"
+    fi
+done
+RUN_CMD -f "cat ${PREF_SERDIR}/*.txt > $PREF_SERIOUS_WORK"
+
 # 東京都データのダウンロードと集計
 TOKYO_POSI_WORK=$WORKDIR/tokyo_covid19_patients.csv
 TOKYO_DL_FILE=${TOKYO_POSI_WORK}.download
@@ -266,6 +280,10 @@ RUN_CMD -m "rm -f ${DEATH_TOTAL_WORK}.tmp ${SEVERE_DAILY_WORK}.tmp"
 for x in Data/*_rate.txt $CHART_SCALES_PARAM $MULTI_STEP_EXPECT_PARAM; do
     RUN_CMD -m "cp -p $x $CSVDIR/$(basename ${x/.txt/.csv})"
 done
+
+# 重症者数
+RUN_CMD -fm "sed -ne '/^2020.9.1,/,$ s/,/,全国,/p' $SEVERE_DAILY_WORK > $PREF_SERIOUS_TARGET"
+RUN_CMD -fm "cat $PREF_SERIOUS_WORK >> $PREF_SERIOUS_TARGET"
 
 # 年代別陽性者数
 RUN_CMD -fm "cp -p Data/$INFECT_AGES_FILE $CSVDIR/${INFECT_AGES_FILE/.txt/.csv}"
