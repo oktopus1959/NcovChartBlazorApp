@@ -19,7 +19,7 @@
     private string _fontWeightBold(bool enabled) { return enabled ? "bold-font" : "normal-font"; }
 
     private static int[] y1maxes = new int[] { 100000, 50000, 20000, 15000, 10000, 5000, 4000, 3000, 2000, 1500, 1000, 500, 400, 300, 200, 150, 100, 50, 20 };
-    private static int[] y1mins = new int[] { 0, 100, 200, 500, 1000, 2000, 5000 };
+    private static int[] y1fixes = new int[] { 10000, 5000, 2000, 1000, 500, 200, 100, };
 
     private string _make_year_month_str(DateTime dt) { return $"{dt.Year}年{dt.Month}月"; }
     private string _disp_start_year_month() { return _rawDispStartDate._isEmpty() ? "自動" : _make_year_month_str(_dispStartDate._parseDateTime()); }
@@ -76,8 +76,12 @@
 
   <div class="vertical-center" style="margin-top: 0.5em;">
       <div class="inline-mr-0">@(_timeMachineInfectEnabled ? "（"+_getTitle()+"）" : _getTitle())</div>
-      @(_latestDate.ToString("M月d日"))<div class="inline-wide-2">現在</div>　
-      <font class="small">陽性者数</font>: @(_latestPositives._formatComma()) ／ <div class="inline-narrow-small">Rt</div><div class="inline-wide-small">実効再生産数</div>: @(_latestRt.ToString("f2"))
+      @(_latestDate.ToString("M月d日"))<div class="inline-wide-2">現在</div> 
+      @if (_drawSerious) {
+          <div class="inline-ml-0 small">陽性者数移動平均</div><span>: @(_latestAverage._formatComma())／</span><font class="small">最新重症者数</font><span>: @(_latestSerious._formatComma())</span>
+      } else {
+          <div class="inline-ml-0 small">陽性者数</div><span>: @(_latestPositives._formatComma())／</span><div class="inline-narrow-small">Rt</div><div class="inline-wide-small">実効再生産数</div><span>: @(_latestRt.ToString("f2"))</span>
+      }
   </div>
 
 @* Chart の Canvas *@
@@ -88,6 +92,9 @@
     <canvas id="yAxis1" style="left: 0" width="0"></canvas>
     <canvas id="yAxis2" style="right: 0" width="0"></canvas>
 </div>
+
+<div class="inline-block-narrow-2" style="margin-top: 2px; margin-left: 4px;"><p class="small darkred" style="line-height: 20px">
+    ※グラフは左右にスクロールできます。なおグラフが表示されない場合は新しいタブを開いて試してみてください。</p></div>
 
 <div class="vertical-align" style="margin-top: 1.0em; line-height: 1.5em">
     <div class="inline-wrapper-narrow">
@@ -101,13 +108,19 @@
             <span class="@_fontColorBlack(_drawExpectation)">推計陽性数</span>
         </label></div>
     
-    <div class="inline-wrapper-narrow position-right-narrow">
+    <div class="inline-wrapper-narrow">
         <label for="detail-settings">
-            <input type="checkbox" name="detail-settings" id="detail-settings" @onchange="ShowDetailSettings" checked="@(_detailSettings)" disabled="@(!_drawExpectation)" />
+            <input type="checkbox" name="detail-settings" id="detail-settings" @onchange="UserScenarioSettings" checked="@(_detailSettings)" disabled="@(!_drawExpectation)" />
             <span class="@_fontColorBlack(_drawExpectation)">シナリオ設定</span>
         </label></div>
     
-    <div class="inline-wrapper-narrow position-right-narrow">
+    <div class="inline-wrapper-narrow">
+        <label for="serious">
+            <input type="checkbox" name="serious" id="serious" @onchange="DrawSerious" checked="@(_drawSerious)" />
+            <span>重症者数</span>
+        </label>
+    </div>
+    <div class="inline-wrapper-narrow">
         <label for="positive-rates">
             <input type="checkbox" name="positive-rates" id="positive-rates" @onchange="DrawPosiRates" checked="@(_drawPosiRates)" />
             <span>検査陽性率@((_drawPosiRates ? "（x10）" : ""))</span>
@@ -119,6 +132,11 @@
             </label><span>）</span>
         } *@
     </div>
+    <div class="inline-wrapper-narrow position-right-narrow">
+        <label for="dist-positives">
+            <input type="checkbox" name="dist-positives" id="dist-positives" @onchange="DrawDistPositives" checked="@(_drawDistPositives)" />
+            <span>欠損日按分</span>
+        </label></div>
     @if (_adminFlag) {
         <div class="inline-wrapper my-0 position-right">
         <button class="btn btn-primary btn-sm py-0 px-1" @onclick="RenderReloadMethod">RE INITIALIZE</button>
@@ -126,35 +144,35 @@
     }
 
 @if (_drawExpectation) {
-    <div class="indent flex-box">
-    @{
+    <div class="flex-box">
+    <!-- 2段階設定 -->
+    @if (!_detailSettings) {
         string _changeDate() => _paramDate._parseDateTime().AddDays(_paramDaysToOne)._toDateString();
-    }
-        <!-- 2段階設定 -->
-        <div class="inline-wrapper with-border">
-        @if (!_detailSettings) {
+        int findDecayFactor() {
+            foreach ((var i, var v) in _decayFactors._enumerate()) {
+                if (v == _paramDecayFactor) return i + _decayFactors1Start;
+            }
+            return 0;
+        }
+        int findDecayFactorNext() {
+            foreach ((var i, var v) in _decayFactors2._enumerate()) {
+                if (v == _paramDecayFactorNext) return i + _decayFactors2Start;
+            }
+            return 0;
+        }
+        <div class="inline-wrapper-ge-500 with-border">
             <!-- システム予測表示 -->
-            int findDecayFactor() {
-                foreach ((var i, var v) in _decayFactors._enumerate()) {
-                    if (v == _paramDecayFactor) return i + _decayFactors1Start;
-                }
-                return 0;
-            }
-            int findDecayFactorNext() {
-                foreach ((var i, var v) in _decayFactors2._enumerate()) {
-                    if (v == _paramDecayFactorNext) return i + _decayFactors2Start;
-                }
-                return 0;
-            }
             <div class="inline-wrapper"><span>基準日： @(_paramDate)</span></div>
             <div class="inline-wrapper position-right-responsive"><span>変化日： @(_changeDate())</span></div>
             <div class="inline-wrapper position-right"><span>変化日Rt： @(_paramEasyRt1) 　傾曲度： @(findDecayFactor())</span></div><br/>
             <div class="inline-wrapper position-right"><span>次の目標Rt： @(_paramEasyRt2) 　次の傾曲度： @(findDecayFactorNext()) 　</span></div>
             <div class="inline-wrapper position-right"><span>Rt>1での減衰率： @(Constants.PostDecayFactorRt2)</span></div>
-        } else {
+        </div>
+    } else {
+        bool _easyEnabled = !_fourstepSettings;
+        string fontColor = _easyEnabled ? null : "grey";
+        <div class="inline-wrapper with-border">
             <!-- シナリオ設定表示 -->
-            bool _easyEnabled = !_fourstepSettings;
-            string fontColor = _easyEnabled ? null : "grey";
             <div class="vertical-center">
                 <label for="easy">
                     <input type="radio" name="easy-or-fourstep" id="easy" value="easy" @onchange="ChangeEasyOrFourstepSettings"
@@ -212,11 +230,13 @@
                 }
                 </div>
                 @if (_eventsInfectInput) {
-                    <div class="inline-wrapper">
+                    <div class="inline-wrapper" style="margin-right: 4px">
                         <span>イベント</span>
-                        <input type="text" class="text-long-2" value="@_events" @onchange="UpdateEvents"/></div>
+                        <input type="text" class="text-long-2" value="@_userEvents" @onchange="UpdateEvents"/></div>
                     <p class="darkred small mb-0" style="line-height: 20px">
-                        ※「日付:文言」のカンマ区切り。例：「1/8:緊急事態宣言,2/7:同終了」<br/>※日付、コロン、カンマは半角で入力すること</p>
+                        ※「日付:文言」のカンマ区切り。例「1/8:緊急事態,3/7:解除」<br/>
+                        ※先頭が ! なら利用者イベントのみ表示。例「!2/17:先行接種」<br/>
+                        ※日付、コロン、カンマ、感嘆符は半角で入力すること</p>
                 }
             <hr class="narrow" style="background-color: silver"/>
             <div class="vertical-center" style="margin-top: 4px">
@@ -254,8 +274,8 @@
                     <input type="text" class="text-number-short" value="@_extremeRtDetectDuration" @onchange="ChangeExtremeRtDetectDuration" disabled="@(!_easyEnabled)"/>
                     <span class="@fontColor">日</span></div><br/>
             }
-        }
         </div>
+    }
         <!-- 多段階設定 (!_detailSettings なら非表示) -->
         @if (_detailSettings) {
             string[] _expectedButtons = DailyData.ExpectedMultiStepParams._safeGet(_getTitle(_dataIdx))?.Select(a => a.ButtonText).ToArray();
@@ -338,7 +358,7 @@
         <p class="small mb-0" style="line-height: 20px">※日付入力の際、「年」は省略可。詳細は下記【説明】を参照</p>
     } else if (_drawExpectation) {
         <p class="small mb-0" style="line-height: 20px">
-        ※上記は過去のRtの推移を基に自動的に<font class="darkred">近似計算</font>し、将来期間にわたって値を延長したものです。
+        ※上グラフは過去の実効再生産数(Rt)の推移を基に自動的に<font class="darkred">近似計算</font>し、将来期間にわたって値を延長したものです。
         将来におけるRtや移動平均の推移を<font class="darkred">予測するものではない</font>ことにご留意ください。</p>
     }
     </div>
@@ -363,7 +383,7 @@
     <div class="inline-wrapper">
         @* 左Y軸の最大値を選択するドロップダウン *@
         <div class="inline-wrapper">
-            @if (_yAxisMin > 0) { <span>左Ｙ軸最大値（≧@_yAxisMin）</span>} else { <span>左Ｙ軸最大値</span> }
+            <span>左Ｙ軸最大値</span>
             @{
                 var y1Max = _yAxisMaxUser;
                 var y1Val = y1Max > 0 ? $"{y1Max}" : "自動";
@@ -371,21 +391,31 @@
             <select style="padding: 1px" name="yAxisMax" value="@y1Val" @onchange="ChangeYAxisMax">
                 @foreach (int n in y1maxes) { <option value="@n" selected="@(n == y1Max)">@n</option> }
                 <option value="自動" selected="@(y1Max <= 0)">自動</option>
-                @if (_useYAxis1LowerLimt) { foreach (int n in y1mins) { <option value="#@n">≧@n</option> } }
             </select>
             （<label for="lower-limit">
-                <input type="checkbox" name="lower-limit" id="lower-limit" @onchange="UseYAxisLowerLimit" checked="@(_useYAxis1LowerLimt)" /><span>下限</span>
-            </label>）</div>
+                <input type="checkbox" name="lower-limit" id="lower-limit" @onchange="UseYAxisFixed" checked="@(_useYAxis1Fixed)" /><span>固定</span>
+            </label>@if (_useYAxis1Fixed) {
+                <select style="padding: 1px" name="yAxisFixed" value="@_yAxisFixed" @onchange="ChangeYAxisFixed">
+                    @foreach (int n in y1fixes) { <option value="@n">@n</option> }
+                </select>
+            }）</div>
         @* 右Y軸の最大値を選択するドロップダウン *@
         <div class="inline-wrapper position-right-narrow">
             <span>右Ｙ軸最大値</span>
-            @{
+            @if (_drawSerious) {
+                var y2Max = ((int)_yAxis2SeriousFixed).ToString();
+                if (!y2Max._containedIn("2000", "1000", "500", "200", "100", "50")) y2Max = "自動";
+                <select style="padding: 1px" name="yAxis2Max" value="@y2Max" @onchange="ChangeYAxis2SeriousFixed">
+                    @foreach (var ser in Helper.Array("2000", "1000", "500", "200", "100", "50", "自動")) { <option value="@ser" selected="@(ser == y2Max)">@ser</option> }
+                </select>
+            } else {
                 var y2Max = _yAxis2MaxUser;
                 if (!y2Max._containedIn("10.0", "5.0", "2.5", "2.0")) y2Max = "自動";
+                <select style="padding: 1px" name="yAxis2Max" value="@y2Max" @onchange="ChangeYAxis2Max">
+                    @foreach (var rt in Helper.Array("10.0", "5.0", "2.5", "2.0", "1.5", "自動")) { <option value="@rt" selected="@(rt == y2Max)">@rt</option> }
+                </select>
             }
-            <select style="padding: 1px" name="yAxis2Max" value="@y2Max" @onchange="ChangeYAxis2Max">
-                @foreach (var rt in Helper.Array("10.0", "5.0", "2.5", "2.0", "1.5", "自動")) { <option value="@rt" selected="@(rt == y2Max)">@rt</option> }
-            </select></div>
+        </div>
     </div>
     @* 表示開始月 *@
     <div class="inline-wrapper">
@@ -394,16 +424,17 @@
             string _dispStartMonth = _disp_start_year_month();
             List<string> _ymOpts = new List<string>();
             DateTime _firstYM = Constants.FIRST_EFFECTIVE_DATE._parseDateTime();
-            DateTime _ym = DateTime.Now.AddMonths(-(DateTime.Now.Month % 3));
+            DateTime _ym = DateTime.Now.AddMonths(-(((DateTime.Now.Month - 1) % 3) + 1));  // 1月→12月, 2月→12月, 3月→12月, 4月→1月, ...
             while (_ym >= _firstYM) {
                 _ymOpts.Add(_make_year_month_str(_ym));
                 _ym = _ym.AddMonths(-3);
             }
-            _ymOpts.Add("自動");
+            _ymOpts.Add($"自動 {Constants.AutoDispStartDate.ToString("(yy/MM)")}");
         }
         <select style="padding: 1px" name="disp-start-date" value="@_dispStartMonth" @onchange="ChangeDispStartDate">
-            @foreach (var m in _ymOpts) {
-                <option value="@m" selected="@(m == _dispStartMonth)">@m</option>
+            @foreach (var ym in _ymOpts) {
+                var m = ym._split(' ')[0];
+                <option value="@m" selected="@(m == _dispStartMonth)">@ym</option>
             }
         </select></div>
     <div class="inline-wrapper">
@@ -413,19 +444,27 @@
                 <input type="checkbox" name="only-on-click" id="only-on-click" @onchange="ChangeOnlyOnClick" checked="@(_onlyOnClick)" />
                 <span>クリックで情報画面</span>
             </label></div>
-        @* 近似曲線を実数曲線より上に描画 *@
-        <div class="inline-wrapper" style="display: @(_drawExpectation ? "inline-block" : "none")">
-            <label for="exp-over-real">
-                <input type="checkbox" name="exp-over-real" id="exp-over-real" @onchange="ChangeExpOverReal" checked="@(_expectOverReal)" />
-            <span>近似曲線を前面</span>
-            </label></div>
-        @* 推計陽性者数を表示する棒グラフの最小幅 *@
-        @if (_drawExpectation && _estimatedBar) {
+        @if (_drawExpectation) {
+            @* 近似曲線を実数曲線より上に描画 *@
             <div class="inline-wrapper">
-                <span>推計陽性者数 棒グラフの最小幅</span>
-                <select style="padding: 1px" name="est-bar-min-width" value="@_estimatedBarMinWidth" @onchange="RenderEstimatedBarMinWidthMethod">
-                    @for (int n = 4; n >= -4; --n) { <option value="@n" selected="@(n == _estimatedBarMinWidth)">@n</option> }
-                </select></div>
+                <label for="exp-over-real">
+                    <input type="checkbox" name="exp-over-real" id="exp-over-real" @onchange="ChangeExpOverReal" checked="@(_expectOverReal)" />
+                <span>近似曲線を前面</span>
+                </label></div>
+            @if (_drawExpectation && _estimatedBar) {
+                @* 逆算Rtを表示 *@
+                <div class="inline-wrapper">
+                    <label for="rev-rt">
+                        <input type="checkbox" name="rev-rt" id="rev-rt" @onchange="DrawRevRt" checked="@(_drawRevRt)" />
+                    <span>逆算Rt表示</span>
+                    </label></div>
+                @* 推計陽性者数を表示する棒グラフの最小幅 *@
+                <div class="inline-wrapper">
+                    <span>推計陽性者数 棒グラフの最小幅</span>
+                    <select style="padding: 1px" name="est-bar-min-width" value="@_estimatedBarMinWidth" @onchange="RenderEstimatedBarMinWidthMethod">
+                        @for (int n = 4; n >= -4; --n) { <option value="@n" selected="@(n == _estimatedBarMinWidth)">@n</option> }
+                    </select></div>
+            }
         }
     </div>
     @* デバッグレベル *@

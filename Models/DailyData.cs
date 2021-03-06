@@ -73,6 +73,7 @@ namespace ChartBlazorApp.Models
                         // ファイルが更新されていたら再ロードする
                         _lastFileDt = fileInfo.ModifyDt;
                         _infectDataList = loadPrefectureData(readFile(filePath), lastRealDt);
+                        loadPrefSerious();
                         loadMultiStepExpectParams();
                         LastUpdateDt = _lastInitializedDt;
                         logger.Info($"prev Initialized at {prevDt}, Reload:{filePath}");
@@ -115,7 +116,7 @@ namespace ChartBlazorApp.Models
                     prefOrder.AddRange(items[1..]);
                 } else if (items[0]._startsWith("#reload")) {
                     ReloadMagicNumber = items[1]._parseInt(9999);
-                    logger.Info($"ReloadMagicNumber: {ReloadMagicNumber}");
+                    logger.Info($"\nReloadMagicNumber: {ReloadMagicNumber}");
                 } else if (items[0]._startsWith("#params")) {
                     var data = getOrNewData(items, false);
                     if (data != null) {
@@ -168,6 +169,31 @@ namespace ChartBlazorApp.Models
             }
 
             return infectList;
+        }
+
+        private void loadPrefSerious()
+        {
+            if (_infectDataList._isEmpty()) return;
+
+            Dictionary<string, InfectData> dict = new Dictionary<string, InfectData>();
+            foreach (var infData in _infectDataList) {
+                dict[infData.Title] = infData;
+                infData.Serious = new double[infData.Dates.Length];
+                infData.Serious[^1] = -1;
+            }
+            foreach (var line in readFile("Data/csv/pref_serious.csv")) {
+                var items = line.Trim().Split(',');
+                if (items._length() >= 3) {
+                    var infData = dict._safeGet(items[1]);
+                    if (infData != null) {
+                        int idx = (items[0]._parseDateTime() - infData.Dates._first()).Days;
+                        if (idx >= 0 && idx < infData.Serious.Length) infData.Serious[idx] = items[2]._parseInt(0);
+                    }
+                }
+            }
+            foreach (var infData in _infectDataList) {
+                if (infData.Serious[^1] == -1) infData.Serious = infData.Serious.Take(infData.Serious.Length - 1).ToArray();
+            }
         }
 
         public class ExpectdMultiStepParam

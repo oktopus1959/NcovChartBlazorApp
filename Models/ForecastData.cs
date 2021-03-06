@@ -61,6 +61,8 @@ namespace ChartBlazorApp.Models
 
         public List<string> AnnotationLabels { get; set; }
 
+        public Dictionary<string, string> KeyValues { get; set; }
+
         public double[] BaseDataSeries { get; set; }
 
         public List<DatedDataSeries> DataSeriesList { get; set; }
@@ -148,6 +150,8 @@ namespace ChartBlazorApp.Models
         //public DailyData dailyData { get; set; }
 
         public DatedDataSeriesList InfectRatesByAges { get; private set; } = null;
+
+        public DatedDataSeriesList InfectNumsByAges { get; private set; } = null;
 
         public DatedDataSeries RealDeathSeries = null;
 
@@ -264,13 +268,13 @@ namespace ChartBlazorApp.Models
                     }
                     // ファイルが更新されていたら再ロードする
                     _lastFileDt = fileInfo.ModifyDt;
-                    InfectRatesByAges = loadInfectByAgesData();                                 // 年代別陽性者数CSVのロード
+                    loadInfectByAgesData();                                                     // 年代別陽性者数CSVのロード
                     loadDeathAndSerious();                                                      // 死亡者数と重症化者数CSVのロード
                     DeathRatesByAges = loadRatesFile(Constants.DEATH_RATE_FILE_PATH, 10);       // 死亡率CSVのロード
                     SeriousRatesByAges = loadRatesFile(Constants.SERIOUS_RATE_FILE_PATH, 10);   // 重症化率CSVのロード
                     RecoverRates = loadRatesFile(Constants.RECOVER_RATE_FILE_PATH, 2);          // 改善率CSVのロード
                     loadOtherChartScales();
-                    logger.Info($"prev Initialized at {prevDt}, Files reloaded");
+                    logger.Info($"prev Initialized at {prevDt}, Files reloaded\n");
                 } catch (Exception e) {
                     logger.Error(e.ToString());
                 }
@@ -292,11 +296,12 @@ namespace ChartBlazorApp.Models
         /// 年代別陽性者数CSVのロード⇒年代別陽性者割合に変換
         /// </summary>
         /// <returns></returns>
-        private DatedDataSeriesList loadInfectByAgesData()
+        private void loadInfectByAgesData()
         {
-            List<DatedDataSeries> list = new List<DatedDataSeries>();
-            List<double[]> infectCountsList = new List<double[]>();
-            infectCountsList.Add(new double[9]);
+            List<DatedDataSeries> ratesList = new List<DatedDataSeries>();
+            List<DatedDataSeries> infectCountsList = new List<DatedDataSeries>();
+            Dictionary<string, string> keyValues = new Dictionary<string, string>();
+            infectCountsList.Add(new DatedDataSeries() { DataSeries = new double[9] });
             //double[] prevCounts = new double[9];
             List<double> totalList = new List<double>();
             totalList.Add(0);
@@ -309,6 +314,9 @@ namespace ChartBlazorApp.Models
                     } else if (items[0]._startsWith("#start")) {
                         var dt = items[1]._parseDateTime();
                         if (dt._isValid()) nextStartDate = dt.AddDays(1);
+                    } else if (items[0]._startsWith("#keyvalue")) {
+                        logger.Info($"KeyValues: {items._join(",")}");
+                        keyValues = items[1..].Select(x => x._split('=')).ToDictionary(p => p._first(), p => p._second());
                     }
                     continue;
                 }
@@ -316,18 +324,21 @@ namespace ChartBlazorApp.Models
 
                 var prevCounts = infectCountsList.Last();
                 var prevTotal = totalList.Last();
-                double[] counts = items[1..10].Select(n => n._parseDouble(0)).ToArray();
-                var total = counts.Sum();
+                DatedDataSeries counts = new DatedDataSeries() {
+                    Date = items[0]._parseDateTime(),
+                    DataSeries = items[1..10].Select(n => n._parseDouble(0)).ToArray()
+                };
+                var total = counts.DataSeries.Sum();
                 if (items._nth(10)._equalsTo("%")) {
                     RateAveWeeks = 0;
-                    list.Add(new DatedDataSeries() {
+                    ratesList.Add(new DatedDataSeries() {
                         Date = items[0]._parseDateTime(),
-                        DataSeries = counts.Select(x => x / total).ToArray(),
+                        DataSeries = counts.DataSeries.Select(x => x / total).ToArray(),
                     });
                 } else {
-                    list.Add(new DatedDataSeries() {
+                    ratesList.Add(new DatedDataSeries() {
                         Date = nextStartDate,
-                        DataSeries = counts.Select((n, i) => (n - prevCounts[i]) / (total - prevTotal)).ToArray(),
+                        DataSeries = counts.DataSeries.Select((n, i) => (n - prevCounts.DataSeries[i]) / (total - prevTotal)).ToArray(),
                     });
                     infectCountsList.Add(counts);
                     totalList.Add(total);
@@ -336,17 +347,18 @@ namespace ChartBlazorApp.Models
             }
 
             if (RateAveWeeks > 0) {
-                var prevCounts = infectCountsList[^(RateAveWeeks + 1)];
+                var prevCounts = infectCountsList[^(RateAveWeeks + 1)].DataSeries;
                 var prevTotal = totalList[^(RateAveWeeks + 1)];
-                var counts = infectCountsList[^1];
+                var counts = infectCountsList[^1].DataSeries;
                 var total = totalList[^1];
-                list.Add(new DatedDataSeries() {
+                ratesList.Add(new DatedDataSeries() {
                     Date = nextStartDate,
                     DataSeries = counts.Select((n, i) => (n - prevCounts[i]) / (total - prevTotal)).ToArray()
                 });
             }
-            PredictStartDate = list.Last().Date;
-            return new DatedDataSeriesList { DataSeriesList = list };
+            PredictStartDate = ratesList.Last().Date;
+            InfectRatesByAges = new DatedDataSeriesList { DataSeriesList = ratesList };
+            InfectNumsByAges = new DatedDataSeriesList() { DataSeriesList = infectCountsList, KeyValues = keyValues };
         }
 
         /// <summary>
@@ -400,22 +412,34 @@ namespace ChartBlazorApp.Models
             }
         }
 
-        private void addAnnotations(Options options, DatedDataSeriesList list, DateTime startDt)
+        private void addAnnotations(Options options, DatedDataSeriesList list1, DatedDataSeriesList list2, DateTime startDt)
         {
-            foreach (var series in list.DataSeriesList) {
-                if (series.Date >= startDt) {
-                    options.AddAnnotation(series.Date._toShortDateString(), "適用");
+            HashSet<string> adjDates = new HashSet<string>();
+            var list = list1.DataSeriesList;
+            if (list2 != null) list = list.Concat(list2.DataSeriesList).ToList();
+            foreach (var series in list) {
+                if (series.Date >= startDt) adjDates.Add(series.Date.AddDays(series.OffsetDays)._toShortDateString());
+            }
+            foreach (var dt in adjDates) {
+                options.AddAnnotation(dt, "調整");
+            }
+            options.AddAnnotation(list1.UpdateDate._toShortDateString(), "更新");
+            if (list2 != null && list2.UpdateDate != list1.UpdateDate)
+                options.AddAnnotation(list2.UpdateDate._toShortDateString(), "更新");
+
+            void addCustomAnnotations(DatedDataSeriesList list) {
+                if ((list?.AnnotationDates)._notEmpty()) {
+                    foreach ((int i, var dt) in list.AnnotationDates._enumerate()) {
+                        var label = list1.AnnotationLabels._nth(i);
+                        if (dt < startDt || label._isEmpty()) break;
+                        options.AddAnnotation(dt._toShortDateString(), label);
+                    }
                 }
             }
-            if (list.AnnotationDates._notEmpty()) {
-                foreach ((int i, var dt) in list.AnnotationDates._enumerate()) {
-                    var label = list.AnnotationLabels._nth(i);
-                    if (dt < startDt || label._isEmpty()) break;
-                    options.AddAnnotation(dt._toShortDateString(), label);
-                }
-            }
-            var predDate = PredictStartDate._toShortDateString();
-            options.AddAnnotation(predDate, predDate);
+            addCustomAnnotations(list1);
+            addCustomAnnotations(list2);
+            //var predDate = PredictStartDate._toShortDateString();
+            //options.AddAnnotation(predDate, "推定");
         }
 
         /// <summary>
@@ -433,7 +457,7 @@ namespace ChartBlazorApp.Models
             options.AnimationDuration = bAnimation ? 500 : 0;
             //options.tooltips.intersect = false;
             options.tooltips.SetCustomAverage(0, -1);
-            addAnnotations(options, SeriousRatesByAges, userData.ChartLabelStartDate);
+            addAnnotations(options, SeriousRatesByAges, null, userData.ChartLabelStartDate);
             options.legend.SetAlignEnd();
             options.legend.reverse = true;
             options.AddStackedAxis();
@@ -484,7 +508,7 @@ namespace ChartBlazorApp.Models
             options.AnimationDuration = bAnimation ? 500 : 0;
             //options.tooltips.intersect = false;
             options.tooltips.SetCustomAverage(0, -1);
-            addAnnotations(options, DeathRatesByAges, userData.ChartLabelStartDate);
+            addAnnotations(options, DeathRatesByAges, null, userData.ChartLabelStartDate);
             options.legend.SetAlignEnd();
             options.legend.reverse = true;
             options.AddStackedAxis();
@@ -541,10 +565,76 @@ namespace ChartBlazorApp.Models
         }
 
         /// <summary>
+        /// 高齢者陽性者数グラフ用データの作成
+        /// </summary>
+        /// <returns></returns>
+        public string MakeHighRiskJsonData(UserForecastData userData, bool onlyOnClick)
+        {
+            var dataSets = new List<Dataset>();
+            dataSets.Add(Dataset.CreateLine("  ", new double?[userData.DailyPredictDeath.Length], "rgba(0,0,0,0)", "rgba(0,0,0,0)")); // 凡例の右端マージン用ダミー
+            var dataList = InfectNumsByAges.DataSeriesList.Skip(1).ToArray();
+            //double?[] lowersBar = (dataList.Length-1)._range().Select(n => dataList[n+1].DataSeries[0..6].Sum() - dataList[n].DataSeries[0..6].Sum())._toNullableArray(0);
+            double?[] sixtiesBar = (dataList.Length-1)._range().Select(n => dataList[n+1].DataSeries._nth(6) - dataList[n].DataSeries._nth(6))._toNullableArray(0);
+            double?[] seventiesBar = (dataList.Length-1)._range().Select(n => dataList[n+1].DataSeries._nth(7) - dataList[n].DataSeries._nth(7))._toNullableArray(0);
+            double?[] highestBar = (dataList.Length-1)._range().Select(n => dataList[n+1].DataSeries._nth(8) - dataList[n].DataSeries._nth(8))._toNullableArray(0);
+            double?[] higherRates = (dataList.Length-1)._range().
+                Select(n =>
+                (double)(dataList[n+1].DataSeries[6..9].Sum() - dataList[n].DataSeries[6..9].Sum())
+                / (double)(dataList[n+1].DataSeries[0..9].Sum() - dataList[n].DataSeries[0..9].Sum()) * 100.0)._toNullableArray(1);
+            string[] colors = InfectNumsByAges.KeyValues._safeGet("colors")._split('|');
+            string[] hoverColors = InfectNumsByAges.KeyValues._safeGet("hovercolors")._split('|');
+            string[] lineColors = InfectNumsByAges.KeyValues._safeGet("linecolors")._split('|');
+            string col1 = colors._nth(1)._orElse("teal");
+            string col2 = colors._nth(2)._orElse("cornflowerblue");
+            string col3 = colors._nth(3)._orElse("lightslategray");
+            string hovCol1 = hoverColors._nth(1)._orElse("mediumblue");
+            string hovCol2 = hoverColors._nth(2)._orElse(hovCol1);
+            string hovCol3 = hoverColors._nth(3)._orElse(hovCol2);
+            string lineCol1 = lineColors._nth(0)._orElse("darkorange");
+            string lineCol2 = lineColors._nth(1)._orElse("yellow");
+            //dataSets.Add(Dataset.CreateBar("50代以下", lowersBar, colors._nth(0, "seagreen")).SetHoverColors("mediumblue").SetStackedAxisId());
+            dataSets.Add(Dataset.CreateBar("60代", sixtiesBar, col1).SetHoverColors(hovCol1).SetStackedAxisId().SetOrders(2, 3));
+            dataSets.Add(Dataset.CreateBar("70代", seventiesBar, col2).SetHoverColors(hovCol2).SetStackedAxisId().SetOrders(2, 2));
+            dataSets.Add(Dataset.CreateBar("80代以上", highestBar, col3).SetHoverColors(hovCol3).SetStackedAxisId().SetOrders(2, 1));
+            dataSets.Add(Dataset.CreateLine2("高齢者率(%:右軸)", higherRates, lineCol1, lineCol2).SetOrders(1, 4));
+
+            //double maxNum = (dataList.Length-1)._range().Select(n => dataList[n+1].DataSeries[0..9].Sum() - dataList[n].DataSeries[0..9].Sum()).Max();
+            //double y1_max = (((int)maxNum + 9999) / 10000) * 10000.0;
+            double maxNum = (dataList.Length-1)._range().Select(n => dataList[n+1].DataSeries[6..9].Sum() - dataList[n].DataSeries[6..9].Sum()).Max();
+            double y1_max = (((int)maxNum + 999) / 1000) * 1000.0;
+
+            double?[] dummyBars1 = highestBar.Select((v, i) => y1_max - (double)sixtiesBar[i] - (double)seventiesBar[i] - (double)v)._toNullableArray(0, 0);
+            dataSets.Add(Dataset.CreateBar("", dummyBars1, "rgba(0,0,0,0)").SetStackedAxisId().SetHoverColors("rgba(10,10,10,0.1)"));
+
+            double y1_min = 0;
+            double y1_step = (y1_max - y1_min) / 10;
+            double y2_max = 50;
+            double y2_min = 0;
+            double y2_step = (y2_max - y2_min) / 10;
+            Options options = Options.CreateTwoAxes(new Ticks(y1_max, y1_step, y1_min), new Ticks(y2_max, y2_step, y2_min));
+            options.AnimationDuration = 0;
+            //options.tooltips.intersect = false;
+            options.tooltips.SetCustomAverage(0, -1);
+            options.legend.SetAlignEnd();
+            options.legend.reverse = true;
+            options.AddStackedAxis();
+            options.SetOnlyClickEvent(onlyOnClick);
+
+            return new ChartJson {
+                type = "bar",
+                data = new Data {
+                    labels = dataList.Skip(1).Select(x => x.Date._toShortDateString()).ToArray(),
+                    datasets = dataSets.ToArray(),
+                },
+                options = options,
+            }._toString();
+        }
+
+        /// <summary>
         /// 日別死亡者数グラフ用データの作成
         /// </summary>
         /// <returns></returns>
-        public string MakeDailyDeathJonData(UserForecastData userData, UserForecastData userDataByUser, bool onlyOnClick)
+        public string MakeDailyDeathJsonData(UserForecastData userData, UserForecastData userDataByUser, bool onlyOnClick)
         {
             double maxDeath = 0;
             var dataSets = new List<Dataset>();
@@ -574,8 +664,7 @@ namespace ChartBlazorApp.Models
             options.AnimationDuration = 0;
             //options.tooltips.intersect = false;
             options.tooltips.SetCustomAverage(0, -1);
-            var predDate = PredictStartDate._toShortDateString();
-            //options.AddAnnotation(predDate, predDate);
+            addAnnotations(options, DeathRatesByAges, null, userData.ChartLabelStartDate);
             options.legend.SetAlignEnd();
             options.legend.reverse = true;
             options.AddStackedAxis();
@@ -605,8 +694,7 @@ namespace ChartBlazorApp.Models
             options.AnimationDuration = 0;
             options.tooltips.intersect = false;
             //options.tooltips.SetCustomAverage(0, -1);
-            var predDate = PredictStartDate._toShortDateString();
-            //options.AddAnnotation(predDate, predDate);
+            addAnnotations(options, SeriousRatesByAges, null, userData.ChartLabelStartDate);
             options.legend.SetAlignEnd();
             options.legend.reverse = true;
             options.AddStackedAxis();
@@ -644,8 +732,7 @@ namespace ChartBlazorApp.Models
             options.AnimationDuration = 0;
             options.tooltips.intersect = false;
             //options.tooltips.SetCustomAverage(0, -1);
-            var predDate = PredictStartDate._toShortDateString();
-            //options.AddAnnotation(predDate, predDate);
+            addAnnotations(options, DeathRatesByAges, null, userData.ChartLabelStartDate);
             options.legend.SetAlignEnd();
             options.legend.reverse = true;
             options.AddStackedAxis();
@@ -683,8 +770,7 @@ namespace ChartBlazorApp.Models
             options.AnimationDuration = 0;
             options.tooltips.intersect = false;
             //options.tooltips.SetCustomAverage(0, -1);
-            var predDate = PredictStartDate._toShortDateString();
-            //options.AddAnnotation(predDate, predDate);
+            addAnnotations(options, SeriousRatesByAges, DeathRatesByAges, userData.ChartLabelStartDate);
             options.legend.SetAlignEnd();
             options.legend.reverse = true;
             options.AddStackedAxis();
@@ -796,6 +882,8 @@ namespace ChartBlazorApp.Models
 
         /// <summary> チャート表示終了日(X軸日付ラベルの末日) </summary>
         public DateTime ChartLabelLastDate { get; set; }
+
+        public string ChartLabelLastDateStr { get { return ChartLabelLastDate.ToString("M月d日"); } }
 
         public DateTime LastRealDate { get { return ChartLabelStartDate.AddDays((RealDeath._length() - 1)._lowLimit(0)); } }
 

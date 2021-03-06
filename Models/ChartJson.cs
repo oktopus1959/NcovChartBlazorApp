@@ -60,9 +60,14 @@ namespace ChartBlazorApp.Models
         public string xAxisID { get; set; } = null;
         public string yAxisID { get; set; } = "y-1";
 
-        public static Dataset CreateBar(string label, double?[] data, string color)
+        public static Dataset CreateBar(string label, double?[] data, string color, string yAxis = "y-1")
         {
-            return new Dataset { label = label, data = data, borderColor = color, backgroundColor = color, order = 5 };
+            return new Dataset { label = label, data = data, borderColor = color, backgroundColor = color, order = 5, yAxisID = yAxis };
+        }
+
+        public static Dataset CreateBar2(string label, double?[] data, string color)
+        {
+            return CreateBar(label, data, color, "y-2");
         }
 
         public static Dataset CreateLine(string label, double?[] data, string bdColor, string bgColor, string yAxis = "y-1")
@@ -279,17 +284,17 @@ namespace ChartBlazorApp.Models
             };
         }
 
-        public Options AddStackedAxis()
+        public Options AddStackedAxis(int yAxisTgt = 0)
         {
-            return AddStackedAxis("x-stacked", "y-stacked");
+            return AddStackedAxis("x-stacked", "y-stacked", yAxisTgt);
         }
 
-        public Options AddStackedAxis(string xAxisId, string yAxisId)
+        public Options AddStackedAxis(string xAxisId, string yAxisId, int yAxisTgt = 0)
         {
             scales.xAxes = scales.xAxes._extend(scales.xAxes._safeCount() + 1);
             scales.yAxes = scales.yAxes._extend(scales.yAxes._safeCount() + 1);
             scales.xAxes[^1] = new Xaxis() { id = xAxisId, stacked = true, display = false };
-            scales.yAxes[^1] = new Yaxis() { id = yAxisId, stacked = true, display = false, ticks = scales.yAxes[0].ticks };
+            scales.yAxes[^1] = new Yaxis() { id = yAxisId, stacked = true, display = false, ticks = scales.yAxes[yAxisTgt].ticks };
             return this;
         }
 

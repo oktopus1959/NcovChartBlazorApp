@@ -218,5 +218,8 @@ namespace ChartBlazorApp.Models
         public const int RADIO_IDX_MAX = MAIN_PREF_NUM + FAVORITE_PREF_MAX;
 
         /*** EffectiveParams.cs ***/
+        /// <summary> 「自動」の場合の表示開始日 </summary>
+        public static DateTime AutoDispStartDate => DateTime.Now.AddMonths(-(6 + (DateTime.Now.Month % 3)))._toFirstInMonth();
+
     }
 }

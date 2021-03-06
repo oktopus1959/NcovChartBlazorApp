@@ -137,7 +137,11 @@ namespace ChartBlazorApp.Pages
 
         private int _latestPositives => (int)_infectData.Newly._last();
 
+        private int _latestAverage => (int)_infectData.Average._last()._round(0);
+
         private double _latestRt => _infectData.Rt._last();
+
+        private int _latestSerious => (int)_infectData.Serious._last();
 
         private string _dispStartDate => _effectiveParams.DispStartDate;
 
@@ -154,11 +158,14 @@ namespace ChartBlazorApp.Pages
         private double _yAxisMax { get { return _effectiveParams.YAxisMax; } }
         private int _yAxisMaxUser { get { return _effectiveParams.CurrentSettings.myYAxisMax(); } }
 
-        //private double _yAxisMin { get { return _effectiveParams.YAxisMin; } }
-        private double _yAxisMin { get; set; } = 0;
+        private double _yAxisFixed { get { return _effectiveParams.YAxisFixed; } }
+
+        private bool _useYAxis1Fixed { get; set; } = false;
 
         private double _yAxis2Max { get { return _effectiveParams.YAxis2Max; } }
         private string _yAxis2MaxUser { get { var y2max = _effectiveParams.CurrentSettings.myYAxis2Max(); return y2max > 0 ? $"{y2max:f1}" : ""; } }
+
+        private double _yAxis2SeriousFixed { get { return _effectiveParams.YAxis2SeriousFixed; } }
 
         private bool _drawExpectation { get { bool flag = _effectiveParams.DrawExpectation; if (flag) _drawExpectationChecked = true; return flag; } }
 
@@ -170,17 +177,21 @@ namespace ChartBlazorApp.Pages
 
         private bool _posiRatePercent { get { return _effectiveParams.PosiRatePercent; } }
 
+        private bool _drawDistPositives { get { return _effectiveParams.DrawDistPositives; } }
+
+        private bool _drawSerious { get; set; }
+
         private bool _detailSettings { get { return _effectiveParams.DetailSettings; } }
 
         private bool _fourstepSettings { get { return _effectiveParams.FourstepSettings; } }
 
         private bool _fourstepDataDefault { get { return _effectiveParams.FourstepDataDefault; } }
 
-        private bool _useYAxis1LowerLimt { get; set; } = false;
-
         private bool _onlyOnClick { get { return _effectiveParams.OnlyOnClick; } }
 
         private bool _expectOverReal { get { return _effectiveParams.ExpectOverReal; } }
+
+        private bool _drawRevRt { get; set; } = false;
 
         private int _extensionDays { get { return _effectiveParams.ExtensionDays; } }
 
@@ -196,7 +207,7 @@ namespace ChartBlazorApp.Pages
 
         private double _postDecayFactorRt2 { get { return _effectiveParams.PostDecayFactorRt2; } }
 
-        private string _events => _effectiveParams.Events;
+        private string _userEvents => _effectiveParams.CurrentSettings.myEvents();
 
         //private string _paramDate { get { return _effectiveParams.MyParamStartDate()._orElse(() => _infectData.FindRecentMaxRtDateStr(_localMaxRtDuration))._orElse(() => _infectData.InitialDecayParam.StartDate._toDateString()); } }
         private string _paramDate { get { return _effectiveParams.ParamStartDate; } }
@@ -384,23 +395,21 @@ namespace ChartBlazorApp.Pages
         public async Task ChangeYAxisMax(ChangeEventArgs args)
         {
             var val = args.Value.ToString();
-            if (val._startsWith("#")) {
-                //_effectiveParams.CurrentSettings.changeYAxisMin(val.Trim('#')._parseInt(0));
-                _yAxisMin = val.Trim('#')._parseInt(0);
-            } else {
-                if (val._equalsTo("自動")) val = "";
-                _effectiveParams.CurrentSettings.changeYAxisMax(val._parseInt(0)._geZeroOr(0));
-            }
+            if (val._equalsTo("自動")) val = "";
+            _effectiveParams.CurrentSettings.changeYAxisMax(val._parseInt(0)._geZeroOr(0));
             await RenderChartMethod();
         }
 
-        public async Task UseYAxisLowerLimit(ChangeEventArgs args)
+        public async Task ChangeYAxisFixed(ChangeEventArgs args)
         {
-            _useYAxis1LowerLimt = (bool)args.Value;
-            if (!_useYAxis1LowerLimt) {
-                _yAxisMin = 0;
-                await RenderChartMethod();
-            }
+            _effectiveParams.CurrentSettings.changeYAxisFixed(args.Value.ToString()._parseInt(0));
+            await RenderChartMethod();
+        }
+
+        public async Task UseYAxisFixed(ChangeEventArgs args)
+        {
+            _useYAxis1Fixed = (bool)args.Value;
+            await RenderChartMethod();
         }
 
         public async Task ChangeYAxis2Max(ChangeEventArgs args)
@@ -411,10 +420,19 @@ namespace ChartBlazorApp.Pages
             await RenderChartMethod();
         }
 
+        public async Task ChangeYAxis2SeriousFixed(ChangeEventArgs args)
+        {
+            var val = args.Value.ToString();
+            if (val._equalsTo("自動")) val = "";
+            _effectiveParams.CurrentSettings.changeYAxis2SeriousFixed(val._parseInt(0));
+            await RenderChartMethod();
+        }
+
         public async Task RenderExpectationCurveMethod(ChangeEventArgs args)
         {
             _effectiveParams.CurrentSettings.setDrawExpectation((bool)args.Value);
-            await RenderChartMethod(false, true);
+            await NormalMode();
+            //await RenderChartMethod(false, true);
         }
 
         /// <summary> 基準日<summary>
@@ -474,6 +492,12 @@ namespace ChartBlazorApp.Pages
         public async Task ChangeExpOverReal(ChangeEventArgs args)
         {
             _effectiveParams.CurrentSettings.setExpectOverReal((bool)args.Value);
+            await RenderChartMethod();
+        }
+
+        public async Task DrawRevRt(ChangeEventArgs args)
+        {
+            _drawRevRt = (bool)args.Value;
             await RenderChartMethod();
         }
 
@@ -828,6 +852,13 @@ namespace ChartBlazorApp.Pages
             await RenderChartMethod(false, _barWidth < _estimatedBarMinWidth);
         }
 
+        public async Task DrawSerious(ChangeEventArgs args)
+        {
+            _drawSerious = (bool)args.Value;
+            _cancellable = false;
+            await RenderChartMethod();
+        }
+
         public async Task DrawPosiRates(ChangeEventArgs args)
         {
             _effectiveParams.CurrentSettings.setDrawPosiRates((bool)args.Value);
@@ -842,11 +873,19 @@ namespace ChartBlazorApp.Pages
             await RenderChartMethod();
         }
 
-        public async Task ShowDetailSettings(ChangeEventArgs args)
+        public async Task DrawDistPositives(ChangeEventArgs args)
+        {
+            _effectiveParams.CurrentSettings.setDrawDistPositives((bool)args.Value);
+            _cancellable = false;
+            await RenderChartMethod();
+        }
+
+        public async Task UserScenarioSettings(ChangeEventArgs args)
         {
             _effectiveParams.CurrentSettings.setDetailSettings((bool)args.Value);
             _cancellable = false;
-            await RenderChartMethod();
+            await NormalMode();
+            //await RenderChartMethod();
         }
 
         public async Task ChangeEasyOrFourstepSettings(ChangeEventArgs args)
@@ -1084,7 +1123,7 @@ namespace ChartBlazorApp.Pages
         {
             await changeRtParam(args.Value.ToString(), ":",
                 (val) => _effectiveParams.CurrentSettings.setEvent(val),
-                () => _effectiveParams.Events,
+                () => _effectiveParams.CurrentSettings.myEvents(),
                 (val) => _effectiveParams.CurrentSettings.setEvent(val));
         }
 
@@ -1144,6 +1183,30 @@ namespace ChartBlazorApp.Pages
                 return 150000;
             } else {
                 return ((newlyMax + 100000) / 100000) * 100000.0;
+            }
+        }
+
+        private double calcSeriousMax(double[] serious, int begin)
+        {
+            int serMax = (int)(serious[begin..].Max() / 0.9);
+            if (serMax <= 20) {
+                return 20;
+            } else if (serMax <= 50) {
+                return 50;
+            //} else if (serMax < 200) {
+            //    return 200.0;
+            } else if (serMax < 1000) {
+                return ((serMax + 100) / 100) * 100.0;
+            } else if (serMax < 10000) {
+                return ((serMax + 1000) / 1000) * 1000.0;
+            } else if (serMax < 15000) {
+                return 15000;
+            } else if (serMax < 100000) {
+                return ((serMax + 10000) / 10000) * 10000.0;
+            } else if (serMax < 150000) {
+                return 150000;
+            } else {
+                return ((serMax + 100000) / 100000) * 100000.0;
             }
         }
 
@@ -1209,6 +1272,7 @@ namespace ChartBlazorApp.Pages
                     $"exp={_drawExpectation}, " +
                     $"det={_detailSettings}, " +
                     $"est={_estimatedBar}, " +
+                    $"ser={_drawSerious}, " +
                     $"pos={_drawPosiRates}, " +
                     //$"rtDur={_localMaxRtDuration}, " +
                     $"expDt={rtp?.EffectiveStartDate.ToShortDateString()}, " +
@@ -1238,43 +1302,46 @@ namespace ChartBlazorApp.Pages
                         logger.Debug(() => $"AveErr: {predData.CalcAverageMSE(infData.Average, realDays - Constants.AVERAGE_ERR_TAIL_DURATION, realDays):f3}");
                     }
                     //dispDays = Math.Max(realDays + 21, predDays) + 1;
-                    dispDays = Math.Max(realDays + extensionDays, predDays) + 1;
+                    dispDays = Math.Max(realDays + extensionDays, predDays) + 1;    // 日付(X軸)は1日分、余分に表示する
 
                     var dataSets = new List<Dataset>();
 
-                    if (ConsoleLog.DEBUG_LEVEL > 1) {
-                        if (predData != null) {
-                            dataSets.Add(Dataset.CreateDotLine("逆算推計移動平均", predData.RevPredAverage.Take(dispDays)._toNullableArray(1), "darkblue"));
-                            //dataSets.Add(Dataset.CreateDotLine2("逆算Rt", predData.RevRt.Take(predData.DispDays)._toNullableArray(1), "crimson"));
-                        }
+                    if (predData != null && !_drawSerious) {
+                        if (ConsoleLog.DEBUG_LEVEL > 1) { dataSets.Add(Dataset.CreateDotLine("逆算推計移動平均", predData.RevPredAverage.Take(predDays)._toNullableArray(1), "darkblue")); }
+                        if (_estimatedBar && _drawRevRt) { dataSets.Add(Dataset.CreateDotLine2("逆算Rt", predData.RevRt.Take(predDays)._toNullableArray(3), "deeppink").SetDispOrder(7)); }
                     }
 
                     if (bTailPadding) { dataSets.Add(Dataset.CreateLine("                ", new double?[fullDates.Count], "rgba(0,0,0,0)", "rgba(0,0,0,0)")); }
-                    double?[] predRts = null;
-                    double?[] predAverage = null;
-                    if (predData != null) {
-                        int dashLineOrder = _expectOverReal ? 1 : 3;
-                        predRts = predData.FullPredRt.Take(predDays)._toNullableArray(3);
-                        dataSets.Add(Dataset.CreateDashLine2("近似実効再生産数", predRts, "brown").SetOrder(dashLineOrder).SetDispOrder(6));
-                        predAverage = predData.PredAverage.Take(predDays)._toNullableArray(1);
-                        dataSets.Add(Dataset.CreateDashLine("近似移動平均", predAverage, "darkgreen").SetOrder(dashLineOrder).SetDispOrder(4));
-                    }
+
                     int lineOrder = _expectOverReal ? 3 : 1;
-                    double?[] realRts = infData.Rt.Take(realDays)._toNullableArray(3);
-                    dataSets.Add(Dataset.CreateLine2("実効再生産数(右軸)", realRts, "darkorange", "yellow").SetOrder(lineOrder).SetDispOrder(5));
-                    if (_drawPosiRates) {
-                        double?[] realPosiRates = infData.PosiRates.Take(realDays).Select(r => _posiRatePercent ? r * 100 : r * 10)._toNullableArray(_posiRatePercent ? 1 : 2);
-                        dataSets.Add(Dataset.CreateLine2($"7日間陽性率{(_posiRatePercent ? "(%:" : "x10(")}右軸)", realPosiRates, "darkviolet", "lightpink").SetOrder(lineOrder).SetDispOrder(7));
+                    if (!_drawSerious) {
+                        double?[] predRts = null;
+                        double?[] predAverage = null;
+                        if (predData != null) {
+                            int dashLineOrder = _expectOverReal ? 1 : 3;
+                            predRts = predData.FullPredRt.Take(predDays)._toNullableArray(3);
+                            dataSets.Add(Dataset.CreateDashLine2("近似実効再生産数", predRts, "brown").SetOrder(dashLineOrder).SetDispOrder(6));
+                            predAverage = predData.PredAverage.Take(predDays)._toNullableArray(1);
+                            dataSets.Add(Dataset.CreateDashLine("近似移動平均", predAverage, "darkgreen").SetOrder(dashLineOrder).SetDispOrder(4));
+                        }
+                        double?[] realRts = infData.Rt.Take(realDays)._toNullableArray(3);
+                        dataSets.Add(Dataset.CreateLine2("実効再生産数(右軸)", realRts, "darkorange", "yellow").SetOrder(lineOrder).SetDispOrder(5));
+                        if (_drawPosiRates) {
+                            double?[] realPosiRates = infData.PosiRates.Take(realDays).Select(r => _posiRatePercent ? r * 100 : r * 10)._toNullableArray(_posiRatePercent ? 1 : 2);
+                            dataSets.Add(Dataset.CreateLine2($"7日間陽性率{(_posiRatePercent ? "(%:" : "x10(")}右軸)", realPosiRates, "darkviolet" /*"mediumorchid"*/, "lightpink").SetOrder(lineOrder).SetDispOrder(7));
+                        }
                     }
                     double?[] realAverage = infData.Average.Take(realDays).Select(x => x > 0 ? x : 0.00001)._toNullableArray(1);
                     dataSets.Add(Dataset.CreateLine("陽性者数移動平均", realAverage, "darkblue", "lightblue").SetOrder(lineOrder).SetDispOrder(3));
-                    double?[] positives = infData.Newly.Take(realDays)._toNullableArray(0, 0);
-                    var positiveDataset = Dataset.CreateBar("新規陽性者数", positives, "royalblue").SetHoverColors("mediumblue").SetDispOrder(1);
+
+                    double[] newly = _drawDistPositives ? infData.DistNewly : infData.Newly;
+                    //double?[] positives = newly.Take(realDays)._toNullableArray(0, 0);
+                    //var positiveDataset = Dataset.CreateBar("新規陽性者数", positives, "royalblue").SetHoverColors("mediumblue").SetDispOrder(1);
 
                     (double, double) calcYAxis1Scale(double yMax) {
                         if (yMax <= 0) {
-                            int begin = (infData.Newly.Length - Constants.Y_MAX_CALC_DURATION)._lowLimit(0);
-                            yMax = calcY1Max(infData.Newly, begin);
+                            int begin = (newly.Length - Constants.Y_MAX_CALC_DURATION)._lowLimit(0);
+                            yMax = calcY1Max(newly, begin);
                             if (predData != null) {
                                 yMax = Math.Max(yMax, calcY1Max(predData.PredAverage, begin));
                                 if (_estimatedBar) yMax = Math.Max(yMax, calcY1Max(predData.PredNewly, begin));
@@ -1282,18 +1349,28 @@ namespace ChartBlazorApp.Pages
                         }
                         return (yMax, yMax / 10);
                     }
-                    (double, double) calcYAxis2Scale(double yMax) {
-                        if (yMax <= 0) {
-                            yMax = calcRtMax(infData.Rt);
-                            if (_drawPosiRates) {
-                                double yMaxPr = calcPosiRateMax(infData.PosiRates);
-                                if (yMax < yMaxPr || yMax > yMaxPr * 1.5) yMax = yMaxPr;
+                    (double, double) calcYAxis2Scale() {
+                        double yMax = 0;
+                        if (_drawSerious) {
+                            yMax = _yAxis2SeriousFixed;
+                            if (yMax <= 0) {
+                                int begin = (infData.Serious.Length - Constants.Y_MAX_CALC_DURATION)._lowLimit(0);
+                                yMax = calcSeriousMax(infData.Serious, begin);
+                            }
+                        } else {
+                            yMax = _drawPosiRates && _posiRatePercent ? 20 : _yAxis2Max;
+                            if (yMax <= 0) {
+                                yMax = calcRtMax(infData.Rt);
+                                if (_drawPosiRates) {
+                                    double yMaxPr = calcPosiRateMax(infData.PosiRates);
+                                    if (yMax < yMaxPr || yMax > yMaxPr * 1.5) yMax = yMaxPr;
+                                }
                             }
                         }
                         return (yMax, yMax / (yMax == 2.5 ? 5 : 10));
                     }
-                    (double y1_max, double y1_step) = calcYAxis1Scale(_yAxisMax._lowLimit(_yAxisMin));
-                    (double y2_max, double y2_step) = calcYAxis2Scale(_drawPosiRates && _posiRatePercent ? 20 : _yAxis2Max);
+                    (double y1_max, double y1_step) = calcYAxis1Scale(_useYAxis1Fixed ? _yAxisFixed : _yAxisMax);
+                    (double y2_max, double y2_step) = calcYAxis2Scale();
 
                     Options options = Options.CreateTwoAxes(new Ticks(y1_max, y1_step), new Ticks(y2_max, y2_step));
                     if (!bAnimation) options.AnimationDuration = 0;
@@ -1301,40 +1378,73 @@ namespace ChartBlazorApp.Pages
                     options.legend.reverse = true;  // 凡例の表示を登録順とは逆順にする
                     options.SetOnlyClickEvent(_onlyOnClick);
                     // イベントアノテーションの追加
-                    string events = _events._isEmpty() ? _extraEvents : _extraEvents._isEmpty() ? _events : $"{_events},{_extraEvents}";
+                    string events = _userEvents;
+                    if (events._getFirst() == '!') {
+                        events = events._substring(1);
+                    } else {
+                        events = $"{_effectiveParams.getSystemEvents()},{events}";
+                    }
+                    events = $"{events},{_extraEvents}";
                     foreach (var evt in events._split(',')) {
-                        var items = evt._split2(':');
-                        var val = items._nth(0)._strip();
-                        var label = items._nth(1);
-                        if (val._notEmpty() && label._notEmpty())
-                            options.AddAnnotation(val._toCanonicalMMDD(), label);
+                        if (evt._notEmpty()) {
+                            var items = evt._split2(':');
+                            var val = items._nth(0)._strip();
+                            var label = items._nth(1);
+                            if (val._notEmpty() && label._notEmpty())
+                                options.AddAnnotation(val._toCanonicalMMDD(), label);
+                        }
                     }
                     chartData.options = options;
 
-                    if (predData != null && _estimatedBar) {
-                        options.tooltips.intersect = false;
-                        options.tooltips.SetCustomHighest();
-                        dataSets.Add(positiveDataset);
-                        dataSets.Add(Dataset.CreateBar("推計陽性者数", predData.PredNewly.Take(predDays)._toNullableArray(0), "darkgray").SetHoverColors("darkseagreen").SetDispOrder(2));
-                    } else {
-                        options.AddStackedAxis();
-                        options.tooltips.SetCustomFixed();
-                        dataSets.Add(positiveDataset.SetStackedAxisId());
-                        //double?[] dummyBars = calcDummyData(predDays, positives, realAverage, predAverage, realRts, predRts, y1_max, y2_max);
-                        double?[] dummyBar = positives.Select(v => y1_max - (v ?? 0)).ToArray()._extend(predDays, y1_max)._toNullableArray(0, 0);
+                    if (_drawSerious) {
+                        double?[] serious = infData.Serious.Take(realDays)._toNullableArray(0);
+                        var seriousDs = Dataset.CreateBar2("重症者数(右軸)", serious, "steelblue").SetHoverColors("mediumblue").SetDispOrder(1);
+                        options.AddStackedAxis(1);
+                        options.tooltips.SetCustomAverage(0, -1);
+                        dataSets.Add(seriousDs.SetStackedAxisId());
+                        double?[] dummyBar = serious.Select(v => y1_max - (v ?? 0)).ToArray()._extend(predDays, y1_max)._toNullableArray(0, 0);
                         dataSets.Add(Dataset.CreateBar("", dummyBar, "rgba(0,0,0,0)").SetStackedAxisId().SetHoverColors("rgba(10,10,10,0.1)").SetDispOrder(100));
-                        //double?[] dummyBars = Dataset.CalcDummyData(predDays,
-                        //    new double?[][] { positives }, new double?[][] { realAverage, predAverage }, new double?[][] { realRts, predRts },
-                        //    y1_max, y2_max);
-                        //dataSets.Add(Dataset.CreateBar("", dummyBars, "rgba(0,0,0,0)").SetStackedAxisId().SetHoverColors("rgba(10,10,10,0.1)").SetDispOrder(100));
+                    } else {
+                        double?[] positives = newly.Take(realDays)._toNullableArray(0, 0);
+                        var positiveDataset = Dataset.CreateBar("新規陽性者数", positives, "royalblue").SetHoverColors("mediumblue").SetDispOrder(1);
+                        if (predData != null && _estimatedBar) {
+                            options.tooltips.intersect = false;
+                            options.tooltips.SetCustomHighest();
+                            dataSets.Add(positiveDataset);
+                            dataSets.Add(Dataset.CreateBar("推計陽性者数", predData.PredNewly.Take(predDays)._toNullableArray(0), "darkgray").SetHoverColors("darkseagreen").SetDispOrder(2));
+                        } else {
+                            options.AddStackedAxis();
+                            options.tooltips.SetCustomFixed();
+                            dataSets.Add(positiveDataset.SetStackedAxisId());
+                            //double?[] dummyBars = calcDummyData(predDays, positives, realAverage, predAverage, realRts, predRts, y1_max, y2_max);
+                            double?[] dummyBar = positives.Select(v => y1_max - (v ?? 0)).ToArray()._extend(predDays, y1_max)._toNullableArray(0, 0);
+                            dataSets.Add(Dataset.CreateBar("", dummyBar, "rgba(0,0,0,0)").SetStackedAxisId().SetHoverColors("rgba(10,10,10,0.1)").SetDispOrder(100));
+                            //double?[] dummyBars = Dataset.CalcDummyData(predDays,
+                            //    new double?[][] { positives }, new double?[][] { realAverage, predAverage }, new double?[][] { realRts, predRts },
+                            //    y1_max, y2_max);
+                            //dataSets.Add(Dataset.CreateBar("", dummyBars, "rgba(0,0,0,0)").SetStackedAxisId().SetHoverColors("rgba(10,10,10,0.1)").SetDispOrder(100));
+                        }
                     }
-                    double?[] rt1Line = new double?[fullDates.Count];
-                    rt1Line[0] = rt1Line[^1] = 1.0;
-                    var rtBaseline = Dataset.CreateLine2("RtBaseline", rt1Line, "grey", null).SetOrders(100, 100);
-                    rtBaseline.borderWidth = 1.2;
-                    rtBaseline.pointRadius = 0;
-                    rtBaseline.spanGaps = true;
-                    dataSets.Add(rtBaseline);
+
+                    //Rt=1のライン
+                    if (!_drawSerious) {
+                        double?[] rt1Line = new double?[fullDates.Count];
+                        rt1Line[0] = rt1Line[^1] = 1.0;
+                        var rtBaseline = Dataset.CreateLine2("RtBaseline", rt1Line, "grey", null).SetOrders(100, 100);
+                        rtBaseline.borderWidth = 1.2;
+                        rtBaseline.pointRadius = 0;
+                        rtBaseline.spanGaps = true;
+                        dataSets.Add(rtBaseline);
+
+                        //陽性者数が前週比70%相当のRtライン
+                        //double?[] rt2Line = new double?[fullDates.Count];
+                        //rt2Line[0] = rt2Line[^1] = 0.775;
+                        //var rtBaseline2 = Dataset.CreateDotLine2("RtBaseline", rt2Line, "grey").SetOrders(100, 100);
+                        //rtBaseline2.borderWidth = 1.2;
+                        //rtBaseline2.pointRadius = 0;
+                        //rtBaseline2.spanGaps = true;
+                        //dataSets.Add(rtBaseline2);
+                    }
 
                     chartData.data = new Data {
                         labels = fullDates.Take(dispDays).ToArray(),

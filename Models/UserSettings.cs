@@ -29,7 +29,8 @@ namespace ChartBlazorApp.Models
         public int barWidth { get; set; }
         public int lastBarWidthRange { get; set; }
 
-        public int yAxisMin { get; set; }
+        public int yAxisFixed { get; set; }
+        public int yAxis2SeriousFixed { get; set; }
 
         public int[] yAxisMax { get; set; }
         public double[] yAxis2Max { get; set; }
@@ -39,6 +40,7 @@ namespace ChartBlazorApp.Models
         public int estimatedBarMinWidth { get; set; }
         public bool drawPosiRates { get; set; }
         public bool posiRatePercent { get; set; }
+        public bool drawDistPositives { get; set; }
         public bool detailSettings { get; set; }
         public bool fourstepSettings { get; set; }
         public bool onlyOnClick { get; set; }
@@ -137,7 +139,8 @@ namespace ChartBlazorApp.Models
             favorPrefIdxes = new int[Constants.FAVORITE_PREF_MAX];
             barWidth = 0;
             lastBarWidthRange = 0;
-            yAxisMin = 0;
+            yAxisFixed = 0;
+            yAxis2SeriousFixed = 0;
             yAxisMax = new int[numData];
             yAxis2Max = new double[numData];
             drawExpectation = false;
@@ -145,6 +148,7 @@ namespace ChartBlazorApp.Models
             estimatedBarMinWidth = 0;
             drawPosiRates = false;
             posiRatePercent = false;
+            drawDistPositives = false;
             detailSettings = false;
             fourstepSettings = false;
             onlyOnClick = false;
@@ -339,9 +343,14 @@ namespace ChartBlazorApp.Models
             if (yAxisMax.Length > dataIdx) yAxisMax[dataIdx] = value;
         }
 
-        public void changeYAxisMin(int value)
+        public void changeYAxisFixed(int value)
         {
-            yAxisMin = value;
+            yAxisFixed = value;
+        }
+
+        public void changeYAxis2SeriousFixed(int value)
+        {
+            yAxis2SeriousFixed = value;
         }
 
         public void changeYAxis2Max(double value)
@@ -469,6 +478,10 @@ namespace ChartBlazorApp.Models
         public void setDrawPosiRates(bool value)
         {
             drawPosiRates = value;
+        }
+        public void setDrawDistPositives(bool value)
+        {
+            drawDistPositives = value;
         }
         public void setDetailSettings(bool value)
         {

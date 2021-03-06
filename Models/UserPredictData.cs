@@ -110,20 +110,24 @@ namespace ChartBlazorApp.Models
             revAveAverage = revAveAverage.Take(totalDays).ToArray();
 
             // 推計陽性者数(3週平均)
-            double[] predNewlyMean = calcPredictInfectMean(infData.Newly, infData.Average, revAveAverage, realDays, predStartIdx);
+            double[] predNewlyMean = calcPredictInfectMean(infData.DistNewly, infData.Average, revAveAverage, realDays, predStartIdx);
 
             // 推計陽性者数(前週差分)
-            //PredNewly = predictInfect(infData.Newly, predNewlyMean, PrePredAverage, realDays, predStartIdx);
+            //PredNewly = predictInfect(infData.DistNewly, predNewlyMean, PrePredAverage, realDays, predStartIdx);
 
             // 累積推計の計算
             double predTotal = 0;
-            double[] predTotals = predNewlyMean.Select((n, i) => predTotal += (n > 0 ? n : infData.Newly._nth(i))).ToArray();
+            double[] predTotals = predNewlyMean.Select((n, i) => predTotal += (n > 0 ? n : infData.DistNewly._nth(i))).ToArray();
+
+            // 逆算推計移動平均
+            double[] revPredAverage = predTotals.Select((_, i) => i >= 7 ? (predTotals[i] - predTotals[i - 7]) / 7.0 : 0.0).ToArray();
 
             // 逆算移動平均による推計陽性者数の調整
             int predEnd = (predStartIdx + predRtLen)._highLimit(revAveAverage.Length);
             for (int predChkIdx = predStartIdx + 1; predChkIdx < predEnd; predChkIdx += 7) {
                 int chkEnd = (predChkIdx + 7)._highLimit(predEnd) - 1;
-                double adjustFact = revAveAverage[chkEnd] / ((predTotals[chkEnd] - predTotals[predChkIdx]) / (chkEnd - predChkIdx));   // 推計移動平均と逆算移動平均の相違率
+                double adjustFact = revPredAverage[chkEnd] > 0 ? revAveAverage[chkEnd] / revPredAverage[chkEnd] : 1.0;   // 推計移動平均と逆算移動平均の相違率
+                if (adjustFact._isNaN()) logger.Warn("adjustFact is NaN");
                 for (int i = predChkIdx; i <= chkEnd; ++i) {
                     predNewlyMean[i] = predNewlyMean[i] * adjustFact;
                 }
@@ -131,7 +135,7 @@ namespace ChartBlazorApp.Models
 
             // 累積推計の再計算
             predTotal = 0;
-            predTotals = predNewlyMean.Select((n, i) => predTotal += (n > 0 ? n : infData.Newly._nth(i))).ToArray();
+            predTotals = predNewlyMean.Select((n, i) => predTotal += (n > 0 ? n : infData.DistNewly._nth(i))).ToArray();
 
             // 逆算Rt
             double[] revRt = new double[totalDays];
@@ -148,7 +152,7 @@ namespace ChartBlazorApp.Models
             // 推計陽性者数
             PredNewly = skip_and_take(predNewlyMean);
             // 逆算推計移動平均
-            RevPredAverage = skip_and_take(predTotals.Select((_, i) => i >= 7 ? (predTotals[i] - predTotals[i - 7]) / 7.0 : 0.0));
+            RevPredAverage = skip_and_take(revPredAverage);
             // 逆算Rt
             RevRt = skip_and_take(revRt);
 

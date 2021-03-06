@@ -1,4 +1,8 @@
-﻿function insertDescription(divId, html) {
+﻿function getScreenWidth() {
+    return screen.width;
+}
+
+function insertDescription(divId, html) {
     initializeDescription();
     document.getElementById(divId).innerHTML = html;
 }
@@ -322,12 +326,15 @@ function ChartDrawer(wrapperId) {
                         value = Math.round(value * 100) / 10;
                         suffix = "%";
                     } else {
-                        newLabel = oldLabel.replace("%:", "");
+                        newLabel = oldLabel.replace("%:", "").replace("(%)", "");
                         if (newLabel != oldLabel) {
                             suffix = "%";
                         }
                     }
-                    return newLabel.replace("(右軸)", "") + ": " + value + suffix;
+                    return newLabel.replace("陽性者数移動平均", "平均陽性者数").
+                        replace("近似実効再生産数", "近似再生産数").
+                        replace("逆算Rt", "逆算再生産数").
+                        replace("(右軸)", "").replace(/代$/, "代　　").replace(/実数$/, "実数　") + ": " + value + suffix;
                 }
                 return "";
             }

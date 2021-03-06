@@ -37,6 +37,8 @@ namespace ChartBlazorApp.Pages
 
         //private InfectData _infectData0 { get { return dailyData.InfectDataList[0]; } }
 
+        private int _screenWidth = 0;
+
         private async Task insertStaticDescription()
         {
             await JSRuntime._insertHtmlFile("wwwroot/html/Forecast-desc1.html", "forecast-desc1");
@@ -52,6 +54,11 @@ namespace ChartBlazorApp.Pages
         {
             logger.Info($"CALLED");
             _effectiveParams = await EffectiveParams.CreateByGettingUserSettings(JSRuntime, dailyData);
+        }
+
+        private async Task getScreenWidth()
+        {
+            _screenWidth = await JSRuntime._getScreenWidth();
         }
 
         private void initializeTimeMachineInfectData()
@@ -72,6 +79,7 @@ namespace ChartBlazorApp.Pages
         {
             if (firstRender) {
                 logger.Info($"CALLED");
+                await getScreenWidth();
                 await insertStaticDescription();
                 await getSettings();
                 initializeTimeMachineInfectData();
@@ -175,24 +183,40 @@ namespace ChartBlazorApp.Pages
 
             bool onlyOnClick = _effectiveParams.OnlyOnClick;
             int barWidth = _thinBar ? -4 : -2;
+            int barWidth2 = _thinBar ? -1 : 2;
 
             string jsonStr;
 
             jsonStr = forecastData.MakeSeriousJsonData(_userData, userDataByUser, onlyOnClick, bAnimation);
             await JSRuntime._renderChart2("chart-wrapper-serious", barWidth, newlyDaysRatio(), jsonStr);
 
+            //await Task.Delay(200);
+
             jsonStr = forecastData.MakeDeathJsonData(_userData, userDataByUser, onlyOnClick, bAnimation);
             await JSRuntime._renderChart2("chart-wrapper-death", barWidth, newlyDaysRatio(), jsonStr);
 
+            await Task.Delay(300);
+
+            jsonStr = forecastData.MakeHighRiskJsonData(_userData, onlyOnClick);
+            await JSRuntime._renderChart2("chart-wrapper-highrisk", barWidth2, 100, jsonStr);
+
+            //await Task.Delay(200);
+
+            jsonStr = forecastData.MakeDailyDeathJsonData(_userData, userDataByUser, onlyOnClick);
+            await JSRuntime._renderChart2("chart-wrapper-dailydeath", barWidth, newlyDaysRatio(), jsonStr);
+
             if (_showOtherCharts) {
-                jsonStr = forecastData.MakeDailyDeathJonData(_userData, userDataByUser, onlyOnClick);
-                await JSRuntime._renderChart2("chart-wrapper-dailydeath", barWidth, newlyDaysRatio(), jsonStr);
+                await Task.Delay(300);
 
                 jsonStr = forecastData.MakeSeriousDiffJsonData(_userData, onlyOnClick);
                 await JSRuntime._renderChart2("chart-wrapper-seriousdiff", barWidth, 100, jsonStr);
 
+                await Task.Delay(200);
+
                 jsonStr = forecastData.MakeDeathDiffJsonData(_userData, onlyOnClick);
                 await JSRuntime._renderChart2("chart-wrapper-deathdiff", barWidth, 100, jsonStr);
+
+                await Task.Delay(200);
 
                 jsonStr = forecastData.MakeBothDiffJsonData(_userData, onlyOnClick);
                 await JSRuntime._renderChart2("chart-wrapper-bothsum", barWidth, 100, jsonStr);

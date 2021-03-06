@@ -277,7 +277,8 @@ namespace ChartBlazorApp.Models
                             if (PostDecayFactorRt2 > 0) {
                                 if ((idx + 1 >= realDays && rt == tgtRt2) || (idx >= realDays + 9)) {
                                     ph3StartIdx = i;
-                                    rt3 = rt;
+                                    rt3 = rt._highLimit(2.0);
+                                    PostDecayFactorRt2 = PostDecayFactorRt2._lowLimit((rt3 - 1.0) / 20.0);
                                 }
                             }
                         } else if (rt2 < 1 && tgtRt2 < rt2 && rt < rt2) {

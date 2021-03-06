@@ -101,6 +101,14 @@ namespace ChartBlazorApp.Models
             return result != null;
         }
 
+        public static async ValueTask<int> _getScreenWidth(this IJSRuntime jsRuntime,
+            [System.Runtime.CompilerServices.CallerMemberName] string method = "",
+            [System.Runtime.CompilerServices.CallerFilePath] string path = "",
+            [System.Runtime.CompilerServices.CallerLineNumber] int linenum = 0)
+        {
+            return await jsRuntime._invokeAsyncInt(callerLoc(method, path, linenum), "getScreenWidth", Constants.SETTINGS_KEY);
+        }
+
         public static async ValueTask<string> _invokeAsync(this IJSRuntime jsRuntime, string caller, string funcname, params object[] args)
         {
             try {
@@ -108,6 +116,16 @@ namespace ChartBlazorApp.Models
             } catch (Exception e) {
                 ConsoleLog.ERROR($"[JSRuntime.InvokeAsync({funcname})] {e}", caller);
                 return null;
+            }
+        }
+
+        public static async ValueTask<int> _invokeAsyncInt(this IJSRuntime jsRuntime, string caller, string funcname, params object[] args)
+        {
+            try {
+                return await jsRuntime.InvokeAsync<int>(funcname, args);
+            } catch (Exception e) {
+                ConsoleLog.ERROR($"[JSRuntime.InvokeAsync({funcname})] {e}", caller);
+                return 0;
             }
         }
 

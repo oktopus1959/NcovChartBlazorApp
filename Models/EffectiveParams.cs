@@ -151,7 +151,7 @@ namespace ChartBlazorApp.Models
         public InfectData MyInfectData { get { return NthInfectData(MyDataIdx); } }
 
         // 表示開始日
-        public string DispStartDate => CurrentSettings.dispStartDate._orElse(() => DateTime.Now.AddMonths(-(6 + (DateTime.Now.Month % 3)))._toFirstInMonth()._toDateString());
+        public string DispStartDate => CurrentSettings.dispStartDate._orElse(() => Constants.AutoDispStartDate._toDateString());
 
         public void SetDispStartDate(string value) { CurrentSettings.dispStartDate = value; }
 
@@ -183,7 +183,9 @@ namespace ChartBlazorApp.Models
 
         public double YAxisMax { get { var res = CurrentSettings.myYAxisMax(); return res > 0 ? res : 0; } }
 
-        public double YAxisMin { get { return CurrentSettings.yAxisMin; } }
+        public double YAxisFixed { get { return CurrentSettings.yAxisFixed._gtZeroOr(1000); } }
+
+        public double YAxis2SeriousFixed { get { return CurrentSettings.yAxis2SeriousFixed; } }
 
         public double YAxis2Max { get { var res = CurrentSettings.myYAxis2Max(); return res > 0 ? res : 0; } }
 
@@ -195,6 +197,8 @@ namespace ChartBlazorApp.Models
 
         public bool DrawPosiRates { get { return CurrentSettings.drawPosiRates; } }
         public bool PosiRatePercent { get { return CurrentSettings.posiRatePercent; } }
+
+        public bool DrawDistPositives { get { return CurrentSettings.drawDistPositives; } }
 
         public bool DetailSettings { get { return CurrentSettings.detailSettings; } }
 
@@ -257,6 +261,11 @@ namespace ChartBlazorApp.Models
         {
             var evt = CurrentSettings.myEvents(idx);
             if (evt._notEmpty()) return evt;
+            return NthInfectData(idx).Events;
+        }
+
+        public string getSystemEvents(int idx = -1)
+        {
             return NthInfectData(idx).Events;
         }
 

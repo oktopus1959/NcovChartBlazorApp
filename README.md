@@ -16,7 +16,7 @@ https://ncov.oktopus59.net/forecast/
 ## データソース
 - 日本全国の陽性者数、COVID-19 重症者数・死亡者数については、[厚生労働省のオープンデータ](https://www.mhlw.go.jp/stf/covid-19/open-data.html)
 - 各都道府県の陽性者数については、厚生労働省の「[発生状況](https://www.mhlw.go.jp/stf/seisakunitsuite/bunya/0000121431_00086.html)」ページからたどれる
-「国内における都道府県別のPCR検査陽性者数」PDF資料（[例](https://www.mhlw.go.jp/content/10906000/000721149.pdf)）。
+【別紙１】「各都道府県の検査陽性者の状況（空港・海港検疫、チャーター便案件を除く国内事例）」PDF資料（[例](https://www.mhlw.go.jp/content/10906000/000747891.pdf)）。
 
 ## ビルド方法など
 ビルドには .NET Core 3.1 が必要になります。

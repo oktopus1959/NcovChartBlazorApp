@@ -24,11 +24,15 @@ namespace ChartBlazorApp.Models
 
         public double[] Newly { get; set; }
 
+        public double[] DistNewly { get; set; }
+
         public double[] Average { get; set; }
 
         public double[] PosiRates { get; set; }
 
         public double[] Rt { get; set; }
+
+        public double[] Serious { get; set; }
 
         /// <summary> イベント("日付:アノテーション,..."形式) </summary>
         public string Events { get; set; }
@@ -58,9 +62,11 @@ namespace ChartBlazorApp.Models
             if (idx > 0) {
                 data.Dates = Dates.Skip(idx).ToArray();
                 data.Newly = Newly.Skip(idx).ToArray();
+                data.DistNewly = DistNewly.Skip(idx).ToArray();
                 data.Average = Average.Skip(idx).ToArray();
                 data.PosiRates = PosiRates.Skip(idx).ToArray();
                 data.Rt = Rt.Skip(idx).ToArray();
+                data.Serious = Serious.Skip(idx).ToArray();
             }
             return data;
         }
@@ -68,9 +74,11 @@ namespace ChartBlazorApp.Models
         public static InfectData DummyData { get; } = new InfectData() {
             Dates = new DateTime[] { DateTime.Now._toDate() },
             Newly = new double[] { 1 },
+            DistNewly = new double[] { 1 },
             Average = new double[] { 1 },
             PosiRates = new double[] { 1 },
             Rt = new double[] { 1 },
+            Serious = new double[] { 1 },
             InitialDecayParam = new RtDecayParam(),
             InitialSubParams = new SubParams() { StartDate = "2020/12/1" },
         };
@@ -807,8 +815,14 @@ namespace ChartBlazorApp.Models
             }
         }
 
+        /// <summary>
+        /// 按分する
+        /// </summary>
+        /// <param name="total"></param>
+        /// <returns></returns>
         private double[] adjustTotal(double[] total)
         {
+            const int distMin = 11;
             double[] adjTotal = new double[total.Length];
             Array.Copy(total, adjTotal, total.Length);
             int emptyIdx = -1;
@@ -818,7 +832,7 @@ namespace ChartBlazorApp.Models
                     if (emptyIdx >= 0) {
                         double prevVal = adjTotal._nth(emptyIdx - 1) - adjTotal._nth(emptyIdx - 2);
                         int num = i - emptyIdx + 1;
-                        if (((newVal >= 40 || prevVal >= 40) && num <= 5) || newVal >= num * 10 || prevVal >= num * 10) {
+                        if (((newVal >= distMin || prevVal >= distMin) && num <= 5) || newVal >= num * 10 || prevVal >= num * 10) {
                             double delta;
                             int k, m;
                             if (prevVal > newVal) {
@@ -895,14 +909,24 @@ namespace ChartBlazorApp.Models
             double testCumu(int i) => _testCumu._nth(i + predatanum);
             double newly(int i) => total(i) - total(i - 1);
             DateTime[] dates = _dates[predatanum..];
-            double[] newlies = (_total.Length - predatanum)._range().Select(i => newly(i)).ToArray();
+            double[] newlies = dates.Length._range().Select(i => newly(i)).ToArray();
+            if (ConsoleLog.DEBUG_FLAG) {
+                foreach ((int i, double p) in newlies._enumerate()) {
+                    if (p < 0) {
+                        logger.Warn($"Negative number: {Title}: {_dates._nth(predatanum + i)._toDateString()}: {p}");
+                    }
+                }
+            }
             double[] posiRates = new double[_testCumu.Length - predatanum];
             int prevIdx = -7;
             foreach (int i in posiRates.Length._range()) {
                 if (testCumu(i) > testCumu(i - 1)) {
                     posiRates[i] = ((total(i) - total(prevIdx)) / (testCumu(i) - testCumu(prevIdx)))._gtZeroOr(0.000001);
                     if (posiRates[i] > 1.0) {
-                        logger.Warn($"{Title}: {_dates._nth(i)._toDateString()}: posiRates[{i}]={posiRates[i]:f3}; {i - prevIdx} days total={total(i) - total(prevIdx)}, {i - prevIdx} days tests={testCumu(i) - testCumu(prevIdx)}");
+                        if (ConsoleLog.DEBUG_FLAG) {
+                            logger.Warn($"{Title}: {_dates._nth(predatanum + i)._toDateString()}: posiRates[{i}]={posiRates[i]:f3}; {i - prevIdx} days total={total(i) - total(prevIdx)}, {i - prevIdx} days tests={testCumu(i) - testCumu(prevIdx)}");
+                        }
+                        posiRates[i] = i > 0 ? posiRates[i - 1] : 1.0;
                     }
                 } else {
                     posiRates[i] = i > 0 ? posiRates[i-1] : 0;
@@ -911,23 +935,33 @@ namespace ChartBlazorApp.Models
             }
             double[] adjustedTotal = adjustTotal(_total);
             double adjTotal(int i) => adjustedTotal._nth(i + predatanum);
+            double distNewly(int i) => adjTotal(i) - adjTotal(i - 1);
+            double[] distNewlies = dates.Length._range().Select(i => distNewly(i)).ToArray();
             //double weekly(int i) => total(i) - total(i - 7);
             double weekly(int i) => adjTotal(i) - adjTotal(i - 7);
             double average(int i) => weekly(i) / 7;
-            double[] averages = (_total.Length - predatanum)._range().Select(i => average(i)).ToArray();
+            double[] averages = dates.Length._range().Select(i => average(i)).ToArray();
             double rt(int i) { double w7 = weekly(i - 7); return w7 > 0 ? Math.Pow(weekly(i) / w7, 5.0 / 7.0) : 0.0; };
-            var rts = (_total.Length - predatanum)._range().Select(i => rt(i)).ToArray();
+            var rts = dates.Length._range().Select(i => rt(i)).ToArray();
+
+            int effectLen = dates.Length;
+            while (effectLen > 0 && newlies[effectLen-1] <= 0) {
+                if (averages[effectLen - 1] < 10) break;
+                --effectLen;
+            }
             //以下を有効にしてしまうと、システム既定基準日とシステム既定検出遡及日による基準日との区別ができなくなってしまう。
             //if (DecayParam.StartDate._notValid()) DecayParam.StartDate = dates[0].AddDays(InfectData.FindRecentMaxIndex(rts));
             var infectData = new InfectData {
                 Title = Title,
                 KeyName = KeyName,
                 Events = Events,
-                Dates = dates,
-                Newly = newlies,
-                Average = averages,
-                PosiRates = posiRates,
-                Rt = rts,
+                Dates = dates[0..effectLen],
+                Newly = newlies[0..effectLen],
+                DistNewly = distNewlies[0..effectLen],
+                Average = averages[0..effectLen],
+                PosiRates = posiRates.Take(effectLen).ToArray(),
+                Rt = rts[0..effectLen],
+                Serious = new double[effectLen],
                 InitialDecayParam = DecayParam,
                 PrefData = this,
             };
