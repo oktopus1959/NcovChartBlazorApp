@@ -194,6 +194,7 @@ DEATH_SERIOUS_PARAM=Data/death_and_serious.txt
 DEATH_SERIOUS_TARGET=$CSVDIR/death_and_serious.csv
 CHART_SCALES_PARAM=Data/other_chart_scales.txt
 MULTI_STEP_EXPECT_PARAM=Data/multi_step_expect_params.txt
+MHLW_LIKE_SERIOUS=Data/pref_serious_ex.txt
 
 PREF_SERIOUS_TARGET=$CSVDIR/pref_serious.csv
 
@@ -279,6 +280,14 @@ RUN_CMD -m "rm -f ${DEATH_TOTAL_WORK}.tmp ${SEVERE_DAILY_WORK}.tmp"
 
 for x in Data/*_rate.txt $CHART_SCALES_PARAM $MULTI_STEP_EXPECT_PARAM; do
     RUN_CMD -m "cp -p $x $CSVDIR/$(basename ${x/.txt/.csv})"
+done
+
+# 国基準の重症者数
+TOKYO_WORKDIR=$WORKDIR/tokyo
+MHLW_LIKE_SERIOUS_CSV=$CSVDIR/$(basename ${MHLW_LIKE_SERIOUS/.txt/.csv})
+RUN_CMD -m "cp -p $MHLW_LIKE_SERIOUS $MHLW_LIKE_SERIOUS_CSV"
+for x in $TOKYO_WORKDIR/kuni_serious_*.txt; do
+    RUN_CMD -fm "cat $x >> $MHLW_LIKE_SERIOUS_CSV"
 done
 
 # 重症者数
