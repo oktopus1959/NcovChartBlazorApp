@@ -196,6 +196,7 @@ CHART_SCALES_PARAM=Data/other_chart_scales.txt
 MULTI_STEP_EXPECT_PARAM=Data/multi_step_expect_params.txt
 MHLW_LIKE_SERIOUS=Data/pref_serious_ex.txt
 
+PREF_SERIOUS_PARAM=Data/pref_serious.txt
 PREF_SERIOUS_TARGET=$CSVDIR/pref_serious.csv
 
 INFECT_AGES_FILE=infect_by_ages.txt
@@ -293,6 +294,7 @@ done
 # 重症者数
 RUN_CMD -fm "sed -ne '/^2020.9.1,/,$ s/,/,全国,/p' $SEVERE_DAILY_WORK > $PREF_SERIOUS_TARGET"
 RUN_CMD -fm "cat $PREF_SERIOUS_WORK >> $PREF_SERIOUS_TARGET"
+[ -f "$PREF_SERIOUS_PARAM" ] && RUN_CMD -fm "cat $PREF_SERIOUS_PARAM >> $PREF_SERIOUS_TARGET"
 
 # 年代別陽性者数
 RUN_CMD -fm "cp -p Data/$INFECT_AGES_FILE $CSVDIR/${INFECT_AGES_FILE/.txt/.csv}"
