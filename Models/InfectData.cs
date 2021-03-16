@@ -24,6 +24,7 @@ namespace ChartBlazorApp.Models
 
         public double[] Newly { get; set; }
 
+        /// <summary>欠損日を按分補完した陽性者数の列</summary>
         public double[] DistNewly { get; set; }
 
         public double[] Average { get; set; }
@@ -33,6 +34,10 @@ namespace ChartBlazorApp.Models
         public double[] Rt { get; set; }
 
         public double[] Serious { get; set; }
+
+        public double[] SeriousEx { get; set; }
+
+        public double Stage3Threshold { get; set; }
 
         /// <summary> イベント("日付:アノテーション,..."形式) </summary>
         public string Events { get; set; }
@@ -67,6 +72,7 @@ namespace ChartBlazorApp.Models
                 data.PosiRates = PosiRates.Skip(idx).ToArray();
                 data.Rt = Rt.Skip(idx).ToArray();
                 data.Serious = Serious.Skip(idx).ToArray();
+                data.SeriousEx = SeriousEx.Skip(idx).ToArray();
             }
             return data;
         }
@@ -79,6 +85,7 @@ namespace ChartBlazorApp.Models
             PosiRates = new double[] { 1 },
             Rt = new double[] { 1 },
             Serious = new double[] { 1 },
+            SeriousEx = new double[] { 1 },
             InitialDecayParam = new RtDecayParam(),
             InitialSubParams = new SubParams() { StartDate = "2020/12/1" },
         };
@@ -962,6 +969,7 @@ namespace ChartBlazorApp.Models
                 PosiRates = posiRates.Take(effectLen).ToArray(),
                 Rt = rts[0..effectLen],
                 Serious = new double[effectLen],
+                SeriousEx = new double[effectLen],
                 InitialDecayParam = DecayParam,
                 PrefData = this,
             };

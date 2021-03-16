@@ -40,7 +40,7 @@ namespace ChartBlazorApp.Models
         public int estimatedBarMinWidth { get; set; }
         public bool drawPosiRates { get; set; }
         public bool posiRatePercent { get; set; }
-        public bool drawDistPositives { get; set; }
+        public bool drawComplements { get; set; }
         public bool detailSettings { get; set; }
         public bool fourstepSettings { get; set; }
         public bool onlyOnClick { get; set; }
@@ -148,7 +148,7 @@ namespace ChartBlazorApp.Models
             estimatedBarMinWidth = 0;
             drawPosiRates = false;
             posiRatePercent = false;
-            drawDistPositives = false;
+            drawComplements = false;
             detailSettings = false;
             fourstepSettings = false;
             onlyOnClick = false;
@@ -237,7 +237,7 @@ namespace ChartBlazorApp.Models
                 } else {
                     logger.Error($"settings read failed.\n{e}");
                 }
-                logger.Info($"Use initail settings instead.");
+                logger.Info($"Use initial settings instead.");
                 return (new UserSettings().SetJsRuntime(jsRuntime)).Initialize(numData);
             }
         }
@@ -479,9 +479,9 @@ namespace ChartBlazorApp.Models
         {
             drawPosiRates = value;
         }
-        public void setDrawDistPositives(bool value)
+        public void setDrawComplements(bool value)
         {
-            drawDistPositives = value;
+            drawComplements = value;
         }
         public void setDetailSettings(bool value)
         {
@@ -628,33 +628,103 @@ namespace ChartBlazorApp.Models
             if (events.Length > dataIdx) events[dataIdx] = value;
         }
 
-        public void saveRtMultiParams()
+        public const int MULTI_PARAMS_SAVE_NUM = 5;
+
+        public static string[] multiSettingsItemNames = new string[] { "初期設定", "保存先1", "保存先2", "保存先3", "保存先4", "作業中" };
+
+        public int getMultiSettingsIdx()
+        {
+            var items = paramRtMultiSave._nth(dataIdx)._split('|');
+            return (items._length() < 2) ? -999 : items[0]._parseInt(-999);
+        }
+
+        public void setMultiSettingsIdx(int n)
         {
             if (paramRtMultiSave.Length > dataIdx) {
-                paramRtMultiSave[dataIdx] = $"{paramRtStartDateFourstep._nth(dataIdx)}," +
-                    $"{paramRtDaysToRt1._nth(dataIdx)},{paramRtRt1._nth(dataIdx):f3},{paramRtDaysToRt2._nth(dataIdx)},{paramRtRt2._nth(dataIdx):f3}," +
-                    $"{paramRtDaysToRt3._nth(dataIdx)},{paramRtRt3._nth(dataIdx):f3},{paramRtDaysToRt4._nth(dataIdx)},{paramRtRt4._nth(dataIdx):f3}," +
-                    $"{paramRtDaysToRt5._nth(dataIdx)},{paramRtRt5._nth(dataIdx):f3},{paramRtDaysToRt6._nth(dataIdx)},{paramRtRt6._nth(dataIdx):f3}";
+                string values = paramRtMultiSave._nth(dataIdx)._split('|')[^1];
+                paramRtMultiSave[dataIdx] = $"{n}|{values}";
             }
         }
 
-        public void loadRtMultiParams()
+        public void saveRtMultiParams(int n = MULTI_PARAMS_SAVE_NUM)
         {
-            var items = paramRtMultiSave._nth(dataIdx)._split(',');
-            int idx = 0;
-            setParamStartDateFourstep(items._nth(idx++));
-            setParamDaysToRt1(items._nth(idx++)._parseInt(0));
-            setParamRt1(items._nth(idx++)._parseDouble(1));
-            setParamDaysToRt2(items._nth(idx++)._parseInt(0));
-            setParamRt2(items._nth(idx++)._parseDouble(1));
-            setParamDaysToRt3(items._nth(idx++)._parseInt(0));
-            setParamRt3(items._nth(idx++)._parseDouble(1));
-            setParamDaysToRt4(items._nth(idx++)._parseInt(0));
-            setParamRt4(items._nth(idx++)._parseDouble(1));
-            setParamDaysToRt5(items._nth(idx++)._parseInt(0));
-            setParamRt5(items._nth(idx++)._parseDouble(1));
-            setParamDaysToRt6(items._nth(idx++)._parseInt(0));
-            setParamRt6(items._nth(idx++)._parseDouble(1));
+            if (paramRtMultiSave.Length > dataIdx && n > 0 && n <= MULTI_PARAMS_SAVE_NUM) {
+                int idx = getMultiSettingsIdx();
+                string[] items = getMultiSettingsItems();
+                --n;
+                items[n] = serializeMultiSettings();
+                paramRtMultiSave[dataIdx] = $"{idx}|{items._join(";")}";
+            }
+        }
+
+        public void loadRtMultiParams(int n = MULTI_PARAMS_SAVE_NUM)
+        {
+            if (n == 0) {
+                clearRtMultiParams();
+            } else {
+                --n;
+                var items = getMultiSettingsItems()._nth(n)._split(',');
+                int idx = 0;
+                setParamStartDateFourstep(items._nth(idx++));
+                setParamDaysToRt1(items._nth(idx++)._parseInt(0));
+                setParamRt1(items._nth(idx++)._parseDouble(0));
+                setParamDaysToRt2(items._nth(idx++)._parseInt(0));
+                setParamRt2(items._nth(idx++)._parseDouble(0));
+                setParamDaysToRt3(items._nth(idx++)._parseInt(0));
+                setParamRt3(items._nth(idx++)._parseDouble(0));
+                setParamDaysToRt4(items._nth(idx++)._parseInt(0));
+                setParamRt4(items._nth(idx++)._parseDouble(0));
+                setParamDaysToRt5(items._nth(idx++)._parseInt(0));
+                setParamRt5(items._nth(idx++)._parseDouble(0));
+                setParamDaysToRt6(items._nth(idx++)._parseInt(0));
+                setParamRt6(items._nth(idx++)._parseDouble(0));
+            }
+        }
+
+        private static string INITIAL_SERIALIZED = ",0,0.000,0,0.000,0,0.000,0,0.000,0,0.000,0,0.000";
+
+        public void clearRtMultiParams()
+        {
+            setParamStartDateFourstep("");
+            setParamDaysToRt1(0);
+            setParamRt1(0);
+            setParamDaysToRt2(0);
+            setParamRt2(0);
+            setParamDaysToRt3(0);
+            setParamRt3(0);
+            setParamDaysToRt4(0);
+            setParamRt4(0);
+            setParamDaysToRt5(0);
+            setParamRt5(0);
+            setParamDaysToRt6(0);
+            setParamRt6(0);
+        }
+
+        public int findCurrentMultiSettings(int checkFirst = -1)
+        {
+            string serialized = serializeMultiSettings();
+            bool isInitial = serialized._equalsTo(INITIAL_SERIALIZED);
+            if (checkFirst == 0 && isInitial) return 0;
+
+            string[] items = getMultiSettingsItems();
+            if (checkFirst > 0 && (serialized._equalsTo(items._nth(checkFirst - 1)) || (isInitial && items._nth(checkFirst-1)._isEmpty()))) return checkFirst;
+
+            if (isInitial) return 0;
+            int idx = items._findIndex(serialized);
+            return idx >= 0 ? idx + 1 : -1;
+        }
+
+        private string[] getMultiSettingsItems()
+        {
+            return  paramRtMultiSave._nth(dataIdx)._split('|')[^1]._split(';')._extend(MULTI_PARAMS_SAVE_NUM, "");
+        }
+
+        public string serializeMultiSettings()
+        {
+            return $"{paramRtStartDateFourstep._nth(dataIdx)._reReplace("/0", "")}," +
+                $"{paramRtDaysToRt1._nth(dataIdx)},{paramRtRt1._nth(dataIdx):f3},{paramRtDaysToRt2._nth(dataIdx)},{paramRtRt2._nth(dataIdx):f3}," +
+                $"{paramRtDaysToRt3._nth(dataIdx)},{paramRtRt3._nth(dataIdx):f3},{paramRtDaysToRt4._nth(dataIdx)},{paramRtRt4._nth(dataIdx):f3}," +
+                $"{paramRtDaysToRt5._nth(dataIdx)},{paramRtRt5._nth(dataIdx):f3},{paramRtDaysToRt6._nth(dataIdx)},{paramRtRt6._nth(dataIdx):f3}";
         }
     }
 

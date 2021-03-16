@@ -74,6 +74,7 @@ namespace ChartBlazorApp.Models
                         _lastFileDt = fileInfo.ModifyDt;
                         _infectDataList = loadPrefectureData(readFile(filePath), lastRealDt);
                         loadPrefSerious();
+                        loadPrefSeriousEx();
                         loadMultiStepExpectParams();
                         LastUpdateDt = _lastInitializedDt;
                         logger.Info($"prev Initialized at {prevDt}, Reload:{filePath}");
@@ -116,7 +117,7 @@ namespace ChartBlazorApp.Models
                     prefOrder.AddRange(items[1..]);
                 } else if (items[0]._startsWith("#reload")) {
                     ReloadMagicNumber = items[1]._parseInt(9999);
-                    logger.Info($"\nReloadMagicNumber: {ReloadMagicNumber}");
+                    logger.Debug($"ReloadMagicNumber: {ReloadMagicNumber}");
                 } else if (items[0]._startsWith("#params")) {
                     var data = getOrNewData(items, false);
                     if (data != null) {
@@ -183,7 +184,7 @@ namespace ChartBlazorApp.Models
             }
             foreach (var line in readFile("Data/csv/pref_serious.csv")) {
                 var items = line.Trim().Split(',');
-                if (items._length() >= 3) {
+                if (items._length() >= 3 && items[0][0] != '#') {
                     var infData = dict._safeGet(items[1]);
                     if (infData != null) {
                         int idx = (items[0]._parseDateTime() - infData.Dates._first()).Days;
@@ -193,6 +194,36 @@ namespace ChartBlazorApp.Models
             }
             foreach (var infData in _infectDataList) {
                 if (infData.Serious[^1] == -1) infData.Serious = infData.Serious.Take(infData.Serious.Length - 1).ToArray();
+            }
+        }
+
+        private void loadPrefSeriousEx()
+        {
+            if (_infectDataList._isEmpty()) return;
+
+            Dictionary<string, InfectData> dict = new Dictionary<string, InfectData>();
+            foreach (var infData in _infectDataList) {
+                dict[infData.Title] = infData;
+                infData.SeriousEx = new double[infData.Dates.Length];
+                infData.SeriousEx[^1] = -1;
+            }
+
+            foreach (var line in readFile("Data/csv/pref_serious_ex.csv")) {
+                var items = line.Trim().Split(',');
+                if (items._length() >= 3) {
+                    var infData = dict._safeGet(items[1]);
+                    if (infData != null) {
+                        if (items[0].StartsWith("#stage3")) {
+                            infData.Stage3Threshold = items[2]._parseDouble(0);
+                        } else if (items[0][0] != '#') {
+                            int idx = (items[0]._parseDateTime() - infData.Dates._first()).Days;
+                            if (idx >= 0 && idx < infData.SeriousEx.Length) infData.SeriousEx[idx] = items[2]._parseInt(0);
+                        }
+                    }
+                }
+            }
+            foreach (var infData in _infectDataList) {
+                if (infData.SeriousEx[^1] == -1) infData.SeriousEx = infData.SeriousEx.Take(infData.SeriousEx.Length - 1).ToArray();
             }
         }
 
@@ -213,6 +244,14 @@ namespace ChartBlazorApp.Models
             public int DaysToRt6;
             public double Rt6;
             public string Events;
+
+            public string SerializeMultiParams()
+            {
+            return $"{StartDate._reReplace("/0", "")}," +
+                $"{DaysToRt1},{Rt1:f3},{DaysToRt2},{Rt2:f3}," +
+                $"{DaysToRt3},{Rt3:f3},{DaysToRt4},{Rt4:f3}," +
+                $"{DaysToRt5},{Rt5:f3},{DaysToRt6},{Rt6:f3}";
+            }
         }
 
         public static Dictionary<string, List<ExpectdMultiStepParam>> ExpectedMultiStepParams { get; private set; } = new Dictionary<string, List<ExpectdMultiStepParam>>();
@@ -222,7 +261,7 @@ namespace ChartBlazorApp.Models
         /// </summary>
         private void loadMultiStepExpectParams()
         {
-            logger.Info("CALLED");
+            logger.Debug("CALLED");
             ExpectedMultiStepParams = new Dictionary<string, List<ExpectdMultiStepParam>>();
             foreach (var items in readFile(Constants.EXPECT_FILE_PATH).
                 Select(line => line.Trim()._reReplace(" *", "")._reReplace(",#.*", "").Split(',')).

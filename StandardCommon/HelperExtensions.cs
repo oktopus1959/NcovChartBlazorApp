@@ -198,6 +198,16 @@ namespace StandardCommon
         }
 
         /// <summary>
+        ///  val が Nan でなければ val を、Nan なら valid を返す
+        /// </summary>
+        /// <param name="val"></param>
+        /// <returns></returns>
+        public static double _toValid(this double val, double valid)
+        {
+            return val._isNaN() ? valid : val;
+        }
+
+        /// <summary>
         ///  val が ERROR_INT_VAL でなければ true を返す
         /// </summary>
         /// <param name="val"></param>

@@ -159,6 +159,15 @@ hr.narrow {
     display: none;
 }
 
+div.inline-block {
+    display: inline-block;
+}
+
+textarea.multistep {
+    margin: 4px;
+    margin-bottom: 0px;
+}
+
 .inline-wrapper {
     display: inline-block;
     margin-top: 4px;
@@ -238,15 +247,18 @@ table {
 @media (min-width: 0px) {
     div.inline-wrapper-narrow { margin-right: 4px; }
     div.inline-or-block { display: block; margin-top: 4px; }
-    div.resp-inline-block { display: block; max-width: 100%; }
+    div.twin-inline-block { display: block; max-width: 100%; }
     div.resp-right { margin-top: 18px; margin-left: 0px; }
     div.resp-right-2 { margin-top: 10px; margin-left: 0px; }
-    div.table-block { margin-right: 0px; }
-    div.tbl-scroll { overflow-x: scroll; }
-    div.br-middle-width { display: none; }
     div.inline-wrapper-ge-500 { display: none; }
     div.inline-wrapper-lt-1000 { display: inline-block; }
     div.inline-wrapper-ge-1000 { display: none; }
+    div.inline-wrapper-lt-twin { display: inline-block; }
+    div.inline-wrapper-ge-twin { display: none; }
+
+    div.table-block { margin-right: 0px; }
+    div.tbl-scroll { overflow-x: scroll; }
+    div.br-middle-width { display: none; }
     .resp-font-size { font-size: small; }
 
     .position-right-responsive {
@@ -338,6 +350,12 @@ table {
     div.tbl-scroll { overflow-x: initial; }
     div.table { max-width: 780px; }
     div.table-block { margin-right: 20px; }
+
+    div.twin-inline-block { display: inline-block; max-width: 48%; }
+    div.resp-right { margin-top: 0px; margin-left: 20px; }
+    div.resp-right-2 { margin-top: 0px; margin-left: 20px; }
+    div.inline-wrapper-lt-twin { display: none; }
+    div.inline-wrapper-ge-twin { display: inline-block; }
 }
 
 @media (min-width: 850px) {
@@ -349,9 +367,11 @@ table {
 }
 
 @media (min-width: 1000px) {
-    div.resp-inline-block { display: inline-block; max-width: 48%; }
+    div.twin-inline-block { display: inline-block; max-width: 48%; }
     div.resp-right { margin-top: 0px; margin-left: 20px; }
     div.resp-right-2 { margin-top: 0px; margin-left: 20px; }
+    div.inline-wrapper-lt-twin { display: none; }
+    div.inline-wrapper-ge-twin { display: inline-block; }
     div.inline-wrapper-lt-1000 { display: none; }
     div.inline-wrapper-ge-1000 { display: inline-block; }
 }

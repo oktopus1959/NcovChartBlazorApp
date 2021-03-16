@@ -198,7 +198,7 @@ namespace ChartBlazorApp.Models
         public bool DrawPosiRates { get { return CurrentSettings.drawPosiRates; } }
         public bool PosiRatePercent { get { return CurrentSettings.posiRatePercent; } }
 
-        public bool DrawDistPositives { get { return CurrentSettings.drawDistPositives; } }
+        public bool DrawComplements { get { return CurrentSettings.drawComplements; } }
 
         public bool DetailSettings { get { return CurrentSettings.detailSettings; } }
 

@@ -274,7 +274,7 @@ namespace ChartBlazorApp.Models
                     SeriousRatesByAges = loadRatesFile(Constants.SERIOUS_RATE_FILE_PATH, 10);   // 重症化率CSVのロード
                     RecoverRates = loadRatesFile(Constants.RECOVER_RATE_FILE_PATH, 2);          // 改善率CSVのロード
                     loadOtherChartScales();
-                    logger.Info($"prev Initialized at {prevDt}, Files reloaded\n");
+                    logger.Info($"prev Initialized at {prevDt}, Files reloaded");
                 } catch (Exception e) {
                     logger.Error(e.ToString());
                 }
@@ -315,7 +315,7 @@ namespace ChartBlazorApp.Models
                         var dt = items[1]._parseDateTime();
                         if (dt._isValid()) nextStartDate = dt.AddDays(1);
                     } else if (items[0]._startsWith("#keyvalue")) {
-                        logger.Info($"KeyValues: {items._join(",")}");
+                        logger.Debug($"KeyValues: {items._join(",")}");
                         keyValues = items[1..].Select(x => x._split('=')).ToDictionary(p => p._first(), p => p._second());
                     }
                     continue;

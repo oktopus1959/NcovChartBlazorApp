@@ -321,6 +321,10 @@ function ChartDrawer(wrapperId) {
                     var value = dataset.data[item.index];
                     var suffix = "";
                     var oldLabel = dataset.label;
+                    if (oldLabel.match(/重症者数.*国基準/)) {
+                        var diffVal = data.datasets[item.datasetIndex - 1].data[item.index];
+                        if (diffVal) value += diffVal;
+                    }
                     var newLabel = oldLabel.replace("x10", "");
                     if (newLabel != oldLabel) {
                         value = Math.round(value * 100) / 10;
@@ -334,7 +338,8 @@ function ChartDrawer(wrapperId) {
                     return newLabel.replace("陽性者数移動平均", "平均陽性者数").
                         replace("近似実効再生産数", "近似再生産数").
                         replace("逆算Rt", "逆算再生産数").
-                        replace("(右軸)", "").replace(/代$/, "代　　").replace(/実数$/, "実数　") + ": " + value + suffix;
+                        replace("(右軸)", "").replace(":右軸)", ")").
+                        replace(/代$/, "代　　").replace(/実数$/, "実数　") + ": " + value + suffix;
                 }
                 return "";
             }

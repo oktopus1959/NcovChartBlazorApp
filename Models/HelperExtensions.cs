@@ -42,13 +42,13 @@ namespace ChartBlazorApp.Models
             return dtStr._toFullDateStr()._parseDateTime().ToString("MM/dd");
         }
 
-        public static async Task _renderChart2(this IJSRuntime jsRuntime, string chartId, int barWidth, double scrollRatio, string jsonStr,
+        public static async ValueTask<bool> _renderChart2(this IJSRuntime jsRuntime, string chartId, int barWidth, double scrollRatio, string jsonStr,
             [System.Runtime.CompilerServices.CallerMemberName] string method = "",
             [System.Runtime.CompilerServices.CallerFilePath] string path = "",
             [System.Runtime.CompilerServices.CallerLineNumber] int linenum = 0)
         {
             logger.Debug(() => $"renderChart2: json len={jsonStr.Length}");
-            await jsRuntime._invokeAsyncEx(callerLoc(method, path, linenum), "renderChart2", chartId, barWidth, scrollRatio, jsonStr);
+            return await jsRuntime._invokeAsyncEx(callerLoc(method, path, linenum), "renderChart2", chartId, barWidth, scrollRatio, jsonStr);
         }
 
         public static async Task _insertHtmlFile(this IJSRuntime jsRuntime, string htmlPath, string divId,
@@ -89,7 +89,7 @@ namespace ChartBlazorApp.Models
             [System.Runtime.CompilerServices.CallerFilePath] string path = "",
             [System.Runtime.CompilerServices.CallerLineNumber] int linenum = 0)
         {
-            return await jsRuntime._invokeAsync(callerLoc(method, path, linenum), "getLocalStorage", Constants.SETTINGS_KEY);
+            return await jsRuntime._invokeAsyncString(callerLoc(method, path, linenum), "getLocalStorage", Constants.SETTINGS_KEY);
         }
 
         public static async ValueTask<bool> _saveSettings(this IJSRuntime jsRuntime, string jsonStr,
@@ -97,8 +97,7 @@ namespace ChartBlazorApp.Models
             [System.Runtime.CompilerServices.CallerFilePath] string path = "",
             [System.Runtime.CompilerServices.CallerLineNumber] int linenum = 0)
         {
-            var result = await jsRuntime._invokeAsync(callerLoc(method, path, linenum), "setLocalStorage", Constants.SETTINGS_KEY, jsonStr);
-            return result != null;
+            return await jsRuntime._invokeAsyncEx(callerLoc(method, path, linenum), "setLocalStorage", Constants.SETTINGS_KEY, jsonStr);
         }
 
         public static async ValueTask<int> _getScreenWidth(this IJSRuntime jsRuntime,
@@ -109,7 +108,7 @@ namespace ChartBlazorApp.Models
             return await jsRuntime._invokeAsyncInt(callerLoc(method, path, linenum), "getScreenWidth", Constants.SETTINGS_KEY);
         }
 
-        public static async ValueTask<string> _invokeAsync(this IJSRuntime jsRuntime, string caller, string funcname, params object[] args)
+        public static async ValueTask<string> _invokeAsyncString(this IJSRuntime jsRuntime, string caller, string funcname, params object[] args)
         {
             try {
                 return await jsRuntime.InvokeAsync<string>(funcname, args);
@@ -129,23 +128,26 @@ namespace ChartBlazorApp.Models
             }
         }
 
-        public static async ValueTask<string> _invokeAsyncEx(this IJSRuntime jsRuntime, string caller, string funcname, params object[] args)
+        // ERROR なら true を返す
+        public static async ValueTask<bool> _invokeAsyncEx(this IJSRuntime jsRuntime, string caller, string funcname, params object[] args)
         {
             try {
-                return await jsRuntime.InvokeAsync<string>(funcname, args);
+                await jsRuntime.InvokeAsync<string>(funcname, args);
+                return false;
             } catch (System.Threading.Tasks.TaskCanceledException e) {
                 ConsoleLog.ERROR($"[JSRuntime.InvokeAsync({funcname})] {e}", caller);
-                return null;
+                return true;
             } catch (Exception e) {
                 ConsoleLog.WARN($"[JSRuntime.InvokeAsync({funcname})] {e}", caller);
                 await Task.Delay(1000);
                 ConsoleLog.WARN($"[JSRuntime.InvokeAsync({funcname}] RETRY");
                 try {
-                    return await jsRuntime.InvokeAsync<string>(funcname, args);
+                    await jsRuntime.InvokeAsync<string>(funcname, args);
+                    return false;
                 } catch (Exception ex) {
                     ConsoleLog.ERROR($"[JSRuntime.InvokeAsync({funcname})] {ex}", caller);
                     ConsoleLog.ERROR($"RETRY ERROR. GIVE UP.", caller);
-                    return null;
+                    return true;
                 }
 
             }

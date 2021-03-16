@@ -52,7 +52,7 @@ namespace ChartBlazorApp.Pages
 
         private async Task getSettings()
         {
-            logger.Info($"CALLED");
+            logger.Debug($"CALLED");
             _effectiveParams = await EffectiveParams.CreateByGettingUserSettings(JSRuntime, dailyData);
         }
 
