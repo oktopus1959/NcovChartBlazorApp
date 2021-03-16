@@ -284,10 +284,9 @@ for x in Data/*_rate.txt $CHART_SCALES_PARAM $MULTI_STEP_EXPECT_PARAM; do
 done
 
 # 国基準の重症者数
-TOKYO_WORKDIR=$WORKDIR/tokyo
 MHLW_LIKE_SERIOUS_CSV=$CSVDIR/$(basename ${MHLW_LIKE_SERIOUS/.txt/.csv})
 RUN_CMD -m "cp -p $MHLW_LIKE_SERIOUS $MHLW_LIKE_SERIOUS_CSV"
-for x in $TOKYO_WORKDIR/kuni_serious_*.txt; do
+for x in Data/tokyo_serious/kuni_serious_*.txt; do
     RUN_CMD -fm "cat $x >> $MHLW_LIKE_SERIOUS_CSV"
 done
 
